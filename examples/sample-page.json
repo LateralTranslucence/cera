@@ -1,0 +1,32 @@
+{
+  "id": "4b9a0c1e-0000-4000-8000-000000000001",
+  "contentType": "landing_page",
+  "slug": "about",
+  "title": "About",
+  "status": "published",
+  "boxes": {
+    "hero": { "title": "About us", "copy": "<p>We build things.</p>" },
+    "seo": { "description": "Who we are." },
+    "admin": {}
+  },
+  "panels": [
+    {
+      "id": "p_8f2a",
+      "type": "blocks",
+      "v": 1,
+      "data": {
+        "title": "What we do",
+        "blocks": [
+          { "_id": "b1", "title": "Design", "cta": { "text": "See work", "url": "work" } },
+          { "_id": "b2", "title": "Development", "hidden": true }
+        ]
+      }
+    },
+    {
+      "id": "p_19cc",
+      "type": "text-media",
+      "v": 1,
+      "data": { "title": "Our story", "mediaAlignment": "right" }
+    }
+  ]
+}
