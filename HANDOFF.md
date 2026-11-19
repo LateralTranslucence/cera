@@ -48,7 +48,8 @@ src/
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish; sanitizes rich text)
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
-  supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage
+  supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
+                    createPageResolver (linked pages for panels' load: published-only live, working copies in preview)
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers;
                     `/admin.css` is its stylesheet, scoped under .cera-admin
 supabase/
@@ -69,6 +70,7 @@ test/
   render.test.ts    <Panels> output, hidden panels, a panel that fails to load
   metadata.test.ts  pageMetadata and JSON-LD escaping
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
+  load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
   support/db.ts     PGlite (Postgres in-process, no Docker) with Supabase's roles stubbed, and a fake supabase-js client
 ```
 
@@ -92,6 +94,7 @@ test/
 16. **Draft and live are separate.** `cera_pages` is the working copy; every save writes a `cera_page_revisions` row; the live page is the revision with `is_published`. Saving a draft never changes the live site. (The theme's "Update" went live immediately.)
 17. **Browsers never write.** No insert/update/delete grants for `anon`/`authenticated`. The app server validates with `preparePageForSave` and calls `cera_save_page` with the service role, passing the user id from a verified session; the function re-checks that the user is an admin or editor. Roles live in `app_metadata.cera_role` (`admin | editor | viewer`), which users can't set themselves. Saves use optimistic locking (`expectedVersion`).
 18. **Rich text is stored as sanitized HTML** (decided 2026-11-19), not structured JSON. Existing WordPress content is HTML, and the toolbars are small enough for an allowlist. `preparePageForSave` sanitizes every `f.html()` value (repeaters included) with `sanitize-html`: the `full` toolbar follows `wp_kses_post` minus inline styles (headings, lists, links, images over http(s), tables, `class`); `limited` follows WordPress's "teeny" toolbar (bold, italic, underline, strikethrough, blockquote, lists, links). Links allow http(s), mailto, tel and relative paths; `target="_blank"` gets `rel="noopener noreferrer"`. Anything removed becomes an `html-sanitized` warning, which never blocks a save. Panels of unknown types aren't sanitized (they aren't rendered). Rendering trusts stored HTML because of this and decision 17.
+19. **Panels load their own data on the server.** `definePanel({ load })` runs before render in `<Panels>` (in parallel with the component import); its awaited result is the component's `loaded` prop, typed from `load`'s return (`PanelPropsOf<typeof fields, Loaded>`). Panels without `load` have no `loaded` prop. Keep `load` in its own `*.load.ts` file, like the fields, so the component can import the result type. `load` gets `ctx.pages.byIds()` (a `PageResolver`) and `ctx.draft`; sites build the resolver with `createPageResolver`. On the live site it returns only published, visible pages, so a panel can't leak a draft or a hidden page; in preview it returns working copies. A failing `load` skips that panel, not the page. Linked pages carry title, URL (content type `url`, default `route`), type label, and the content type's SEO description and image.
 
 ## Pattern: keep fields in their own file
 
@@ -129,7 +132,7 @@ Builders choose `ZodOptional<S>` / `ZodDefault<S>` / `S` from the options throug
 | `cta` / `ctas` | `f.cta()` / `f.ctas()` | ✅ |
 | `icon` | `f.icon()` | ✅ (icon source still to decide) |
 | `multi_array` (+ `limit`) | `f.repeater({ fields, limit })` | ✅ |
-| `post_browser` (+ `post_types_field`) | `f.relation({ to: [...] \| { field } , limit })` | ✅ |
+| `post_browser` (+ `post_types_field`) | `f.relation({ to: [...] \| { field } , limit })` | ✅ with a page picker in the admin (search, filtered by `to`) |
 | `stats` | `stats()` | ⚠️ verify sub-fields |
 | `*_callback` types | `custom(kind, schema)` | ✅ escape hatch |
 | `accordion`, `image_link`, `image_size`, `post_type_labels`, `email`, `phone`, `radio`, `checkbox`, `button_select`, `range_slider`, `date_time`, `timezone`, `read_only`, `read_only_json`, `hidden`, `form` (relation to forms) | — | ❌ to port |
@@ -149,7 +152,8 @@ B. ✅ **Minimal admin** (`examples/next-site/app/admin`, editor in `src/admin`)
    How it works: the editor edits the raw stored page (unknown panels and keys included) and upgrades known panels to their current version on load. Saves go through a server action that takes the user id from the verified session. Preview from the admin goes through `/admin/preview` (session-checked), so the preview secret stays on the server. A content type's `editor` option places boxes: `pageBoxes` go inside the Page section (landing page: `admin`), `leadBoxes` sit just above the panels, styled like one (landing page: `hero`), and the rest get their own sections in between (`seo`).
    Still to do for the admin: drag-to-reorder (buttons for now), a media library with uploads (paths are typed by hand), a page picker for `relation`, a rich-text editor for `f.html()`, deleting pages, revision history, and client-side validation before save.
    Also still to do: replace `force-dynamic` with cached pages plus `revalidateTag` on publish.
-C. **Panel data loading.** Add an optional server-side `load(data, ctx)` to `definePanel` whose return type feeds the component's props (needed for `featured-post`'s relation and any panel that queries). Not needed by `blocks`, so it can follow A and B.
+C. ✅ **Panel data loading** (decision 19), proven with Featured Post: fields, `featured-post.load.ts` and a component ported from the theme (image optional, unlike the theme). The admin's page picker replaces pasted ids for `relation` fields: it searches pages as the signed-in user, respects `to` (fixed or a sibling field like Post Type), shows "Not published" on picks the live site won't show, and replaces the pick when `limit` is 1. Checked in a browser: the home page features About; picking Our Services and saving a draft changed only the preview.
+   Not yet: `load` results aren't cached across requests, and a linked page doesn't know which pages feature it (so unpublishing it silently empties those panels).
 D. ✅ **Sanitize `f.html()` on save** (decision 18). Checked in the admin: a script, an `onclick` and a `javascript:` link were removed on save, the editor showed the cleaned HTML with a warning under the field, and the preview rendered only the clean version. `savePage` now returns the stored page, and the editor switches to it after a save.
 
 **Then the original list:**

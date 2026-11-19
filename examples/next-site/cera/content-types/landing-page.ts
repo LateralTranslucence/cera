@@ -10,6 +10,7 @@ export const landingPage = defineContentType({
   name: 'landing_page',
   label: 'Landing Page',
   route: '/[slug]', // theme: rewrite rule '[^/]+/?$' with no post type slug
+  url: (p) => (p.slug === 'home' ? '/' : `/${p.slug}`), // the home page lives at /
 
   boxes: {
     hero: {

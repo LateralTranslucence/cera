@@ -4,7 +4,7 @@ import { pageMetadata } from '@lateraltranslucence/cera/next';
 import { landingPage } from '@/cera';
 import { LandingPageView } from '@/components/LandingPageView.tsx';
 import { mediaUrl } from '@/lib/media.ts';
-import { loadLandingPage } from '@/lib/pages.ts';
+import { loadContextFor, loadLandingPage } from '@/lib/pages.ts';
 
 // Rendered per request for now. Caching with revalidateTag on publish comes
 // with the admin.
@@ -20,5 +20,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function Page({ params }: Props) {
   const loaded = await loadLandingPage((await params).slug);
   if (!loaded) notFound();
-  return <LandingPageView page={loaded.page} />;
+  return <LandingPageView page={loaded.page} loadContext={loadContextFor(loaded.draft)} />;
 }

@@ -4,7 +4,7 @@ import { pageMetadata } from '@lateraltranslucence/cera/next';
 import { landingPage } from '@/cera';
 import { LandingPageView } from '@/components/LandingPageView.tsx';
 import { mediaUrl } from '@/lib/media.ts';
-import { loadLandingPage } from '@/lib/pages.ts';
+import { loadContextFor, loadLandingPage } from '@/lib/pages.ts';
 
 // The home page is the landing page with slug "home" (theme: DO_Landing_Page::onsave).
 export const dynamic = 'force-dynamic';
@@ -17,5 +17,5 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Home() {
   const loaded = await loadLandingPage('home');
   if (!loaded) notFound();
-  return <LandingPageView page={loaded.page} />;
+  return <LandingPageView page={loaded.page} loadContext={loadContextFor(loaded.draft)} />;
 }

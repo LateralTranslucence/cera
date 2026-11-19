@@ -11,7 +11,8 @@
  *     this user is an admin or editor.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { AnyContentType, PageOf } from '../content-type.ts';
+import { pageUrl, type AnyContentType, type PageOf } from '../content-type.ts';
+import type { LinkedPage, PageResolver } from '../panel.ts';
 import {
   preparePageForSave,
   readPage,
@@ -122,6 +123,53 @@ export async function getPageForEditing(client: SupabaseClient, ct: AnyContentTy
 
   return { page: toStored(row.id, row), version: row.version, published: live.data !== null };
 }
+
+/**
+ * Looks up linked pages for panels' `load` (e.g. Featured Post).
+ *
+ * - Live (`draft: false`): published revisions only, never hidden pages, so a
+ *   panel can't leak a draft or an unpublished page. Any client works.
+ * - Draft preview (`draft: true`): working copies, hidden pages included.
+ *   Needs a client that can read them (a staff user, or the secret key on the
+ *   server behind draft mode).
+ *
+ * Pages whose content type isn't in `contentTypes` are skipped.
+ */
+export function createPageResolver(client: SupabaseClient, contentTypes: readonly AnyContentType[], opts: { draft: boolean }): PageResolver {
+  const byName = new Map(contentTypes.map((ct) => [ct.name as string, ct]));
+  return {
+    async byIds(ids) {
+      const wanted = [...new Set(ids)].filter((id) => UUID.test(id));
+      if (wanted.length === 0) return [];
+      const { data, error } = opts.draft
+        ? await client.from('cera_pages').select(`id, ${PAGE_COLUMNS}`).in('id', wanted)
+        : await client.from('cera_page_revisions').select(`page_id, ${PAGE_COLUMNS}`).in('page_id', wanted).eq('is_published', true);
+      if (error) fail(error);
+
+      const found = new Map<string, LinkedPage>();
+      for (const row of data as Array<PageRow & { id?: string; page_id?: string }>) {
+        const id = (row.page_id ?? row.id) as string;
+        const ct = byName.get(row.content_type);
+        if (!ct) continue;
+        const { page } = readPage(ct, toStored(id, row), { status: opts.draft ? 'draft' : 'published' });
+        if (!opts.draft && ct.hidden?.(page)) continue;
+        found.set(id, {
+          id,
+          contentType: ct.name,
+          contentTypeLabel: ct.label,
+          slug: page.slug,
+          title: page.title,
+          url: pageUrl(ct, page),
+          description: ct.seo?.description?.(page) || undefined,
+          image: ct.seo?.image?.(page),
+        });
+      }
+      return ids.map((id) => found.get(id)).filter((p): p is LinkedPage => p !== undefined);
+    },
+  };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface PageSummary {
   id: string;

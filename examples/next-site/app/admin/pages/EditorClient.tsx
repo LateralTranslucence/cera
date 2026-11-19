@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import type { StoredPage } from '@lateraltranslucence/cera';
 import { PageEditor } from '@lateraltranslucence/cera/admin';
 import { contentTypes } from '@/cera';
-import { savePageAction, unpublishPageAction } from '../actions.ts';
+import { findPagesAction, savePageAction, unpublishPageAction } from '../actions.ts';
 
 export function EditorClient({
   page,
@@ -34,6 +34,7 @@ export function EditorClient({
       published={published}
       readOnly={readOnly}
       onSave={savePageAction}
+      findPages={findPagesAction}
       onUnpublish={async () => {
         await unpublishPageAction(page.id);
       }}

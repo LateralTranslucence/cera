@@ -3,7 +3,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getDraftPage, getPageForEditing, getPublishedPage, listPages, savePage, unpublishPage } from '../src/supabase/index.ts';
+import { createPageResolver, getDraftPage, getPageForEditing, getPublishedPage, listPages, savePage, unpublishPage } from '../src/supabase/index.ts';
 import type { StoredPage } from '../src/index.ts';
 import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
@@ -126,4 +126,39 @@ test('listPages shows staff every working copy with its live status; anon sees n
     ],
   );
   assert.deepEqual(await listPages(anon), []);
+});
+
+test('page resolver: the live site sees only published, visible pages; preview sees working copies', async () => {
+  const live = newPage('resolver-live');
+  live.title = 'Live title';
+  live.boxes.seo = { description: 'Live description' };
+  const draftOnly = newPage('resolver-draft-only');
+  const hidden = newPage('resolver-hidden');
+  hidden.boxes.admin = { hidden: true };
+  for (const p of [live, hidden]) await savePage(server, landingPage, p, { mode: 'publish', expectedVersion: 0, userId: editor });
+  await savePage(server, landingPage, draftOnly, { mode: 'draft', expectedVersion: 0, userId: editor });
+  // An unpublished change to the live page.
+  await savePage(server, landingPage, { ...live, title: 'Draft title' }, { mode: 'draft', expectedVersion: 1, userId: editor });
+
+  const ids = [hidden.id, draftOnly.id, live.id, 'not-a-uuid'];
+
+  const publicPages = await createPageResolver(anon, [landingPage], { draft: false }).byIds(ids);
+  assert.deepEqual(publicPages, [
+    {
+      id: live.id,
+      contentType: 'landing_page',
+      contentTypeLabel: 'Landing Page',
+      slug: 'resolver-live',
+      title: 'Live title',
+      url: '/resolver-live',
+      description: 'Live description',
+      image: undefined,
+    },
+  ]);
+
+  const preview = await createPageResolver(staff, [landingPage], { draft: true }).byIds(ids);
+  assert.deepEqual(preview.map((p) => p.title), [hidden.title, draftOnly.title, 'Draft title']); // in the order asked
+
+  assert.deepEqual(await createPageResolver(anon, [], { draft: false }).byIds([live.id]), []); // unknown content type
+  assert.deepEqual(await createPageResolver(anon, [landingPage], { draft: false }).byIds([]), []);
 });

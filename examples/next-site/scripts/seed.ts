@@ -97,6 +97,13 @@ const pages: StoredPage[] = [
           mediaAlignment: 'right',
         },
       },
+      {
+        id: 'home-featured',
+        type: 'featured-post',
+        v: 1,
+        // Title, description and link come from the About page at render time (its load()).
+        data: { postTypes: ['landing_page'], post: ['00000000-0000-4000-8000-00000000c002'] },
+      },
     ],
   },
   {

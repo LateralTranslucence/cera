@@ -31,7 +31,7 @@ If saves or page loads stall for many seconds, check Docker's memory: each local
 | `app/api/draft` | Preview for external tools: `/api/draft?secret=…&slug=about` |
 | `proxy.ts` | Refreshes the admin's Supabase session cookies |
 | `lib/auth.ts` | `requireStaff(role)`: verified user + Cera role from `app_metadata.cera_role` |
-| `lib/pages.ts` | Picks the live revision or, in draft mode, the working copy; logs read issues |
+| `lib/pages.ts` | Picks the live revision or, in draft mode, the working copy; logs read issues; `loadContextFor` gives panels' `load` a page resolver (published-only live) |
 | `lib/supabase.ts` | Anonymous client (published pages only) and secret-key client (server only) |
 | `scripts/seed.ts` | Admin account and pages, saved through `savePage` like the admin does |
 
@@ -39,4 +39,4 @@ If saves or page loads stall for many seconds, check Docker's memory: each local
 
 - **Caching.** Pages render per request (`force-dynamic`); `revalidateTag` on publish is next.
 - **Media uploads.** Media fields take a path typed by hand; there is no upload flow or library yet.
-- **Admin extras.** Drag-to-reorder, a rich-text editor, a page picker for relations, deleting pages and revision history.
+- **Admin extras.** Drag-to-reorder, a rich-text editor, deleting pages and revision history.

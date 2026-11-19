@@ -28,6 +28,8 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
   label: string;
   /** Next.js-style route pattern. Theme: rewrite rules / post_type_slug. */
   route: string;
+  /** A page's public URL. Defaults to `route` with `[slug]` filled in. */
+  url?: (page: PageDocument<N, B, P>) => string;
   boxes: B;
   panels?: P;
   seo?: {
@@ -124,4 +126,9 @@ export function defineContentType<
   }) as unknown as z.ZodType<PageDocument<N, B, P>>;
 
   return { ...config, panels, pageSchema };
+}
+
+/** A page's public URL: the content type's `url`, or its `route` with `[slug]` filled in. */
+export function pageUrl<CT extends AnyContentType>(ct: CT, page: PageOf<CT>): string {
+  return ct.url ? ct.url(page) : ct.route.replace('[slug]', encodeURIComponent(page.slug));
 }

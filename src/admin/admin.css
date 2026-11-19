@@ -132,7 +132,7 @@
   .cera-field--toggle > input[type="checkbox"] { grid-column: 1; grid-row: 1; }
   .cera-field--toggle > :not(input):not(label) { grid-column: 1 / -1; }
 }
-.cera-admin input[type='text'], .cera-admin input[type='number'], .cera-admin input[type='password'], .cera-admin input[type='email'], .cera-admin input:not([type]), .cera-admin select, .cera-admin textarea {
+.cera-admin input[type='text'], .cera-admin input[type='number'], .cera-admin input[type='password'], .cera-admin input[type='email'], .cera-admin input[type='search'], .cera-admin input:not([type]), .cera-admin select, .cera-admin textarea {
   width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-bg); color: var(--cera-fg); font: inherit;
 }
 .cera-admin input:focus-visible, .cera-admin select:focus-visible, .cera-admin textarea:focus-visible, .cera-admin button:focus-visible, .cera-admin summary:focus-visible { outline: 2px solid var(--cera-accent); outline-offset: 1px; }
@@ -194,3 +194,16 @@
 
 /* Sign-in */
 .cera-login { max-width: 360px; margin: 10vh auto 0; padding: 24px; background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: var(--cera-radius); display: grid; gap: 14px; container-type: inline-size; }
+
+/* Page picker (relation fields) */
+.cera-picker { display: grid; gap: 8px; }
+.cera-picker__picked { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cera-picker__picked > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 8px 8px 12px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-bg); }
+.cera-picker__picked > li > .cera-icon-button { margin-left: auto; }
+.cera-picker__title { font-weight: 600; }
+.cera-picker__meta { color: var(--cera-muted); font-size: 0.85em; }
+.cera-picker__search { position: relative; }
+.cera-picker__results { position: absolute; z-index: 3; left: 0; right: 0; top: calc(100% + 4px); list-style: none; margin: 0; padding: 4px; max-height: 18rem; overflow: auto; background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: 6px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }
+.cera-picker__results > li.cera-note { padding: 8px; }
+.cera-picker__results button { display: grid; gap: 2px; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: none; color: var(--cera-fg); font: inherit; text-align: left; cursor: pointer; }
+.cera-picker__results button:hover, .cera-picker__results button:focus-visible { background: var(--cera-panel-head-bg); }

@@ -1,9 +1,9 @@
 import 'server-only';
 import { cache } from 'react';
 import { draftMode } from 'next/headers';
-import { getDraftPage, getPublishedPage } from '@lateraltranslucence/cera/supabase';
-import type { PageIssue } from '@lateraltranslucence/cera';
-import { landingPage } from '../cera/index.ts';
+import { createPageResolver, getDraftPage, getPublishedPage } from '@lateraltranslucence/cera/supabase';
+import type { LoadContext, PageIssue } from '@lateraltranslucence/cera';
+import { contentTypes, landingPage } from '../cera/index.ts';
 import { publicClient, serviceClient } from './supabase.ts';
 
 function logIssue(slug: string) {
@@ -27,3 +27,12 @@ export const loadLandingPage = cache(async (slug: string) => {
   if (!draft && landingPage.hidden?.(result.page)) return null;
   return { ...result, draft };
 });
+
+/**
+ * How panels' `load` looks up linked pages: published pages for visitors,
+ * working copies in draft-mode preview (behind the draft-mode cookie, so the
+ * secret key is safe to use there).
+ */
+export function loadContextFor(draft: boolean): Pick<LoadContext, 'pages' | 'draft'> {
+  return { pages: createPageResolver(draft ? serviceClient() : publicClient(), contentTypes, { draft }), draft };
+}

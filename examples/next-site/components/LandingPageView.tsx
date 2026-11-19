@@ -1,4 +1,4 @@
-import type { PageOf } from '@lateraltranslucence/cera';
+import type { LoadContext, PageOf } from '@lateraltranslucence/cera';
 import { jsonLdString, Panels } from '@lateraltranslucence/cera/next';
 import { landingPage } from '../cera/index.ts';
 import { mediaUrl } from '../lib/media.ts';
@@ -25,13 +25,13 @@ function Hero({ hero, fallbackTitle }: { hero: LandingPage['boxes']['hero']; fal
   );
 }
 
-export async function LandingPageView({ page }: { page: LandingPage }) {
+export async function LandingPageView({ page, loadContext }: { page: LandingPage; loadContext: Pick<LoadContext, 'pages' | 'draft'> }) {
   const jsonLd = jsonLdString(landingPage, page);
   return (
     <main className={page.boxes.admin.css || undefined}>
       {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />}
       <Hero hero={page.boxes.hero} fallbackTitle={page.title} />
-      <Panels contentType={landingPage} page={page} />
+      <Panels contentType={landingPage} page={page} loadContext={loadContext} />
     </main>
   );
 }

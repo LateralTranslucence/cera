@@ -36,6 +36,8 @@ export interface PageEditorProps {
   previewHref?: (slug: string) => string;
   /** Content types offered to `selectFrom` option sources. */
   contentTypes?: OptionsContext['contentTypes'];
+  /** Finds pages for `relation` fields' page picker (a server action). Without it, relations take pasted ids. */
+  findPages?: FormContext['findPages'];
   /** Viewers can look but not save. */
   readOnly?: boolean;
 }
@@ -70,6 +72,7 @@ export function PageEditor({
   onSaved,
   previewHref,
   contentTypes,
+  findPages,
   readOnly = false,
 }: PageEditorProps) {
   const [page, setPage] = useState(() => upgradeForEditing(ct, initialPage));
@@ -97,7 +100,7 @@ export function PageEditor({
     () => ({ contentTypes: contentTypes ?? [{ name: ct.name, label: ct.label, public: true }] }),
     [contentTypes, ct],
   );
-  const ctx: FormContext = { issues, options, readOnly };
+  const ctx: FormContext = { issues, options, readOnly, findPages };
 
   // Warn before leaving with unsaved changes.
   useEffect(() => {

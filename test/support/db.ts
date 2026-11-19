@@ -81,9 +81,12 @@ function toError(e: unknown): PgError {
 export function fakeSupabase(db: PGlite, role: DbRole, claims: Record<string, unknown> = {}): SupabaseClient {
   const from = (table: string) => {
     let columns = '*';
-    const filters: Array<[string, unknown]> = [];
+    // [column, value, operator]: `=` for eq, `= any` for in (value is an array).
+    const filters: Array<[string, unknown, 'eq' | 'in']> = [];
     const run = async (single: boolean) => {
-      const where = filters.length ? ` where ${filters.map(([c], i) => `${c} = $${i + 1}`).join(' and ')}` : '';
+      const where = filters.length
+        ? ` where ${filters.map(([c, , op], i) => (op === 'in' ? `${c}::text = any($${i + 1}::text[])` : `${c} = $${i + 1}`)).join(' and ')}`
+        : '';
       try {
         const rows = await queryAs(db, role, `select ${columns} from public.${table}${where}`, filters.map(([, v]) => v), claims);
         if (single && rows.length > 1) return { data: null, error: { code: 'PGRST116', message: 'multiple rows' } };
@@ -98,7 +101,11 @@ export function fakeSupabase(db: PGlite, role: DbRole, claims: Record<string, un
         return builder;
       },
       eq(column: string, value: unknown) {
-        filters.push([column, value]);
+        filters.push([column, value, 'eq']);
+        return builder;
+      },
+      in(column: string, values: unknown[]) {
+        filters.push([column, values, 'in']);
         return builder;
       },
       maybeSingle: () => run(true),

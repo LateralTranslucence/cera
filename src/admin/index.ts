@@ -4,5 +4,5 @@
  * Styles: import '@lateraltranslucence/cera/admin.css' in the admin layout.
  */
 export { PageEditor, type PageEditorProps, type SaveInput } from './PageEditor.tsx';
-export { FieldMapForm, IssueList, type FormContext } from './fields.tsx';
+export { FieldMapForm, IssueList, type FormContext, type PageOption, type PageQuery } from './fields.tsx';
 export * from './state.ts';

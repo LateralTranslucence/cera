@@ -1,6 +1,7 @@
 // Compile-time assertions (checked by `npm run typecheck`) + a trivial runtime test so node --test picks it up.
 import { test } from 'node:test';
-import type { CTA, MediaRef, PageOf, PanelData } from '../src/index.ts';
+import type { CTA, LinkedPage, MediaRef, PageOf, PanelData, PanelDefinition, PanelPropsOf } from '../src/index.ts';
+import type { blocksFields } from '../examples/next-site/cera/panels/blocks.fields.ts';
 import type { blocks } from '../examples/next-site/cera/panels/blocks.ts';
 import type { featuredPost } from '../examples/next-site/cera/panels/featured-post.ts';
 import type { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
@@ -11,6 +12,9 @@ type Expect<T extends true> = T;
 type Blocks = PanelData<typeof blocks>;
 type Featured = PanelData<typeof featuredPost>;
 type Page = PageOf<typeof landingPage>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LoadedOf<P> = P extends PanelDefinition<any, any, infer L> ? L : never;
 
 export type _tests = [
   // optional text
@@ -33,6 +37,10 @@ export type _tests = [
   Expect<Equal<Page['boxes']['admin']['schemaType'], 'WebPage' | 'AboutPage' | 'ContactPage' | 'SearchResultsPage'>>,
   // panels are a discriminated union
   Expect<Equal<Page['panels'][number]['type'], 'blocks' | 'featured-post' | 'text-media'>>,
+  // load(): its awaited result is inferred and becomes the component's `loaded` prop
+  Expect<Equal<LoadedOf<typeof featuredPost>, { page: LinkedPage | null }>>,
+  // panels without load() have no `loaded` prop at all
+  Expect<Equal<'loaded' extends keyof PanelPropsOf<typeof blocksFields> ? true : false, false>>,
 ];
 
 // Narrowing on `type` gives the right data shape.

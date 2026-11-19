@@ -12,10 +12,29 @@ import type { AnyField, FieldMap, Option, OptionsContext, OptionsSource } from '
 import type { PageIssue } from '../document.ts';
 import { fieldDefault, getIn, humanize, issuesAt, moveItem, newId, newRepeaterItem, removeItem, setIn, type Path } from './state.ts';
 
+/** What the page picker asks for: by ids (to show picked pages), or a search within content types. */
+export interface PageQuery {
+  ids?: string[];
+  contentTypes?: string[];
+  search?: string;
+}
+
+/** A page offered by the page picker. */
+export interface PageOption {
+  id: string;
+  title: string;
+  slug: string;
+  contentType: string;
+  contentTypeLabel: string;
+  published: boolean;
+}
+
 export interface FormContext {
   issues: readonly PageIssue[];
   options: OptionsContext;
   readOnly: boolean;
+  /** Finds pages for `relation` fields (a server action). Without it, relations take pasted ids. */
+  findPages?: (query: PageQuery) => Promise<PageOption[]>;
 }
 
 type Change = (value: unknown) => void;
@@ -53,6 +72,7 @@ export function FieldMapForm({
           value={obj[key]}
           onChange={(v) => onChange(setIn(obj, [key], v))}
           path={[...path, key]}
+          siblings={obj}
           ctx={ctx}
         />
       ))}
@@ -64,7 +84,7 @@ export function FieldMapForm({
 /* One field: label, control, note, counter, issues                    */
 /* ------------------------------------------------------------------ */
 
-const GROUP_KINDS = new Set(['media', 'background', 'cta', 'ctas', 'repeater', 'selectFrom']);
+const GROUP_KINDS = new Set(['media', 'background', 'cta', 'ctas', 'repeater', 'selectFrom', 'relation']);
 
 interface FieldProps {
   name: string;
@@ -72,6 +92,8 @@ interface FieldProps {
   value: unknown;
   onChange: Change;
   path: Path;
+  /** The other values at the same level (e.g. a relation reads the content types picked in a sibling field). */
+  siblings: Record<string, unknown>;
   ctx: FormContext;
 }
 
@@ -153,7 +175,7 @@ export function IssueList({ issues }: { issues: readonly PageIssue[] }) {
 /* Controls                                                            */
 /* ------------------------------------------------------------------ */
 
-function Control({ field, value, onChange, path, ctx, id }: FieldProps & { id: string }): ReactNode {
+function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps & { id: string }): ReactNode {
   const ro = ctx.readOnly;
   switch (field.kind) {
     case 'text':
@@ -278,6 +300,7 @@ function Control({ field, value, onChange, path, ctx, id }: FieldProps & { id: s
       return <Repeater field={field} value={value} onChange={onChange} path={path} ctx={ctx} />;
 
     case 'relation': {
+      if (ctx.findPages) return <PagePicker field={field} value={value} onChange={onChange} siblings={siblings} ctx={ctx} findPages={ctx.findPages} id={id} />;
       const ids = asArray(value).map(asString);
       return (
         <>
@@ -289,7 +312,7 @@ function Control({ field, value, onChange, path, ctx, id }: FieldProps & { id: s
             placeholder="Page ids, comma-separated"
             onChange={(e) => onChange(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
           />
-          <p className="cera-note">A page picker comes later. For now, paste page ids.</p>
+          <p className="cera-note">This admin has no page search; paste page ids.</p>
         </>
       );
     }
@@ -496,5 +519,147 @@ function SelectFrom({ field, value, onChange, id, ctx }: { field: AnyField; valu
         </option>
       ))}
     </select>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page picker (relation fields)                                       */
+/* ------------------------------------------------------------------ */
+
+function PagePicker({
+  field,
+  value,
+  onChange,
+  siblings,
+  ctx,
+  findPages,
+  id,
+}: {
+  field: AnyField;
+  value: unknown;
+  onChange: Change;
+  siblings: Record<string, unknown>;
+  ctx: FormContext;
+  findPages: NonNullable<FormContext['findPages']>;
+  id: string;
+}) {
+  const cfg = field.config as { to: string[] | { field: string }; limit?: number };
+  const ids = asArray(value).map(asString).filter(Boolean);
+  const idsKey = ids.join(',');
+
+  // Allowed content types: fixed, or read from a sibling field (theme: post_types_field). None means any.
+  const types = Array.isArray(cfg.to) ? cfg.to : asArray(siblings[cfg.to.field]).map(asString).filter(Boolean);
+  const typesKey = types.join(',');
+  const labelOf = (name: string) => ctx.options.contentTypes.find((t) => t.name === name)?.label ?? name;
+
+  // Details for the picked ids.
+  const [picked, setPicked] = useState<PageOption[]>([]);
+  useEffect(() => {
+    if (!idsKey) return setPicked([]);
+    let live = true;
+    findPages({ ids: idsKey.split(',') }).then((r) => live && setPicked(r));
+    return () => {
+      live = false;
+    };
+  }, [idsKey, findPages]);
+
+  // Search results, shown while the search box has focus.
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const [results, setResults] = useState<PageOption[] | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    const t = setTimeout(() => {
+      findPages({ search, contentTypes: typesKey ? typesKey.split(',') : undefined }).then((r) => live && setResults(r));
+    }, 200);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [open, search, typesKey, findPages]);
+
+  const single = cfg.limit === 1;
+  const full = cfg.limit !== undefined && ids.length >= cfg.limit && !single;
+  const pick = (p: PageOption) => {
+    onChange(single ? [p.id] : [...ids, p.id]);
+    setSearch('');
+    setOpen(false);
+  };
+  const choices = (results ?? []).filter((r) => !ids.includes(r.id)).slice(0, 8);
+
+  return (
+    <div className="cera-picker">
+      {ids.length === 0 ? (
+        <p className="cera-note">No page picked.</p>
+      ) : (
+        <ul className="cera-picker__picked">
+          {ids.map((pid, i) => {
+            const p = picked.find((x) => x.id === pid);
+            return (
+              <li key={pid}>
+                <span className="cera-picker__title">{p ? p.title || p.slug : 'Page not found'}</span>
+                <span className="cera-picker__meta">
+                  {p ? `${p.contentTypeLabel} · ${p.slug}` : 'It may have been deleted. Remove it or pick another.'}
+                </span>
+                {p && !p.published && <span className="cera-badge cera-badge--dirty">Not published: hidden on the live site</span>}
+                {!ctx.readOnly && (
+                  <button type="button" className="cera-icon-button cera-danger" aria-label="Remove page" title="Remove" onClick={() => onChange(removeItem(ids, i))}>
+                    ✕
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {!ctx.readOnly && !full && (
+        <div className="cera-picker__search">
+          <input
+            id={id}
+            type="search"
+            value={search}
+            placeholder={single && ids.length ? 'Search to replace the page…' : 'Search pages…'}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={`${id}-results`}
+            autoComplete="off"
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setOpen(false);
+              if (e.key === 'Enter' && choices[0]) {
+                e.preventDefault();
+                pick(choices[0]);
+              }
+            }}
+          />
+          {open && (
+            <ul className="cera-picker__results" id={`${id}-results`} role="listbox">
+              {results === null ? (
+                <li className="cera-note">Searching…</li>
+              ) : choices.length === 0 ? (
+                <li className="cera-note">No matching pages.</li>
+              ) : (
+                choices.map((p) => (
+                  <li key={p.id} role="option" aria-selected={false}>
+                    {/* mousedown fires before the input's blur, which would close the list first. */}
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(p)}>
+                      <span className="cera-picker__title">{p.title || p.slug}</span>
+                      <span className="cera-picker__meta">
+                        {p.contentTypeLabel} · {p.slug}
+                        {p.published ? '' : ' · not published'}
+                      </span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+      {types.length > 0 && <p className="cera-note">Only {types.map(labelOf).join(', ')} pages.</p>}
+    </div>
   );
 }
