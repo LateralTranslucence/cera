@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch or PR cancels the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Library typecheck plus all tests. The SQL tests run the migrations in
+      # PGlite (Postgres in-process), so no Supabase or Docker is needed.
+      - name: Typecheck and test
+        run: npm run check
+
+      # Builds the example site, which also typechecks it. Pages render per
+      # request, so the build needs no Supabase environment variables.
+      - name: Build the example site
+        run: npm run build -w cera-next-site
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
