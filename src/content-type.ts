@@ -6,7 +6,7 @@
  * `panels` = the panel types editors can add (theme: the dynamic "Panel" box)
  */
 import { z } from 'zod';
-import { type FieldMap, type InferFields, type MediaRef, shapeOf } from './fields.ts';
+import { type FieldMap, type InferFields, type MediaRef, objectSchema } from './fields.ts';
 import type { AnyPanel, PanelUnion } from './panel.ts';
 
 export type BoxMap = Record<string, FieldMap>;
@@ -51,12 +51,23 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
 export interface ContentType<N extends string, B extends BoxMap, P extends readonly AnyPanel[]>
   extends ContentTypeConfig<N, B, P> {
   panels: P;
-  /** Validates a stored page and fills in defaults. */
+  /**
+   * Strict, all-or-nothing schema for a fully valid page. Useful in tests and
+   * scripts. For real reads and writes use `readPage` (tolerant, per panel)
+   * and `preparePageForSave` (keeps unknown data, draft vs publish) from
+   * `document.ts`.
+   */
   pageSchema: z.ZodType<PageDocument<N, B, P>>;
 }
 
+/**
+ * Any content type. `any` (not `string`/`BoxMap`) because the hook and seo
+ * functions take the specific page type as a parameter, and parameters are
+ * contravariant: `ContentType<'landing_page', …>` is not a
+ * `ContentType<string, BoxMap, …>`.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyContentType = ContentType<string, BoxMap, readonly any[]>;
+export type AnyContentType = ContentType<any, any, any>;
 
 export type PageOf<CT> = CT extends ContentType<infer N, infer B, infer P> ? PageDocument<N, B, P> : never;
 
@@ -74,7 +85,7 @@ export function defineContentType<
   }
 
   const boxesSchema = z.object(
-    Object.fromEntries(Object.entries(config.boxes).map(([k, fields]) => [k, z.object(shapeOf(fields)).default({} as never)])),
+    Object.fromEntries(Object.entries(config.boxes).map(([k, fields]) => [k, objectSchema(fields).default({} as never)])),
   );
 
   const instanceSchemas = panels.map((p) =>

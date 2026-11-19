@@ -43,7 +43,12 @@ src/
   defaults.ts       panelDefaults (Title, Background, Copy, ID) + omit()
   content-type.ts   defineContentType, PageDocument, PageOf, runtime pageSchema
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
-  next/             the `/next` entry: <Panels> renderer (sketch); React lives only here
+  document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish)
+  next/             the `/next` entry: async <Panels> Server Component; React lives only here
+  supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, savePage, unpublishPage
+supabase/migrations/
+  …_cera_init.sql          cera_pages, cera_page_revisions, cera_media, RLS, cera_save_page / cera_unpublish_page
+  …_cera_media_bucket.sql  public `cera-media` Storage bucket
 examples/
   panels/           blocks (+ fields file + component), featured-post, text-media (v2 with a migration)
   content-types/    landing-page (ported DO_Landing_Page)
@@ -51,6 +56,11 @@ examples/
 test/
   types.test.ts     compile-time assertions on inferred types (Equal/Expect)
   runtime.test.ts   validation, defaults, migrations, hooks, guards
+  document.test.ts  forgiving reads, lossless saves, draft vs publish, beforeSave
+  sql.test.ts       the migrations: publishing, conflicts, roles, RLS
+  supabase.test.ts  end to end: savePage → SQL → getPublishedPage / getPageForEditing
+  render.test.ts    <Panels> output, hidden panels, a panel that fails to load
+  support/db.ts     PGlite (Postgres in-process, no Docker) with Supabase's roles stubbed, and a fake supabase-js client
 ```
 
 ## Decisions already made (don't revisit without asking the project owner)
@@ -68,6 +78,10 @@ test/
 11. **The page model keeps `boxes` (fixed groups) separate from `panels`.** This mirrors the theme's `default_meta_boxes: ['Hero','SEO','Admin']` versus the dynamic Panel box.
 12. **Page concerns are typed functions,** not string syntax: `seo.title: p => p.boxes.seo.title || p.title` replaces `'SEO Title||post_title'`. Likewise `jsonLd` for schema.org, `hidden` for `hide_field`, and `hooks.beforeSave` / `hooks.afterSave` for `onsave_callback` / `aftersave_callback`.
 13. **The name is Cera** (Latin for wax, as in Roman wax writing tablets). It ships as one package, `@lateraltranslucence/cera`, with subpath exports: `.` is the core (no React or Next imports) and `./next` is the renderer, admin and routes. React is an optional peer dependency. The installer is the unscoped `create-cera` (`npx create-cera`), which was free on npm on 2026-11-16. Shorter scopes (`@cera`, `@syndr`) were not available.
+14. **Saves never lose data; reads never fail on content.** Field-map objects and repeater items are loose (unknown keys are kept). `preparePageForSave` writes back unknown panel types, unknown keys and retired boxes untouched. `readPage` falls back to a field's default when it fails, skips panels it can't repair or doesn't know, and reports issues instead of throwing. The admin loads pages with `getPageForEditing`, which returns the raw stored page, so it can't drop what it never saw.
+15. **Drafts save with warnings; publishing requires valid fields.** A draft with an empty title or an invalid field still saves (the raw value is kept). Publishing turns those into errors. Bad slugs and duplicate panel ids are errors in both modes. `beforeSave` runs only on fully valid pages.
+16. **Draft and live are separate.** `cera_pages` is the working copy; every save writes a `cera_page_revisions` row; the live page is the revision with `is_published`. Saving a draft never changes the live site. (The theme's "Update" went live immediately.)
+17. **Browsers never write.** No insert/update/delete grants for `anon`/`authenticated`. The app server validates with `preparePageForSave` and calls `cera_save_page` with the service role, passing the user id from a verified session; the function re-checks that the user is an admin or editor. Roles live in `app_metadata.cera_role` (`admin | editor | viewer`), which users can't set themselves. Saves use optimistic locking (`expectedVersion`).
 
 ## Pattern: keep fields in their own file
 
@@ -114,14 +128,26 @@ Look for `TODO(verify)` comments in the code. Those are guesses about the theme'
 
 ## Next tasks, in order
 
+The plan changed on 2026-11-16: build one panel (`blocks`) end to end before porting everything, so gaps in the core show up early.
+
+**Done:** core data safety (decisions 14–15), the Supabase schema and save/load module (16–17), and `<Panels>` as an async Server Component.
+
+**Next, to finish the `blocks` slice:**
+
+A. **Next.js example site** (`examples/next-site`): `app/[slug]/page.tsx` using `getPublishedPage` + `<Panels>`, draft-mode preview with `getDraftPage`, `generateMetadata` from `seo`/`jsonLd`, run against `supabase start`.
+B. **Minimal admin** for that site: sign-in, page list, and a form generated from `FieldMap` for the `blocks` panel (text, html as textarea for now, toggle, select, perRow, cta/ctas, media as a path field, repeater with add/remove/move). Save and publish through a server action calling `savePage`; show issues inline; handle `conflict`.
+C. **Panel data loading.** Add an optional server-side `load(data, ctx)` to `definePanel` whose return type feeds the component's props (needed for `featured-post`'s relation and any panel that queries). Not needed by `blocks`, so it can follow A and B.
+
+**Then the original list:**
+
 1. **Finish the field set.** Port the ❌ types above and resolve every `TODO(verify)`. Add a type assertion and a runtime test for each new builder.
 2. **Port all panels.** The 15 types in `class-landing-page.php` → `set_panel_fields()`, plus the full Hero, SEO and Admin boxes. Use the `.fields.ts` pattern. Port components from `app/components/panels/`.
    *Done when:* every theme panel has a definition, `PanelData` types match what the existing React components consume, and `npm run check` passes.
 3. **Content-type parity.** Port `class-simple-page.php`, `class-form.php`, `class-form-submission.php` and `class-icon.php`. Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
-4. **Supabase layer.** Write SQL migrations for `pages` (with `boxes jsonb` and `panels jsonb`), `page_revisions` (written on every save; this replaces the theme's `BAK` meta keys), and `media` (Storage-backed). Add RLS policies for admin, editor and viewer roles, and validate with `pageSchema` on write.
+4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Still to do: media uploads (server route writing to `cera-media` and `cera_media`), pruning old draft revisions, and a "restore revision" action.
 5. **Admin form generator.** Build a widget registry keyed by `field.kind` that renders forms from any `FieldMap`. Use `meta.label`, `meta.note` and `meta.maxLength` (live counter). Repeaters need drag-to-reorder (dnd-kit) and collapsed item titles via `itemTitle`. Include the panel picker and panel reordering.
-6. **Next.js integration.** Admin route handler and pages, a server-side page loader (fetch → `upgradePagePanels` → `pageSchema.parse`), `<Panels>` as a Server Component with client panels marked as such, draft-mode preview, and `generateMetadata` from `seo`/`jsonLd`.
-7. **Packaging.** The package is `@lateraltranslucence/cera` with `.` and `./next` entry points (already set up in `package.json`, currently pointing at source). Add a build step that emits JS and `.d.ts`, point `exports` at the output, and keep `.` free of React and Next imports. Then add the `create-cera` installer.
+6. **Next.js integration.** Started in A and B above. Still to do after them: per-panel error boundaries (a client component) and admin route handlers packaged in `./next`.
+7. **Packaging.** The package is `@lateraltranslucence/cera` with `.`, `./next` and `./supabase` entry points (already set up in `package.json`, currently pointing at source). Add a build step that emits JS and `.d.ts`, point `exports` at the output, and keep `.` free of React and Next imports. Then add the `create-cera` installer.
 
 ## Open questions for the project owner
 
