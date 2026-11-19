@@ -130,6 +130,9 @@ fieldset.cera-field > legend { padding: 0 4px; }
 /* scroll-margin keeps a newly added panel's header clear of the sticky toolbar. */
 .cera-panel { min-width: 0; border-left: 3px solid var(--cera-accent); scroll-margin-top: 9rem; }
 .cera-panel.has-warning { border-color: var(--cera-warning); }
+.cera-panel--fixed { border-left-color: var(--cera-muted); }
+.cera-subsection { display: grid; gap: 14px; padding-top: 14px; border-top: 1px solid var(--cera-line); }
+.cera-subsection > h3 { margin: 0; font-size: 0.95rem; }
 .cera-panel.is-hidden { border-left-style: dashed; }
 .cera-panel.is-hidden .cera-panel__type, .cera-panel.is-hidden .cera-panel__title { opacity: 0.55; }
 .cera-panel > details > summary { display: flex; align-items: center; gap: 10px; list-style: none; }

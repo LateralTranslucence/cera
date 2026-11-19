@@ -39,6 +39,9 @@ export const landingPage = defineContentType({
 
   panels: [blocks, featuredPost, textMedia],
 
+  // Admin settings sit with title and slug; the hero renders like a panel, so it sits with them.
+  editor: { pageBoxes: ['admin'], leadBoxes: ['hero'] },
+
   seo: {
     title: (p) => p.boxes.seo.title || p.title,
     description: (p) => p.boxes.seo.description || stripHtml(p.boxes.hero.copy),

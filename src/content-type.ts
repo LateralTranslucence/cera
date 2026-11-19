@@ -40,6 +40,16 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
   jsonLd?: (page: PageDocument<N, B, P>) => Record<string, unknown>;
   /** Hide from public queries/routes. Theme: settings()['hide_field']. */
   hidden?: (page: PageDocument<N, B, P>) => boolean;
+  /**
+   * Where boxes appear in the admin editor. Boxes not listed here get their
+   * own section between the Page section and the panels, in declared order.
+   */
+  editor?: {
+    /** Shown inside the Page section, under title and slug (e.g. admin settings). */
+    pageBoxes?: ReadonlyArray<keyof B & string>;
+    /** Shown just above the panels, styled like one (e.g. a hero that renders like a panel). */
+    leadBoxes?: ReadonlyArray<keyof B & string>;
+  };
   hooks?: {
     /** Theme: onsave_callback (could modify $_POST). */
     beforeSave?: (page: PageDocument<N, B, P>) => PageDocument<N, B, P> | Promise<PageDocument<N, B, P>>;

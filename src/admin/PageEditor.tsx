@@ -168,6 +168,14 @@ export function PageEditor({
   };
 
   const pageIssues = [...issuesAt(issues, ['title']), ...issuesAt(issues, ['slug'])];
+
+  // Where each box goes, from the content type's `editor` layout.
+  const inPage = new Set<string>(ct.editor?.pageBoxes ?? []);
+  const lead = new Set<string>(ct.editor?.leadBoxes ?? []);
+  const allBoxes = Object.entries(ct.boxes as BoxMap);
+  const pageBoxes = allBoxes.filter(([name]) => inPage.has(name));
+  const leadBoxes = allBoxes.filter(([name]) => lead.has(name) && !inPage.has(name));
+  const otherBoxes = allBoxes.filter(([name]) => !inPage.has(name) && !lead.has(name));
   const errorCount = issues.filter((i) => i.severity === 'error').length;
 
   return (
@@ -249,6 +257,12 @@ export function PageEditor({
             <p className="cera-note">The page’s address: lowercase words joined by hyphens. “home” is the front page.</p>
           </div>
           <IssueList issues={pageIssues} />
+          {pageBoxes.map(([name, fields]) => (
+            <div key={name} className="cera-subsection">
+              <h3>{humanize(name)}</h3>
+              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
+            </div>
+          ))}
           {!readOnly && ct.panels.length > 0 && (
             <div className="cera-field">
               <label htmlFor="cera-add-panel">Add a panel</label>
@@ -284,24 +298,31 @@ export function PageEditor({
         </div>
       </section>
 
-      {Object.entries(ct.boxes as BoxMap).map(([name, fields]) => (
+      {otherBoxes.map(([name, fields]) => (
         <section key={name} className="cera-section">
-          <details open={name === 'hero' || issuesAt(issues, ['boxes', name]).length > 0}>
+          <details open={issuesAt(issues, ['boxes', name]).length > 0}>
             <summary>
               <h2>{humanize(name)}</h2>
             </summary>
-            <FieldMapForm
-              fields={fields}
-              value={page.boxes[name]}
-              onChange={(v) => update(setIn(page, ['boxes', name], v))}
-              path={['boxes', name]}
-              ctx={ctx}
-            />
+            <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
           </details>
         </section>
       ))}
 
-      {/* Each panel is a top-level section, like the boxes above. */}
+      {/* Lead boxes (e.g. the hero) render like panels, so they sit with them, but can't be moved or removed. */}
+      {leadBoxes.map(([name, fields]) => (
+        <section key={name} className="cera-section cera-panel cera-panel--fixed">
+          <details open>
+            <summary>
+              <h2 className="cera-panel__type">{humanize(name)}</h2>
+              <span className="cera-panel__title">Always first on the page</span>
+            </summary>
+            <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
+          </details>
+        </section>
+      ))}
+
+      {/* Each panel is a top-level section. */}
       {page.panels.map((p, i) => {
         const def = defs.get(p.type);
         const path = ['panels', i];
