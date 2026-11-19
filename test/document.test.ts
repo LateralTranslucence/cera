@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defineContentType, definePanel, f, preparePageForSave, readPage, PageShapeError, type StoredPage } from '../src/index.ts';
-import { landingPage } from '../examples/content-types/landing-page.ts';
+import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
 
 const clone = (): StoredPage => structuredClone(sample) as unknown as StoredPage;

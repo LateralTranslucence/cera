@@ -5,7 +5,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getDraftPage, getPageForEditing, getPublishedPage, savePage, unpublishPage } from '../src/supabase/index.ts';
 import type { StoredPage } from '../src/index.ts';
-import { landingPage } from '../examples/content-types/landing-page.ts';
+import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
 import { addUser, createTestDb, fakeSupabase } from './support/db.ts';
 

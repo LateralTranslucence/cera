@@ -29,8 +29,10 @@ Read these before changing the design:
 
 ```bash
 npm install
-npm run check      # tsc --noEmit + node --test (via tsx)
+npm run check      # tsc --noEmit + node --test (via tsx); no Docker needed
 ```
+
+The example site runs against a local Supabase stack; see [examples/next-site/README.md](examples/next-site/README.md). Its ports (56320–56329) are chosen to avoid the other local Supabase projects (Supabase's default is 543xx).
 
 Versions used: TypeScript 7.0, Zod 4.6, React 19, Node 22+.
 
@@ -44,14 +46,16 @@ src/
   content-type.ts   defineContentType, PageDocument, PageOf, runtime pageSchema
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish)
-  next/             the `/next` entry: async <Panels> Server Component; React lives only here
+  next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, savePage, unpublishPage
-supabase/migrations/
-  …_cera_init.sql          cera_pages, cera_page_revisions, cera_media, RLS, cera_save_page / cera_unpublish_page
-  …_cera_media_bucket.sql  public `cera-media` Storage bucket
+supabase/
+  config.toml              local stack (`supabase start`), ports 563xx
+  migrations/…_cera_init.sql          cera_pages, cera_page_revisions, cera_media, RLS, cera_save_page / cera_unpublish_page
+  migrations/…_cera_media_bucket.sql  public `cera-media` Storage bucket
 examples/
-  panels/           blocks (+ fields file + component), featured-post, text-media (v2 with a migration)
-  content-types/    landing-page (ported DO_Landing_Page)
+  next-site/        npm workspace: Next.js 16 example site (see its README)
+    cera/           the example panels (blocks, featured-post, text-media v2) and the landing_page content type;
+                    they import '@lateraltranslucence/cera' like a real site, and the library tests use them too
   sample-page.json  a stored page row
 test/
   types.test.ts     compile-time assertions on inferred types (Equal/Expect)
@@ -60,6 +64,7 @@ test/
   sql.test.ts       the migrations: publishing, conflicts, roles, RLS
   supabase.test.ts  end to end: savePage → SQL → getPublishedPage / getPageForEditing
   render.test.ts    <Panels> output, hidden panels, a panel that fails to load
+  metadata.test.ts  pageMetadata and JSON-LD escaping
   support/db.ts     PGlite (Postgres in-process, no Docker) with Supabase's roles stubbed, and a fake supabase-js client
 ```
 
@@ -130,13 +135,15 @@ Look for `TODO(verify)` comments in the code. Those are guesses about the theme'
 
 The plan changed on 2026-11-16: build one panel (`blocks`) end to end before porting everything, so gaps in the core show up early.
 
-**Done:** core data safety (decisions 14–15), the Supabase schema and save/load module (16–17), and `<Panels>` as an async Server Component.
+**Done:** core data safety (decisions 14–15), the Supabase schema and save/load module (16–17), `<Panels>` as an async Server Component, and the example site (A below), checked in a browser against the local stack: live pages, metadata and JSON-LD, 404s, draft preview and exiting it.
 
 **Next, to finish the `blocks` slice:**
 
-A. **Next.js example site** (`examples/next-site`): `app/[slug]/page.tsx` using `getPublishedPage` + `<Panels>`, draft-mode preview with `getDraftPage`, `generateMetadata` from `seo`/`jsonLd`, run against `supabase start`.
+A. ✅ **Next.js example site** (`examples/next-site`).
 B. **Minimal admin** for that site: sign-in, page list, and a form generated from `FieldMap` for the `blocks` panel (text, html as textarea for now, toggle, select, perRow, cta/ctas, media as a path field, repeater with add/remove/move). Save and publish through a server action calling `savePage`; show issues inline; handle `conflict`.
+   Also: link the admin to `/api/draft?secret=…&slug=…` for preview, and replace `force-dynamic` with cached pages plus `revalidateTag` on publish.
 C. **Panel data loading.** Add an optional server-side `load(data, ctx)` to `definePanel` whose return type feeds the component's props (needed for `featured-post`'s relation and any panel that queries). Not needed by `blocks`, so it can follow A and B.
+D. **Sanitize `f.html()` on save.** The site's `Html` component trusts stored HTML. Sanitize in `preparePageForSave` with an allowlist per toolbar (`full`/`limited`) before any real site uses this. Needs a server-side HTML sanitizer dependency.
 
 **Then the original list:**
 

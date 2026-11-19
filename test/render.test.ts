@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { defineContentType, definePanel, f, readPage, type StoredPage } from '../src/index.ts';
 import { Panels } from '../src/next/index.ts';
-import { landingPage } from '../examples/content-types/landing-page.ts';
+import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
 
 const clone = (): StoredPage => structuredClone(sample) as unknown as StoredPage;

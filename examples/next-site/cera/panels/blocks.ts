@@ -1,4 +1,4 @@
-import { definePanel } from '../../src/index.ts';
+import { definePanel } from '@lateraltranslucence/cera';
 import { blocksFields } from './blocks.fields.ts';
 
 export const blocks = definePanel({

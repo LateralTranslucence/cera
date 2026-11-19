@@ -1,9 +1,9 @@
 // Compile-time assertions (checked by `npm run typecheck`) + a trivial runtime test so node --test picks it up.
 import { test } from 'node:test';
 import type { CTA, MediaRef, PageOf, PanelData } from '../src/index.ts';
-import type { blocks } from '../examples/panels/blocks.ts';
-import type { featuredPost } from '../examples/panels/featured-post.ts';
-import type { landingPage } from '../examples/content-types/landing-page.ts';
+import type { blocks } from '../examples/next-site/cera/panels/blocks.ts';
+import type { featuredPost } from '../examples/next-site/cera/panels/featured-post.ts';
+import type { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Expect<T extends true> = T;

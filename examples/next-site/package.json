@@ -1,0 +1,30 @@
+{
+  "name": "cera-next-site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Example Next.js site built on Cera, run against a local Supabase stack",
+  "scripts": {
+    "dev": "next dev --port 3100",
+    "build": "next build",
+    "start": "next start --port 3100",
+    "typecheck": "tsc --noEmit",
+    "env": "node --import tsx scripts/env.ts",
+    "seed": "node --env-file=.env.local --import tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@lateraltranslucence/cera": "file:../..",
+    "@supabase/supabase-js": "^2.119.0",
+    "next": "^16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

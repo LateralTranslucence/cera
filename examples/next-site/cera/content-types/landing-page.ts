@@ -1,5 +1,5 @@
 // Ported from DO_Landing_Page (class-landing-page.php).
-import { defineContentType, f } from '../../src/index.ts';
+import { defineContentType, f } from '@lateraltranslucence/cera';
 import { blocks } from '../panels/blocks.ts';
 import { featuredPost } from '../panels/featured-post.ts';
 import { textMedia } from '../panels/text-media.ts';

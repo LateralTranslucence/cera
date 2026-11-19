@@ -1,6 +1,6 @@
 // Ported from set_panel_fields()['featured-post']:
 // drops Title/Background/Copy ($unset), dynamic options, post_browser → relation.
-import { definePanel, f, omit, panelDefaults, type PanelPropsOf } from '../../src/index.ts';
+import { definePanel, f, omit, panelDefaults, type PanelPropsOf } from '@lateraltranslucence/cera';
 
 export const featuredPostFields = {
   ...omit(panelDefaults, 'title', 'background', 'copy'),
