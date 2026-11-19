@@ -47,7 +47,9 @@ src/
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish)
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
-  supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, savePage, unpublishPage
+  supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage
+  admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers;
+                    `/admin.css` is its stylesheet, scoped under .cera-admin
 supabase/
   config.toml              local stack (`supabase start`), ports 563xx
   migrations/…_cera_init.sql          cera_pages, cera_page_revisions, cera_media, RLS, cera_save_page / cera_unpublish_page
@@ -140,8 +142,10 @@ The plan changed on 2026-11-16: build one panel (`blocks`) end to end before por
 **Next, to finish the `blocks` slice:**
 
 A. ✅ **Next.js example site** (`examples/next-site`).
-B. **Minimal admin** for that site: sign-in, page list, and a form generated from `FieldMap` for the `blocks` panel (text, html as textarea for now, toggle, select, perRow, cta/ctas, media as a path field, repeater with add/remove/move). Save and publish through a server action calling `savePage`; show issues inline; handle `conflict`.
-   Also: link the admin to `/api/draft?secret=…&slug=…` for preview, and replace `force-dynamic` with cached pages plus `revalidateTag` on publish.
+B. ✅ **Minimal admin** (`examples/next-site/app/admin`, editor in `src/admin`). Checked in a browser: sign-in, page list, editing a block inside the Blocks panel, save draft (live page unchanged), preview, publish, refusing to publish an empty title, the conflict message, and creating and publishing a new page. Not yet checked in a browser: unpublish (it asks for confirmation, which the test browser can't answer) and a viewer's read-only view.
+   How it works: the editor edits the raw stored page (unknown panels and keys included) and upgrades known panels to their current version on load. Saves go through a server action that takes the user id from the verified session. Preview from the admin goes through `/admin/preview` (session-checked), so the preview secret stays on the server.
+   Still to do for the admin: drag-to-reorder (buttons for now), a media library with uploads (paths are typed by hand), a page picker for `relation`, a rich-text editor for `f.html()`, deleting pages, revision history, and client-side validation before save.
+   Also still to do: replace `force-dynamic` with cached pages plus `revalidateTag` on publish.
 C. **Panel data loading.** Add an optional server-side `load(data, ctx)` to `definePanel` whose return type feeds the component's props (needed for `featured-post`'s relation and any panel that queries). Not needed by `blocks`, so it can follow A and B.
 D. **Sanitize `f.html()` on save.** The site's `Html` component trusts stored HTML. Sanitize in `preparePageForSave` with an allowlist per toolbar (`full`/`limited`) before any real site uses this. Needs a server-side HTML sanitizer dependency.
 
@@ -152,9 +156,9 @@ D. **Sanitize `f.html()` on save.** The site's `Html` component trusts stored HT
    *Done when:* every theme panel has a definition, `PanelData` types match what the existing React components consume, and `npm run check` passes.
 3. **Content-type parity.** Port `class-simple-page.php`, `class-form.php`, `class-form-submission.php` and `class-icon.php`. Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Still to do: media uploads (server route writing to `cera-media` and `cera_media`), pruning old draft revisions, and a "restore revision" action.
-5. **Admin form generator.** Build a widget registry keyed by `field.kind` that renders forms from any `FieldMap`. Use `meta.label`, `meta.note` and `meta.maxLength` (live counter). Repeaters need drag-to-reorder (dnd-kit) and collapsed item titles via `itemTitle`. Include the panel picker and panel reordering.
+5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.
 6. **Next.js integration.** Started in A and B above. Still to do after them: per-panel error boundaries (a client component) and admin route handlers packaged in `./next`.
-7. **Packaging.** The package is `@lateraltranslucence/cera` with `.`, `./next` and `./supabase` entry points (already set up in `package.json`, currently pointing at source). Add a build step that emits JS and `.d.ts`, point `exports` at the output, and keep `.` free of React and Next imports. Then add the `create-cera` installer.
+7. **Packaging.** The package is `@lateraltranslucence/cera` with `.`, `./next`, `./supabase`, `./admin` and `./admin.css` entry points (already set up in `package.json`, currently pointing at source). Add a build step that emits JS and `.d.ts`, point `exports` at the output, and keep `.` free of React and Next imports. Then add the `create-cera` installer.
 
 ## Open questions for the project owner
 

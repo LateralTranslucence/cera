@@ -123,6 +123,40 @@ export async function getPageForEditing(client: SupabaseClient, ct: AnyContentTy
   return { page: toStored(row.id, row), version: row.version, published: live.data !== null };
 }
 
+export interface PageSummary {
+  id: string;
+  contentType: string;
+  slug: string;
+  title: string;
+  version: number;
+  updatedAt: string;
+  published: boolean;
+}
+
+/** Working copies for the admin's page list, sorted by title. Staff client (row-level security). */
+export async function listPages(client: SupabaseClient, opts: { contentType?: string } = {}): Promise<PageSummary[]> {
+  let query = client.from('cera_pages').select('id, content_type, slug, title, version, updated_at');
+  if (opts.contentType) query = query.eq('content_type', opts.contentType);
+  const { data, error } = await query;
+  if (error) fail(error);
+
+  const live = await client.from('cera_page_revisions').select('page_id').eq('is_published', true);
+  if (live.error) fail(live.error);
+  const published = new Set((live.data as Array<{ page_id: string }>).map((r) => r.page_id));
+
+  return (data as Array<{ id: string; content_type: string; slug: string; title: string; version: number; updated_at: string }>)
+    .map((r) => ({
+      id: r.id,
+      contentType: r.content_type,
+      slug: r.slug,
+      title: r.title,
+      version: r.version,
+      updatedAt: r.updated_at,
+      published: published.has(r.id),
+    }))
+    .sort((a, b) => (a.title || a.slug).localeCompare(b.title || b.slug));
+}
+
 /* ------------------------------------------------------------------ */
 /* Saving                                                              */
 /* ------------------------------------------------------------------ */

@@ -1,6 +1,6 @@
 # Cera example site
 
-A Next.js site that renders Cera pages from a local Supabase stack. It is also where the example panels and the `landing_page` content type live (`cera/`), and the library's tests use those same definitions.
+A Next.js site that renders Cera pages from a local Supabase stack, with a minimal admin for editing them. It is also where the example panels and the `landing_page` content type live (`cera/`), and the library's tests use those same definitions.
 
 ## Run it
 
@@ -10,26 +10,34 @@ From the repository root:
 npm install
 supabase start                      # local stack on ports 56320–56329, applies supabase/migrations
 npm run env -w cera-next-site       # writes examples/next-site/.env.local from `supabase status`
-npm run seed -w cera-next-site      # publishes a home and an about page
+npm run seed -w cera-next-site      # admin account + a published home and about page
 npm run dev -w cera-next-site       # http://localhost:3100
 ```
 
-Supabase Studio is at http://127.0.0.1:56323.
+- **Admin:** http://localhost:3100/admin. Sign in with `CERA_ADMIN_EMAIL` / `CERA_ADMIN_PASSWORD` from `.env.local` (generated locally; the seed creates or resets that account).
+- **Supabase Studio:** http://127.0.0.1:56323.
+
+If saves or page loads stall for many seconds, check Docker's memory: each local Supabase stack needs a few hundred MB, and a 1.4 GB Docker VM running several stacks starts swapping.
 
 ## What's here
 
 | Path | Purpose |
 |---|---|
 | `cera/` | Panel definitions and components, and the `landing_page` content type |
-| `app/page.tsx`, `app/[slug]/page.tsx` | Live pages: `getPublishedPage` → `<Panels>`, with `generateMetadata` from `pageMetadata` |
-| `app/api/draft` | Draft-mode preview: `/api/draft?secret=…&slug=about` shows the unpublished working copy |
+| `app/(site)/` | Live pages: `getPublishedPage` → `<Panels>`, with `generateMetadata` from `pageMetadata` |
+| `app/admin/` | Sign-in, page list and the editor (`PageEditor` from `@lateraltranslucence/cera/admin`) |
+| `app/admin/actions.ts` | Server actions: save/publish via `savePage` with the user from the verified session; sign in/out |
+| `app/admin/preview` | Preview from the admin: checks the session, enables draft mode |
+| `app/api/draft` | Preview for external tools: `/api/draft?secret=…&slug=about` |
+| `proxy.ts` | Refreshes the admin's Supabase session cookies |
+| `lib/auth.ts` | `requireStaff(role)`: verified user + Cera role from `app_metadata.cera_role` |
 | `lib/pages.ts` | Picks the live revision or, in draft mode, the working copy; logs read issues |
 | `lib/supabase.ts` | Anonymous client (published pages only) and secret-key client (server only) |
-| `scripts/seed.ts` | Saves pages through `savePage`, the same path the admin will use |
+| `scripts/seed.ts` | Admin account and pages, saved through `savePage` like the admin does |
 
 ## Not done yet
 
-- **Admin.** Pages can only be changed with the seed script for now.
-- **Caching.** Pages render per request (`force-dynamic`); `revalidateTag` on publish comes with the admin.
+- **Caching.** Pages render per request (`force-dynamic`); `revalidateTag` on publish is next.
 - **HTML sanitizing.** `components/Html.tsx` trusts stored HTML. Cera must sanitize `f.html()` values on save before this is safe for real sites.
-- **Media uploads.** `lib/media.ts` builds URLs for the `cera-media` bucket, but there is no upload flow yet.
+- **Media uploads.** Media fields take a path typed by hand; there is no upload flow or library yet.
+- **Admin extras.** Drag-to-reorder, a rich-text editor, a page picker for relations, deleting pages and revision history.

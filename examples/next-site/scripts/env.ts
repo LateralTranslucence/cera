@@ -29,6 +29,9 @@ for (const key of ['API_URL', 'PUBLISHABLE_KEY', 'SECRET_KEY']) {
 
 const existing = existsSync(target) ? parse(readFileSync(target, 'utf8')) : {};
 const previewSecret = existing.CERA_PREVIEW_SECRET ?? randomBytes(24).toString('hex');
+// Local admin account created by `npm run seed`. Sign in at /admin with these.
+const adminEmail = existing.CERA_ADMIN_EMAIL ?? 'admin@cera.test';
+const adminPassword = existing.CERA_ADMIN_PASSWORD ?? randomBytes(12).toString('base64url');
 
 writeFileSync(
   target,
@@ -38,6 +41,8 @@ writeFileSync(
     `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.PUBLISHABLE_KEY}`,
     `SUPABASE_SECRET_KEY=${status.SECRET_KEY}`,
     `CERA_PREVIEW_SECRET=${previewSecret}`,
+    `CERA_ADMIN_EMAIL=${adminEmail}`,
+    `CERA_ADMIN_PASSWORD=${adminPassword}`,
     '',
   ].join('\n'),
 );

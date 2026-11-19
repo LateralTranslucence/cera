@@ -17,21 +17,31 @@ if (!url || !secret) throw new Error('Run `npm run env` first to create .env.loc
 
 const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
 
-/** A content user for attributing seeded saves. It has a random password; nobody signs in as it. */
-async function seedEditor(): Promise<string> {
-  const email = 'seed-editor@cera.test';
+/** Creates the user, or resets its password and role so they match what's given. */
+async function ensureUser(email: string, password: string, role: 'admin' | 'editor'): Promise<string> {
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw error;
   const existing = data.users.find((u) => u.email === email);
-  if (existing) return existing.id;
-  const created = await admin.auth.admin.createUser({
-    email,
-    password: randomBytes(24).toString('hex'),
-    email_confirm: true,
-    app_metadata: { cera_role: 'editor' },
-  });
+  if (existing) {
+    const updated = await admin.auth.admin.updateUserById(existing.id, { password, app_metadata: { cera_role: role } });
+    if (updated.error) throw updated.error;
+    return existing.id;
+  }
+  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { cera_role: role } });
   if (created.error) throw created.error;
   return created.data.user.id;
+}
+
+/** Attributes seeded saves. Random password: nobody signs in as it. */
+const seedEditor = () => ensureUser('seed-editor@cera.test', randomBytes(24).toString('hex'), 'editor');
+
+/** The account you sign in to /admin with (credentials in .env.local). */
+async function seedAdmin(): Promise<void> {
+  const email = process.env.CERA_ADMIN_EMAIL;
+  const password = process.env.CERA_ADMIN_PASSWORD;
+  if (!email || !password) throw new Error('CERA_ADMIN_EMAIL / CERA_ADMIN_PASSWORD missing. Run `npm run env` again.');
+  await ensureUser(email, password, 'admin');
+  console.log(`Admin account ${email} is ready (password in .env.local).`);
 }
 
 const pages: StoredPage[] = [
@@ -103,6 +113,7 @@ const pages: StoredPage[] = [
   },
 ];
 
+await seedAdmin();
 const userId = await seedEditor();
 for (const page of pages) {
   const existing = await getPageForEditing(admin, landingPage, page.id);

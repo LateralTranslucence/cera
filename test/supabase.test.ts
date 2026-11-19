@@ -3,7 +3,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getDraftPage, getPageForEditing, getPublishedPage, savePage, unpublishPage } from '../src/supabase/index.ts';
+import { getDraftPage, getPageForEditing, getPublishedPage, listPages, savePage, unpublishPage } from '../src/supabase/index.ts';
 import type { StoredPage } from '../src/index.ts';
 import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
@@ -104,4 +104,24 @@ test('unpublish removes the live page', async () => {
   await savePage(server, landingPage, p, { mode: 'publish', expectedVersion: 0, userId: editor });
   await unpublishPage(server, p.id, editor);
   assert.equal(await getPublishedPage(anon, landingPage, 'temporary'), null);
+});
+
+test('listPages shows staff every working copy with its live status; anon sees none', async () => {
+  const live = newPage('list-live');
+  live.title = 'AAA live';
+  const draft = newPage('list-draft');
+  draft.title = 'AAB draft';
+  await savePage(server, landingPage, live, { mode: 'publish', expectedVersion: 0, userId: editor });
+  await savePage(server, landingPage, draft, { mode: 'draft', expectedVersion: 0, userId: editor });
+
+  const pages = await listPages(staff, { contentType: 'landing_page' });
+  const mine = pages.filter((p) => p.slug.startsWith('list-'));
+  assert.deepEqual(
+    mine.map((p) => [p.title, p.published, p.version]),
+    [
+      ['AAA live', true, 1],
+      ['AAB draft', false, 1],
+    ],
+  );
+  assert.deepEqual(await listPages(anon), []);
 });
