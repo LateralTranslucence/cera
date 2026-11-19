@@ -170,7 +170,8 @@ export interface SaveOptions {
 }
 
 export type SaveResult =
-  | { ok: true; id: string; version: number; revisionId: string; issues: PageIssue[] }
+  /** `page` is what was stored: defaults filled in, panels upgraded, rich text sanitized. */
+  | { ok: true; id: string; version: number; revisionId: string; page: StoredPage; issues: PageIssue[] }
   | { ok: false; reason: 'invalid'; issues: PageIssue[] }
   | { ok: false; reason: 'conflict' | 'forbidden' | 'not-found' | 'slug-taken'; message: string; issues: PageIssue[] };
 
@@ -218,7 +219,7 @@ export async function savePage<CT extends AnyContentType>(
     }
   }
 
-  return { ok: true, ...saved, issues: prepared.issues };
+  return { ok: true, ...saved, page: prepared.page, issues: prepared.issues };
 }
 
 /** Takes a page off the live site. Service-role client only (see top of file). */

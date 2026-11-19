@@ -17,13 +17,25 @@ if (!url || !secret) throw new Error('Run `npm run env` first to create .env.loc
 
 const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
 
-/** Creates the user, or resets its password and role so they match what's given. */
-async function ensureUser(email: string, password: string, role: 'admin' | 'editor'): Promise<string> {
+/** Does this password still sign in? Checked with a throwaway client so no session is kept. */
+async function passwordWorks(email: string, password: string): Promise<boolean> {
+  const probe = createClient(url!, secret!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { error } = await probe.auth.signInWithPassword({ email, password });
+  return !error;
+}
+
+/**
+ * Creates the user, or makes sure its role (and, if given, password) match.
+ * The password is only reset when it no longer works: resetting it signs the
+ * user out everywhere, which re-running the seed shouldn't do.
+ */
+async function ensureUser(email: string, password: string, role: 'admin' | 'editor', keepPassword = false): Promise<string> {
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw error;
   const existing = data.users.find((u) => u.email === email);
   if (existing) {
-    const updated = await admin.auth.admin.updateUserById(existing.id, { password, app_metadata: { cera_role: role } });
+    const reset = !keepPassword && !(await passwordWorks(email, password));
+    const updated = await admin.auth.admin.updateUserById(existing.id, { app_metadata: { cera_role: role }, ...(reset && { password }) });
     if (updated.error) throw updated.error;
     return existing.id;
   }
@@ -33,7 +45,7 @@ async function ensureUser(email: string, password: string, role: 'admin' | 'edit
 }
 
 /** Attributes seeded saves. Random password: nobody signs in as it. */
-const seedEditor = () => ensureUser('seed-editor@cera.test', randomBytes(24).toString('hex'), 'editor');
+const seedEditor = () => ensureUser('seed-editor@cera.test', randomBytes(24).toString('hex'), 'editor', true);
 
 /** The account you sign in to /admin with (credentials in .env.local). */
 async function seedAdmin(): Promise<void> {
@@ -70,7 +82,7 @@ const pages: StoredPage[] = [
           perRow: 3,
           blocks: [
             { _id: 'b1', title: 'Typed props', copy: '<p>Component props are inferred from the panel’s fields.</p>' },
-            { _id: 'b2', title: 'Defaults on read', copy: '<p>No <code>Number(x) || 3</code> in components.</p>' },
+            { _id: 'b2', title: 'Defaults on read', copy: '<p>Components get every default filled in; no fallback logic.</p>' }, // block copy is the limited toolbar: no <code>
             { _id: 'b3', title: 'Safe saves', copy: '<p>Unknown panels and keys survive a save.</p>', cta: { text: 'Read the handoff', url: 'about' } },
           ],
         },

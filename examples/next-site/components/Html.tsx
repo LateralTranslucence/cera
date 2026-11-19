@@ -1,9 +1,10 @@
 /**
  * Renders a rich-text field.
  *
- * SECURITY: this trusts the stored HTML. Only admins and editors can write
- * pages, but Cera still has to sanitize `f.html()` values on save (allowlist
- * per toolbar) before this is safe for real sites. Tracked in HANDOFF.md.
+ * The HTML is trusted because Cera sanitizes every `f.html()` value when a
+ * page is saved (`preparePageForSave`), and browsers can't write pages
+ * directly (all saves go through the server). Content written to the
+ * database some other way would bypass that, so don't.
  */
 export function Html({ html, className = 'rich-text' }: { html: string; className?: string }) {
   return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;

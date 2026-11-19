@@ -35,6 +35,8 @@ function newPage(slug: string): StoredPage {
 test('publish, then read the live page as an anonymous visitor', async () => {
   const saved = await savePage(server, landingPage, newPage('about'), { mode: 'publish', expectedVersion: 0, userId: editor });
   assert.equal(saved.ok, true, JSON.stringify(saved));
+  // The result carries what was stored, so the editor can show it.
+  if (saved.ok) assert.equal(saved.page.panels[1]?.v, 2);
 
   const live = await getPublishedPage(anon, landingPage, 'about');
   assert.ok(live);

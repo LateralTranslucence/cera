@@ -5,7 +5,7 @@
  * action that calls `savePage`), so validation and the database checks all
  * happen on the server.
  */
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import type { AnyContentType, BoxMap } from '../content-type.ts';
 import type { OptionsContext } from '../fields.ts';
 import type { PageIssue, SaveMode, StoredPage } from '../document.ts';
@@ -113,18 +113,28 @@ export function PageEditor({
   };
   const setPanels = (panels: StoredPanel[]) => update({ ...page, panels });
 
+  // The latest page state, readable after an await in the save handler.
+  const pageRef = useRef(page);
+  pageRef.current = page;
+
   const save = (mode: SaveMode) => {
     // Outside the transition, so it shows immediately (updates inside a
     // transition are held back until it finishes).
     setStatus({ tone: 'info', text: mode === 'publish' ? 'Publishing…' : 'Saving…' });
+    const sent = page;
     startSaving(async () => {
       try {
-        const result = await onSave({ page, expectedVersion: version, mode });
+        const result = await onSave({ page: sent, expectedVersion: version, mode });
         setIssues(result.issues);
         if (result.ok) {
           setVersion(result.version);
           if (mode === 'publish') setPublished(true);
-          setDirty(false);
+          // Show what was stored (sanitized rich text, filled-in defaults), unless
+          // the editor kept typing during the save: then keep their newer edits.
+          if (pageRef.current === sent) {
+            setPage(result.page);
+            setDirty(false);
+          }
           setSlugTouched(true);
           const warnings = result.issues.length ? ` ${result.issues.length} warning${result.issues.length === 1 ? '' : 's'} below.` : '';
           setStatus({ tone: 'success', text: (mode === 'publish' ? 'Published.' : 'Draft saved. The live page is unchanged.') + warnings });

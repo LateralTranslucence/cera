@@ -31,7 +31,8 @@ export type IssueCode =
   | 'invalid-panel' // a panel was skipped on read
   | 'unknown-panel' // no definition for the panel's type
   | 'migration-failed' // stored panel couldn't be upgraded to the current version
-  | 'duplicate-panel-id';
+  | 'duplicate-panel-id'
+  | 'html-sanitized'; // disallowed HTML was removed from a rich-text field on save
 
 export interface PageIssue {
   severity: 'error' | 'warning';
@@ -295,8 +296,76 @@ export interface PrepareOptions {
   mode: SaveMode;
 }
 
+/* ------------------------------------------------------------------ */
+/* Rich-text sanitizing                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Sanitizes every `f.html()` value in the known boxes and panels (repeaters
+ * included), reporting a warning wherever something was removed. Unknown
+ * panels and keys are left alone: they aren't rendered.
+ */
+async function sanitizePage(ct: AnyContentType, page: StoredPage): Promise<{ page: StoredPage; issues: PageIssue[] }> {
+  // Lazy: keeps the sanitizer out of client bundles that only import field definitions.
+  const { sanitizeRichTextWithReport } = await import('./sanitize.ts');
+  const issues: PageIssue[] = [];
+
+  const clean = (fields: FieldMap, value: unknown, path: IssuePath, panelId?: string): unknown => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+    const out: Record<string, unknown> = { ...(value as Record<string, unknown>) };
+    for (const [key, field] of Object.entries(fields)) {
+      const v = out[key];
+      if (field.kind === 'html' && typeof v === 'string') {
+        const toolbar = (field.config as { toolbar?: 'full' | 'limited' } | undefined)?.toolbar ?? 'full';
+        const r = sanitizeRichTextWithReport(v, toolbar);
+        out[key] = r.html;
+        if (r.removed) {
+          issues.push({
+            severity: 'warning',
+            code: 'html-sanitized',
+            path: [...path, key],
+            panelId,
+            message:
+              toolbar === 'limited'
+                ? 'Formatting this field doesn’t allow was removed. It takes bold, italic, underline, strikethrough, lists, links and quotes.'
+                : 'HTML that isn’t allowed (scripts, inline styles, unsafe links) was removed.',
+          });
+        }
+      } else if (field.kind === 'repeater' && Array.isArray(v)) {
+        const sub = (field.config as { fields: FieldMap }).fields;
+        out[key] = v.map((item, i) => clean(sub, item, [...path, key, i], panelId));
+      }
+    }
+    return out;
+  };
+
+  const boxes = { ...page.boxes };
+  for (const [name, fields] of Object.entries(ct.boxes as BoxMap)) {
+    if (boxes[name]) boxes[name] = clean(fields, boxes[name], ['boxes', name]) as Record<string, unknown>;
+  }
+  const defs = new Map<string, AnyPanel>(ct.panels.map((p: AnyPanel) => [p.type, p]));
+  const panels = page.panels.map((p, index) => {
+    const def = defs.get(p.type);
+    // Only panels at the current version: a panel whose migration failed may not match the fields.
+    if (!def || p.v !== def.version) return p;
+    return { ...p, data: clean(def.fields, p.data, ['panels', index, 'data'], p.id) as Record<string, unknown> };
+  });
+  return { page: { ...page, boxes, panels }, issues };
+}
+
+/** validateForSave, then sanitize the rich text in what it returns. */
+async function validateAndSanitize(ct: AnyContentType, raw: unknown, mode: SaveMode): Promise<PrepareResult> {
+  const result = validateForSave(ct, raw, mode);
+  if (!result.page) return result;
+  const cleaned = await sanitizePage(ct, result.page);
+  const issues = [...result.issues, ...cleaned.issues];
+  return result.ok ? { ok: true, page: cleaned.page, issues } : { ok: false, page: cleaned.page, issues };
+}
+
 /**
  * Validates a page the admin wants to save and returns what to write.
+ * Rich-text (`f.html()`) values are sanitized; anything removed is reported
+ * as an `html-sanitized` warning, which doesn't block saving or publishing.
  *
  * `beforeSave` runs only when every known field is valid (always the case for
  * a successful publish, and for complete drafts). It sees a typed page with
@@ -304,10 +373,10 @@ export interface PrepareOptions {
  * positions afterward, and the hook's result is validated again.
  */
 export async function preparePageForSave<CT extends AnyContentType>(ct: CT, raw: unknown, opts: PrepareOptions): Promise<PrepareResult> {
-  const first = validateForSave(ct, raw, opts.mode);
+  const first = await validateAndSanitize(ct, raw, opts.mode);
   const hook = ct.hooks?.beforeSave;
   if (!first.ok || !first.page || !hook) return first;
-  if (first.issues.some((i) => i.code !== 'unknown-panel')) return first;
+  if (first.issues.some((i) => i.code !== 'unknown-panel' && i.code !== 'html-sanitized')) return first;
 
   const known = new Set(ct.panels.map((p: AnyPanel) => p.type));
   const unknown = first.page.panels.map((p, index) => ({ p, index })).filter(({ p }) => !known.has(p.type));
@@ -322,5 +391,12 @@ export async function preparePageForSave<CT extends AnyContentType>(ct: CT, raw:
   const panels = [...rest.panels];
   for (const { p, index } of unknown) panels.splice(Math.min(index, panels.length), 0, p);
 
-  return validateForSave(ct, { ...rest, id: first.page.id, contentType: first.page.contentType, panels }, opts.mode);
+  // Validate and sanitize again: the hook may have changed anything. The second
+  // pass sees HTML that is already clean, so carry over the first pass's
+  // sanitize warnings for the editor.
+  const second = await validateAndSanitize(ct, { ...rest, id: first.page.id, contentType: first.page.contentType, panels }, opts.mode);
+  const seen = new Set(second.issues.map((i) => `${i.code}:${i.path.join('.')}`));
+  const carried = first.issues.filter((i) => i.code === 'html-sanitized' && !seen.has(`${i.code}:${i.path.join('.')}`));
+  const issues = [...second.issues, ...carried];
+  return second.ok ? { ok: true, page: second.page, issues } : { ok: false, page: second.page, issues };
 }

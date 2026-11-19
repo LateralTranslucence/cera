@@ -38,6 +38,5 @@ If saves or page loads stall for many seconds, check Docker's memory: each local
 ## Not done yet
 
 - **Caching.** Pages render per request (`force-dynamic`); `revalidateTag` on publish is next.
-- **HTML sanitizing.** `components/Html.tsx` trusts stored HTML. Cera must sanitize `f.html()` values on save before this is safe for real sites.
 - **Media uploads.** Media fields take a path typed by hand; there is no upload flow or library yet.
 - **Admin extras.** Drag-to-reorder, a rich-text editor, a page picker for relations, deleting pages and revision history.

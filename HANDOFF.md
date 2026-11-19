@@ -45,7 +45,8 @@ src/
   defaults.ts       panelDefaults (Title, Background, Copy, ID) + omit()
   content-type.ts   defineContentType, PageDocument, PageOf, runtime pageSchema
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
-  document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish)
+  document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish; sanitizes rich text)
+  sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers;
@@ -67,6 +68,7 @@ test/
   supabase.test.ts  end to end: savePage → SQL → getPublishedPage / getPageForEditing
   render.test.ts    <Panels> output, hidden panels, a panel that fails to load
   metadata.test.ts  pageMetadata and JSON-LD escaping
+  sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   support/db.ts     PGlite (Postgres in-process, no Docker) with Supabase's roles stubbed, and a fake supabase-js client
 ```
 
@@ -89,6 +91,7 @@ test/
 15. **Drafts save with warnings; publishing requires valid fields.** A draft with an empty title or an invalid field still saves (the raw value is kept). Publishing turns those into errors. Bad slugs and duplicate panel ids are errors in both modes. `beforeSave` runs only on fully valid pages.
 16. **Draft and live are separate.** `cera_pages` is the working copy; every save writes a `cera_page_revisions` row; the live page is the revision with `is_published`. Saving a draft never changes the live site. (The theme's "Update" went live immediately.)
 17. **Browsers never write.** No insert/update/delete grants for `anon`/`authenticated`. The app server validates with `preparePageForSave` and calls `cera_save_page` with the service role, passing the user id from a verified session; the function re-checks that the user is an admin or editor. Roles live in `app_metadata.cera_role` (`admin | editor | viewer`), which users can't set themselves. Saves use optimistic locking (`expectedVersion`).
+18. **Rich text is stored as sanitized HTML** (decided 2026-11-19), not structured JSON. Existing WordPress content is HTML, and the toolbars are small enough for an allowlist. `preparePageForSave` sanitizes every `f.html()` value (repeaters included) with `sanitize-html`: the `full` toolbar follows `wp_kses_post` minus inline styles (headings, lists, links, images over http(s), tables, `class`); `limited` follows WordPress's "teeny" toolbar (bold, italic, underline, strikethrough, blockquote, lists, links). Links allow http(s), mailto, tel and relative paths; `target="_blank"` gets `rel="noopener noreferrer"`. Anything removed becomes an `html-sanitized` warning, which never blocks a save. Panels of unknown types aren't sanitized (they aren't rendered). Rendering trusts stored HTML because of this and decision 17.
 
 ## Pattern: keep fields in their own file
 
@@ -113,7 +116,7 @@ Builders choose `ZodOptional<S>` / `ZodDefault<S>` / `S` from the options throug
 |---|---|---|
 | `text`, `varchar` | `f.text()` | ✅ |
 | `textarea` | `f.textarea()` | ✅ |
-| `html`, `wp_editor`, `wp_editor_limited` | `f.html({ toolbar })` | ✅ (sanitizing still to do) |
+| `html`, `wp_editor`, `wp_editor_limited` | `f.html({ toolbar })` | ✅ sanitized on save. Import note: the theme stored `wp_editor` values without `<p>` tags and added them on output (`devo_autop`), so a WordPress importer must wrap paragraphs. |
 | `url` | `f.url()` (relative paths allowed) | ✅ |
 | `binary`, `toggle` | `f.toggle()` | ✅ |
 | `int` | `f.number({ int: true })` | ✅ |
@@ -147,7 +150,7 @@ B. ✅ **Minimal admin** (`examples/next-site/app/admin`, editor in `src/admin`)
    Still to do for the admin: drag-to-reorder (buttons for now), a media library with uploads (paths are typed by hand), a page picker for `relation`, a rich-text editor for `f.html()`, deleting pages, revision history, and client-side validation before save.
    Also still to do: replace `force-dynamic` with cached pages plus `revalidateTag` on publish.
 C. **Panel data loading.** Add an optional server-side `load(data, ctx)` to `definePanel` whose return type feeds the component's props (needed for `featured-post`'s relation and any panel that queries). Not needed by `blocks`, so it can follow A and B.
-D. **Sanitize `f.html()` on save.** The site's `Html` component trusts stored HTML. Sanitize in `preparePageForSave` with an allowlist per toolbar (`full`/`limited`) before any real site uses this. Needs a server-side HTML sanitizer dependency.
+D. ✅ **Sanitize `f.html()` on save** (decision 18). Checked in the admin: a script, an `onclick` and a `javascript:` link were removed on save, the editor showed the cleaned HTML with a warning under the field, and the preview rendered only the clean version. `savePage` now returns the stored page, and the editor switches to it after a save.
 
 **Then the original list:**
 
@@ -164,7 +167,6 @@ D. **Sanitize `f.html()` on save.** The site's `Html` component trusts stored HT
 
 - Should the extension model stay "core wins on collision", or should sites be able to override core panels?
 - Icons: keep an icon content type as in the theme, or use a bundled icon set?
-- Rich text storage: sanitized HTML (as the theme does) or structured JSON (Tiptap/Lexical)?
 - Migrating content from existing WordPress client sites: wanted, and if so for which sites first?
 
 ## Unrelated issue in the current theme
