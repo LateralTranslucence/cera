@@ -98,31 +98,38 @@ function FieldRow(props: FieldProps) {
 
   const className = `cera-field cera-field--${field.kind}${own.some((i) => i.severity === 'error') ? ' has-error' : own.length ? ' has-warning' : ''}`;
 
+  // Every field is a two-column row: label on the left, control and
+  // its note/counter/issues on the right (stacked in narrow containers).
   if (field.kind === 'toggle') {
     return (
       <div className={className}>
-        <label className="cera-check">
-          <input type="checkbox" id={id} checked={value === true} disabled={ctx.readOnly} onChange={(e) => props.onChange(e.target.checked)} />
+        <label htmlFor={id} className="cera-field__label">
           {label}
         </label>
+        <input type="checkbox" id={id} checked={value === true} disabled={ctx.readOnly} onChange={(e) => props.onChange(e.target.checked)} />
         {extras}
       </div>
     );
   }
 
   if (group) {
+    // Several inputs: a labeled group rather than a fieldset, so the label can sit in the left column.
     return (
-      <fieldset className={className} disabled={ctx.readOnly}>
-        <legend>{label}</legend>
+      <div className={className} role="group" aria-labelledby={`${id}-label`}>
+        <span id={`${id}-label`} className="cera-field__label">
+          {label}
+        </span>
         <Control {...props} id={id} />
         {extras}
-      </fieldset>
+      </div>
     );
   }
 
   return (
     <div className={className}>
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} className="cera-field__label">
+        {label}
+      </label>
       <Control {...props} id={id} />
       {extras}
     </div>
@@ -219,7 +226,7 @@ function Control({ field, value, onChange, path, ctx, id }: FieldProps & { id: s
       return (
         <div className="cera-group">
           <label className="cera-inline">
-            Colour
+            Color
             <input type="text" value={asString(bg.color)} placeholder="#2b2118" readOnly={ro} onChange={(e) => onChange(setIn(bg, ['color'], emptyToUndefined(e.target.value)))} />
           </label>
           <MediaInput value={bg.media} onChange={(m) => onChange(setIn(bg, ['media'], m))} readOnly={ro} />

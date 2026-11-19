@@ -13,6 +13,10 @@
   --cera-warning-bg: #fff6dc;
   --cera-success: #1d6b3a;
   --cera-success-bg: #e6f4ea;
+  /* Section header bars: neutral for page settings, warm for panels, in between for fixed panels like Hero. */
+  --cera-head-bg: #eceae5;
+  --cera-panel-head-bg: #f5e3cc;
+  --cera-panel-head-fixed-bg: #efe6da;
   --cera-radius: 8px;
 
   background: var(--cera-bg);
@@ -35,6 +39,9 @@
     --cera-warning-bg: #352a12;
     --cera-success: #7fd39b;
     --cera-success-bg: #15301f;
+    --cera-head-bg: #262420;
+    --cera-panel-head-bg: #3a2a18;
+    --cera-panel-head-fixed-bg: #2e2820;
   }
 }
 .cera-admin *, .cera-admin *::before, .cera-admin *::after { box-sizing: border-box; }
@@ -49,14 +56,14 @@
 .cera-shell__brand { font-weight: 700; color: var(--cera-fg) !important; text-decoration: none; margin-right: auto; }
 .cera-shell__user { color: var(--cera-muted); font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .cera-shell__bar form { margin: 0; }
-.cera-shell__main { max-width: 920px; margin: 0 auto; padding: 24px 16px 80px; }
+.cera-shell__main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
 
 /* Buttons */
 .cera-button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-surface); color: var(--cera-fg); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
 .cera-button:hover:not(:disabled) { border-color: var(--cera-accent); }
 .cera-button:disabled { opacity: 0.5; cursor: not-allowed; }
 .cera-button--primary { background: var(--cera-accent); border-color: var(--cera-accent); color: var(--cera-accent-fg); }
-/* Links styled as buttons: beat the generic `.cera-admin a` colour. */
+/* Links styled as buttons: beat the generic `.cera-admin a` color. */
 .cera-admin a.cera-button { color: var(--cera-fg); }
 .cera-admin a.cera-button--primary { color: var(--cera-accent-fg); }
 .cera-button--small { padding: 4px 10px; font-size: 0.9em; font-weight: 500; }
@@ -81,16 +88,50 @@
 
 .cera-section { background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: var(--cera-radius); padding: 16px; margin-top: 16px; }
 .cera-section > h2 { margin-bottom: 12px; }
-.cera-section > details > summary { cursor: pointer; list-style-position: outside; }
-.cera-section > details > summary h2 { display: inline; }
-.cera-section > details[open] > summary { margin-bottom: 12px; }
+/* Collapsible section headers are tinted bars across the top of the section. */
+.cera-section > details > summary {
+  display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer;
+  margin: -16px -16px 0; padding: 12px 16px;
+  background: var(--cera-head-bg);
+  border-radius: calc(var(--cera-radius) - 1px);
+}
+.cera-section > details > summary::-webkit-details-marker { display: none; }
+.cera-section > details > summary::before { content: "▸"; flex: none; width: 1ch; font-size: 0.9em; }
+.cera-section > details[open] > summary::before { content: "▾"; }
+.cera-section > details > summary h2 { display: block; }
+.cera-section > details[open] > summary { margin-bottom: 16px; border-bottom: 1px solid var(--cera-line); border-radius: calc(var(--cera-radius) - 1px) calc(var(--cera-radius) - 1px) 0 0; }
+.cera-section > details:not([open]) > summary { margin-bottom: -16px; }
+.cera-section > details > summary:hover { filter: brightness(0.97); }
+@media (prefers-color-scheme: dark) { .cera-section > details > summary:hover { filter: brightness(1.15); } }
 
 /* Fields */
-.cera-fields { display: grid; gap: 14px; }
-.cera-field { display: grid; gap: 4px; min-width: 0; }
-.cera-field > label, .cera-field > legend { font-weight: 600; font-size: 0.92em; }
-fieldset.cera-field { border: 1px solid var(--cera-line); border-radius: var(--cera-radius); padding: 10px 12px 12px; margin: 0; }
-fieldset.cera-field > legend { padding: 0 4px; }
+/*
+ * Each field is a row: label in a fixed left column, the control plus its
+ * note, counter and issues in the right column. Field lists are size
+ * containers, so rows stack (label above) wherever they get narrow:
+ * small screens, and fields nested deep in repeaters.
+ */
+.cera-fields { display: grid; gap: 14px; container-type: inline-size; }
+.cera-field {
+  display: grid;
+  grid-template-columns: var(--cera-label-width, 11rem) minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 4px;
+  align-items: start;
+  min-width: 0;
+}
+.cera-field > * { grid-column: 2; }
+.cera-field > .cera-field__label { grid-column: 1; grid-row: 1; padding-top: 8px; font-weight: 600; font-size: 0.92em; overflow-wrap: anywhere; text-align: right; }
+.cera-field--toggle > .cera-field__label { padding-top: 0; }
+.cera-field > input[type="checkbox"] { justify-self: start; width: 18px; height: 18px; margin: 0; }
+@container (max-width: 34rem) {
+  .cera-field { grid-template-columns: minmax(0, 1fr); }
+  .cera-field > *, .cera-field > .cera-field__label { grid-column: 1; grid-row: auto; padding-top: 0; text-align: left; }
+  .cera-field--toggle { grid-template-columns: auto minmax(0, 1fr); }
+  .cera-field--toggle > .cera-field__label { grid-column: 2; grid-row: 1; }
+  .cera-field--toggle > input[type="checkbox"] { grid-column: 1; grid-row: 1; }
+  .cera-field--toggle > :not(input):not(label) { grid-column: 1 / -1; }
+}
 .cera-admin input[type='text'], .cera-admin input[type='number'], .cera-admin input[type='password'], .cera-admin input[type='email'], .cera-admin input:not([type]), .cera-admin select, .cera-admin textarea {
   width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-bg); color: var(--cera-fg); font: inherit;
 }
@@ -131,15 +172,11 @@ fieldset.cera-field > legend { padding: 0 4px; }
 .cera-panel { min-width: 0; border-left: 3px solid var(--cera-accent); scroll-margin-top: 9rem; }
 .cera-panel.has-warning { border-color: var(--cera-warning); }
 .cera-panel--fixed { border-left-color: var(--cera-muted); }
-.cera-subsection { display: grid; gap: 14px; padding-top: 14px; border-top: 1px solid var(--cera-line); }
-.cera-subsection > h3 { margin: 0; font-size: 0.95rem; }
 .cera-panel.is-hidden { border-left-style: dashed; }
 .cera-panel.is-hidden .cera-panel__type, .cera-panel.is-hidden .cera-panel__title { opacity: 0.55; }
-.cera-panel > details > summary { display: flex; align-items: center; gap: 10px; list-style: none; }
-.cera-panel > details > summary::-webkit-details-marker { display: none; }
-/* Flex summaries drop the native arrow; draw one to match the boxes. */
-.cera-panel > details > summary::before { content: '▸'; flex: none; width: 1ch; margin-left: -4px; font-size: 0.9em; }
-.cera-panel > details[open] > summary::before { content: '▾'; }
+.cera-panel > details > summary { background: var(--cera-panel-head-bg); }
+.cera-panel--fixed > details > summary { background: var(--cera-panel-head-fixed-bg); }
+.cera-panel.is-hidden > details > summary { background: var(--cera-head-bg); }
 .cera-panel > details > summary h2.cera-panel__type { display: block; flex: none; }
 .cera-panel__title { flex: 1 1 auto; min-width: 0; color: var(--cera-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cera-panel > details > summary .cera-item-buttons, .cera-item > summary .cera-item-buttons { flex: none; }
@@ -156,4 +193,4 @@ fieldset.cera-field > legend { padding: 0 4px; }
 @media (max-width: 640px) { .cera-table .cera-hide-sm { display: none; } }
 
 /* Sign-in */
-.cera-login { max-width: 360px; margin: 10vh auto 0; padding: 24px; background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: var(--cera-radius); display: grid; gap: 14px; }
+.cera-login { max-width: 360px; margin: 10vh auto 0; padding: 24px; background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: var(--cera-radius); display: grid; gap: 14px; container-type: inline-size; }

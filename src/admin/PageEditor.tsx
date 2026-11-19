@@ -83,6 +83,7 @@ export function PageEditor({
   const [addType, setAddType] = useState<string>(ct.panels[0]?.type ?? '');
   // Which panels are expanded. Newly added panels start open.
   const [openPanels, setOpenPanels] = useState<Set<string>>(() => new Set());
+  const [pageOpen, setPageOpen] = useState(true);
   // A panel just added from the Page section: bring it into view once rendered.
   const [scrollTo, setScrollTo] = useState<string | null>(null);
   useEffect(() => {
@@ -176,6 +177,8 @@ export function PageEditor({
   const pageBoxes = allBoxes.filter(([name]) => inPage.has(name));
   const leadBoxes = allBoxes.filter(([name]) => lead.has(name) && !inPage.has(name));
   const otherBoxes = allBoxes.filter(([name]) => !inPage.has(name) && !lead.has(name));
+  // The Page section stays open while anything in it has an issue, so errors can't hide.
+  const pageSectionHasIssues = pageIssues.length > 0 || pageBoxes.some(([name]) => issuesAt(issues, ['boxes', name]).length > 0);
   const errorCount = issues.filter((i) => i.severity === 'error').length;
 
   return (
@@ -227,75 +230,79 @@ export function PageEditor({
       {errorCount > 0 && <p className="cera-note">{errorCount} error{errorCount === 1 ? '' : 's'}; each is shown next to its field.</p>}
 
       <section className="cera-section">
-        <h2>Page</h2>
-        <div className="cera-fields">
-          <div className="cera-field">
-            <label htmlFor="cera-title">Title</label>
-            <input
-              id="cera-title"
-              type="text"
-              value={page.title}
-              readOnly={readOnly}
-              onChange={(e) => {
-                const title = e.target.value;
-                update({ ...page, title, ...(slugTouched ? {} : { slug: slugify(title) }) });
-              }}
-            />
-          </div>
-          <div className="cera-field">
-            <label htmlFor="cera-slug">Slug</label>
-            <input
-              id="cera-slug"
-              type="text"
-              value={page.slug}
-              readOnly={readOnly}
-              onChange={(e) => {
-                setSlugTouched(true);
-                update({ ...page, slug: e.target.value });
-              }}
-            />
-            <p className="cera-note">The page’s address: lowercase words joined by hyphens. “home” is the front page.</p>
-          </div>
-          <IssueList issues={pageIssues} />
-          {pageBoxes.map(([name, fields]) => (
-            <div key={name} className="cera-subsection">
-              <h3>{humanize(name)}</h3>
-              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
-            </div>
-          ))}
-          {!readOnly && ct.panels.length > 0 && (
+        <details
+          open={pageOpen || pageSectionHasIssues}
+          onToggle={(e) => setPageOpen((e.currentTarget as HTMLDetailsElement).open)}
+        >
+          <summary>
+            <h2>Page</h2>
+          </summary>
+          <div className="cera-fields">
             <div className="cera-field">
-              <label htmlFor="cera-add-panel">Add a panel</label>
-              <div className="cera-add-panel">
-                <select id="cera-add-panel" value={addType} onChange={(e) => setAddType(e.target.value)}>
-                  {ct.panels.map((p: AnyPanel) => (
-                    <option key={p.type} value={p.type}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="cera-button"
-                  onClick={() => {
-                    const def = defs.get(addType);
-                    if (!def) return;
-                    const panel = newPanel(def);
-                    setOpenPanels((s) => new Set(s).add(panel.id));
-                    setScrollTo(panel.id);
-                    setPanels([...page.panels, panel]);
-                  }}
-                >
-                  Add
-                </button>
-              </div>
-              <p className="cera-note">
-                {page.panels.length === 0 ? 'No panels yet. ' : `${page.panels.length} panel${page.panels.length === 1 ? '' : 's'} below. `}
-                New panels are added at the end; use ↑ ↓ on a panel to move it.
-              </p>
+              <label htmlFor="cera-title" className="cera-field__label">Title</label>
+              <input
+                id="cera-title"
+                type="text"
+                value={page.title}
+                readOnly={readOnly}
+                onChange={(e) => {
+                  const title = e.target.value;
+                  update({ ...page, title, ...(slugTouched ? {} : { slug: slugify(title) }) });
+                }}
+              />
             </div>
-          )}
-        </div>
+            <div className="cera-field">
+              <label htmlFor="cera-slug" className="cera-field__label">Slug</label>
+              <input
+                id="cera-slug"
+                type="text"
+                value={page.slug}
+                readOnly={readOnly}
+                onChange={(e) => {
+                  setSlugTouched(true);
+                  update({ ...page, slug: e.target.value });
+                }}
+              />
+              <p className="cera-note">The page’s address: lowercase words joined by hyphens. “home” is the front page.</p>
+            </div>
+            <IssueList issues={pageIssues} />
+            {pageBoxes.map(([name, fields]) => (
+              <FieldMapForm key={name} fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
+            ))}
+            {!readOnly && ct.panels.length > 0 && (
+              <div className="cera-field">
+                <label htmlFor="cera-add-panel" className="cera-field__label">Add a panel</label>
+                <div className="cera-add-panel">
+                  <select id="cera-add-panel" value={addType} onChange={(e) => setAddType(e.target.value)}>
+                    {ct.panels.map((p: AnyPanel) => (
+                      <option key={p.type} value={p.type}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="cera-button"
+                    onClick={() => {
+                      const def = defs.get(addType);
+                      if (!def) return;
+                      const panel = newPanel(def);
+                      setOpenPanels((s) => new Set(s).add(panel.id));
+                      setScrollTo(panel.id);
+                      setPanels([...page.panels, panel]);
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <p className="cera-note">
+                  {page.panels.length === 0 ? 'No panels yet. ' : `${page.panels.length} panel${page.panels.length === 1 ? '' : 's'} below. `}
+                  New panels are added at the end; use ↑ ↓ on a panel to move it.
+                </p>
+              </div>
+            )}
+          </div>
+        </details>
       </section>
 
       {otherBoxes.map(([name, fields]) => (

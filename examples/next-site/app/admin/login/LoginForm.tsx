@@ -14,11 +14,11 @@ export function LoginForm({ notice }: { notice?: string }) {
         </p>
       )}
       <div className="cera-field">
-        <label htmlFor="email">Email</label>
+        <label htmlFor="email" className="cera-field__label">Email</label>
         <input id="email" name="email" type="text" inputMode="email" autoComplete="username" required />
       </div>
       <div className="cera-field">
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password" className="cera-field__label">Password</label>
         <input id="password" name="password" type="password" autoComplete="current-password" required />
       </div>
       <button type="submit" className="cera-button cera-button--primary" disabled={pending}>

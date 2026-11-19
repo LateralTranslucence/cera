@@ -121,7 +121,7 @@ export const mediaRef = z.object({
 });
 export type MediaRef = z.output<typeof mediaRef>;
 
-/** TODO(verify): match the theme's `background` field (image or .mp4 video, colour, overlay?). */
+/** TODO(verify): match the theme's `background` field (image or .mp4 video, color, overlay?). */
 export const background = z.object({
   media: mediaRef.optional(),
   color: z.string().optional(),

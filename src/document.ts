@@ -301,7 +301,7 @@ export interface PrepareOptions {
  * `beforeSave` runs only when every known field is valid (always the case for
  * a successful publish, and for complete drafts). It sees a typed page with
  * the known panels only; unknown panels are put back at their original
- * positions afterwards, and the hook's result is validated again.
+ * positions afterward, and the hook's result is validated again.
  */
 export async function preparePageForSave<CT extends AnyContentType>(ct: CT, raw: unknown, opts: PrepareOptions): Promise<PrepareResult> {
   const first = validateForSave(ct, raw, opts.mode);

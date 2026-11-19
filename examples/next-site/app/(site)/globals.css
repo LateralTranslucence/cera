@@ -31,7 +31,7 @@ a { color: var(--accent); }
 .site-nav__brand { font-weight: 700; color: var(--fg); text-decoration: none; margin-right: auto; }
 
 .hero { position: relative; padding: 80px 16px; background-size: cover; background-position: center; border-bottom: 1px solid var(--line); overflow: hidden; }
-/* A set background (colour, image or video) is assumed dark; text goes light. */
+/* A set background (color, image or video) is assumed dark; text goes light. */
 .hero--has-bg { color: #fff; }
 .hero--has-bg a { color: #f3c98b; }
 .hero--overlay::before { content: ''; position: absolute; inset: 0; background: rgb(0 0 0 / 0.45); }
