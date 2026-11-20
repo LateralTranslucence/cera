@@ -195,6 +195,27 @@
 /* Sign-in */
 .cera-login { max-width: 360px; margin: 10vh auto 0; padding: 24px; background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: var(--cera-radius); display: grid; gap: 14px; container-type: inline-size; }
 
+/* Media fields */
+.cera-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.cera-link-button { padding: 4px 2px; border: 0; background: none; color: var(--cera-accent); font: inherit; font-size: 0.9em; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.cera-link-button.cera-danger { color: var(--cera-muted); }
+.cera-media { padding: 10px; border: 1px dashed var(--cera-line); border-radius: 6px; }
+.cera-media--drop { border-color: var(--cera-accent); background: var(--cera-panel-head-bg); }
+.cera-media .cera-note, .cera-media .cera-status { margin: 0; }
+.cera-media__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cera-media__preview { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.cera-media__preview > img, .cera-media__preview > video, .cera-media__embed { flex: none; width: 120px; height: 80px; object-fit: cover; border-radius: 4px; background: var(--cera-bg); border: 1px solid var(--cera-line); }
+.cera-media__embed { display: grid; place-items: center; color: var(--cera-muted); font-size: 0.85em; }
+.cera-media__meta { display: grid; gap: 2px; min-width: 0; font-size: 0.85em; color: var(--cera-muted); }
+.cera-media__name { color: var(--cera-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cera-media__library { display: grid; gap: 8px; padding-top: 8px; border-top: 1px solid var(--cera-line); }
+.cera-media__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 22rem; overflow: auto; }
+.cera-media__grid button { display: grid; gap: 4px; width: 100%; padding: 4px; border: 2px solid transparent; border-radius: 6px; background: var(--cera-bg); color: var(--cera-fg); font: inherit; font-size: 0.8em; text-align: left; cursor: pointer; }
+.cera-media__grid button:hover, .cera-media__grid button:focus-visible { border-color: var(--cera-accent); }
+.cera-media__grid button[aria-pressed='true'] { border-color: var(--cera-accent); background: var(--cera-panel-head-bg); }
+.cera-media__grid img, .cera-media__grid video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; }
+.cera-media__grid span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Page picker (relation fields) */
 .cera-picker { display: grid; gap: 8px; }
 .cera-picker__picked { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }

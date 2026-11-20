@@ -14,7 +14,7 @@ export default function Blocks({ data, panel }: PanelPropsOf<typeof blocksFields
       <ul className="blocks" style={{ ['--per-row' as string]: data.perRow }}>
         {visible.map((b) => (
           <li key={b._id} className="block">
-            {b.media && <img src={mediaUrl(b.media)} alt={b.media.alt ?? ''} />}
+            {b.media && <img src={mediaUrl(b.media)} alt={b.media.alt ?? ''} width={b.media.width} height={b.media.height} loading="lazy" />}
             {b.title && <h3>{b.title}</h3>}
             {b.copy && <Html html={b.copy} />}
             {b.cta && <CtaLink cta={b.cta} />}

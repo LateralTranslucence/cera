@@ -1,7 +1,16 @@
 'use server';
 import { redirect } from 'next/navigation';
+import type { MediaItem, MediaQuery, MediaUploadDone, MediaUploadPrepared, MediaUploadRequest, MediaUploadResult } from '@lateraltranslucence/cera';
 import type { PageOption, PageQuery, SaveInput } from '@lateraltranslucence/cera/admin';
-import { listPages, savePage, unpublishPage, type SaveResult } from '@lateraltranslucence/cera/supabase';
+import {
+  finishMediaUpload,
+  listMedia,
+  listPages,
+  prepareMediaUpload,
+  savePage,
+  unpublishPage,
+  type SaveResult,
+} from '@lateraltranslucence/cera/supabase';
 import { contentTypes } from '@/cera';
 import { requireStaff, userClient } from '@/lib/auth.ts';
 import { serviceClient } from '@/lib/supabase.ts';
@@ -44,6 +53,27 @@ export async function findPagesAction(query: PageQuery): Promise<PageOption[]> {
 export async function unpublishPageAction(pageId: string): Promise<void> {
   const { user } = await requireStaff('editor');
   await unpublishPage(serviceClient(), pageId, user.id);
+}
+
+/**
+ * Media uploads (see `finishMediaUpload` for the steps). The browser uploads
+ * to Storage itself with the signed URL from the first action; the second
+ * checks what arrived and records it.
+ */
+export async function prepareMediaUploadAction(request: MediaUploadRequest): Promise<MediaUploadPrepared> {
+  await requireStaff('editor');
+  return prepareMediaUpload(serviceClient(), request);
+}
+
+export async function finishMediaUploadAction(done: MediaUploadDone): Promise<MediaUploadResult> {
+  const { user } = await requireStaff('editor');
+  return finishMediaUpload(serviceClient(), done, { userId: user.id });
+}
+
+/** The media library, read as the signed-in user. */
+export async function findMediaAction(query: MediaQuery): Promise<MediaItem[]> {
+  const staff = await requireStaff();
+  return listMedia(staff.client, query);
 }
 
 export type SignInState = { error?: string };

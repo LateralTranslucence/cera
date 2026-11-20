@@ -22,7 +22,7 @@ export default function FeaturedPost({ data, loaded, panel }: PanelPropsOf<typeo
     <section id={data.anchorId} className="panel panel--featured-post" data-index={panel.index}>
       {image && (
         <figure className="featured-post__image">
-          <img src={mediaUrl(image)} alt={image.alt ?? ''} />
+          <img src={mediaUrl(image)} alt={image.alt ?? ''} width={image.width} height={image.height} loading="lazy" />
         </figure>
       )}
       <div className="featured-post__content">

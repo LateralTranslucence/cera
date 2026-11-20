@@ -10,6 +10,7 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { AnyField, FieldMap, Option, OptionsContext, OptionsSource } from '../fields.ts';
 import type { PageIssue } from '../document.ts';
+import { MediaInput, type MediaContext } from './media.tsx';
 import { fieldDefault, getIn, humanize, issuesAt, moveItem, newId, newRepeaterItem, removeItem, setIn, type Path } from './state.ts';
 
 /** What the page picker asks for: by ids (to show picked pages), or a search within content types. */
@@ -35,6 +36,8 @@ export interface FormContext {
   readOnly: boolean;
   /** Finds pages for `relation` fields (a server action). Without it, relations take pasted ids. */
   findPages?: (query: PageQuery) => Promise<PageOption[]>;
+  /** Uploads and the media library. Without it, media fields take typed paths and URLs only. */
+  media?: MediaContext;
 }
 
 type Change = (value: unknown) => void;
@@ -241,7 +244,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
       return <SelectFrom field={field} value={value} onChange={onChange} id={id} ctx={ctx} />;
 
     case 'media':
-      return <MediaInput value={value} onChange={onChange} readOnly={ro} />;
+      return <MediaInput value={value} onChange={onChange} readOnly={ro} media={ctx.media} accept={(field.config as { accept?: Array<'image' | 'video' | 'embed'> } | undefined)?.accept} />;
 
     case 'background': {
       const bg = isObject(value) ? value : {};
@@ -251,7 +254,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
             Color
             <input type="text" value={asString(bg.color)} placeholder="#2b2118" readOnly={ro} onChange={(e) => onChange(setIn(bg, ['color'], emptyToUndefined(e.target.value)))} />
           </label>
-          <MediaInput value={bg.media} onChange={(m) => onChange(setIn(bg, ['media'], m))} readOnly={ro} />
+          <MediaInput value={bg.media} onChange={(m) => onChange(setIn(bg, ['media'], m))} readOnly={ro} media={ctx.media} accept={['image', 'video']} />
           <label className="cera-check">
             <input type="checkbox" checked={bg.overlay === true} disabled={ro} onChange={(e) => onChange(setIn(bg, ['overlay'], e.target.checked))} />
             Dark overlay
@@ -330,43 +333,6 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
 /* ------------------------------------------------------------------ */
 /* Compound controls                                                   */
 /* ------------------------------------------------------------------ */
-
-function MediaInput({ value, onChange, readOnly }: { value: unknown; onChange: Change; readOnly: boolean }) {
-  const m = isObject(value) ? value : undefined;
-  const set = (key: string, v: unknown) => {
-    const next = setIn(m ?? {}, [key], v);
-    // A media reference needs a path; clearing the path clears the reference.
-    if (!asString(next.path)) return onChange(undefined);
-    // References typed by hand use the path as their id until uploads exist.
-    const manual = !m?.id || m.id === m.path;
-    onChange({ kind: 'image', ...next, id: manual ? asString(next.path) : m.id });
-  };
-  return (
-    <div className="cera-group cera-media">
-      <label className="cera-inline">
-        Path or URL
-        <input type="text" value={asString(m?.path)} placeholder="uploads/photo.jpg or https://…" readOnly={readOnly} onChange={(e) => set('path', e.target.value)} />
-      </label>
-      {m && (
-        <>
-          <label className="cera-inline">
-            Alt text
-            <input type="text" value={asString(m.alt)} readOnly={readOnly} onChange={(e) => set('alt', emptyToUndefined(e.target.value))} />
-          </label>
-          <label className="cera-inline">
-            Kind
-            <select value={asString(m.kind) || 'image'} disabled={readOnly} onChange={(e) => set('kind', e.target.value)}>
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-              <option value="embed">Embed</option>
-            </select>
-          </label>
-        </>
-      )}
-      <p className="cera-note">Uploads come later. Paths are objects in the cera-media bucket.</p>
-    </div>
-  );
-}
 
 function CtaInput({
   value,
