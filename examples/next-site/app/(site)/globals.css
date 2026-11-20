@@ -46,6 +46,10 @@ a { color: var(--accent); }
 .panel__copy { max-width: 70ch; }
 .panel.has-background { color: #fff; }
 .panel.has-background a { color: #f3c98b; }
+/* A light background color (no image, video or overlay) gets dark text instead (PanelFrame's isLightColor). */
+.panel.has-light-background, .hero--light { color: #1d1b18; }
+.panel.has-light-background a, .hero--light a { color: #6b3a07; }
+.panel.has-light-background .cta, .hero--light .cta { border-color: currentColor; }
 /* Cards keep their own light background, so their links keep the accent. */
 .panel.has-background :is(.block, .quote, .decision-tree__card) a { color: var(--accent); }
 .panel.has-overlay::before { content: ''; position: absolute; inset: 0; background: rgb(0 0 0 / 0.45); }

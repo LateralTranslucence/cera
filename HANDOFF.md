@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 86 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 87 tests).
 
 ## Goal
 
@@ -49,6 +49,8 @@ src/
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish; sanitizes rich text)
   roles.ts          CERA_ROLES, their labels, CeraUser
+  color.ts          isLightColor: dark text beats light on a background color (WCAG contrast); PanelFrame adds
+                    has-light-background for a light color with no image, video or overlay
   media.ts          uploadable types (MEDIA_TYPES), size limits, MediaItem and the upload request/result types, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   panels/           the `/panels` entry: the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,

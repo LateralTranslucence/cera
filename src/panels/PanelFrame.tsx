@@ -12,10 +12,13 @@
  *   has-background        a color, image or video is set
  *   has-overlay           the dark overlay is on
  *   has-video             the background is a video
+ *   has-light-background  a light color with no image, video or overlay:
+ *                         dark text reads better on it (isLightColor)
  */
 import type { CSSProperties, ReactNode } from 'react';
 import type { Background } from '../fields.ts';
 import type { PanelContext } from '../panel.ts';
+import { isLightColor } from '../color.ts';
 import { mediaUrl } from '../media-url.ts';
 import { Html } from './Html.tsx';
 
@@ -54,6 +57,8 @@ export function PanelFrame({
   if (bg?.color || media) classes.push('has-background');
   if (bg?.overlay) classes.push('has-overlay');
   if (video) classes.push('has-video');
+  // An image, a video or the overlay makes the panel dark whatever the color.
+  if (!media && !bg?.overlay && isLightColor(bg?.color)) classes.push('has-light-background');
 
   return (
     <section
