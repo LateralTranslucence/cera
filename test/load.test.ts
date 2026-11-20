@@ -113,3 +113,40 @@ test('load gets the panel data and context (page, panel, draft)', async () => {
     ctx: { draft: true, page: { id: 'p1', contentType: 'landing_page', slug: 'x' }, panel: { pageId: 'p1', panelId: 'a', index: 0, contentType: 'landing_page' } },
   });
 });
+
+function pageWithPosts(data: Record<string, unknown>) {
+  const raw = structuredClone(sample) as unknown as StoredPage;
+  raw.panels = [{ id: 'ps', type: 'cera/posts', v: 1, data }];
+  return readPage(landingPage, raw).page;
+}
+
+const MARS = '00000000-0000-4000-8000-0000000000bb';
+const mars: LinkedPage = {
+  id: MARS,
+  contentType: 'landing_page',
+  contentTypeLabel: 'Landing Page',
+  slug: 'mars',
+  title: 'Mars',
+  url: '/mars',
+  image: { id: 'i', path: '2026/11/mars.png', kind: 'image', width: 800, height: 500 },
+};
+const HIDDEN = '00000000-0000-4000-8000-0000000000cc';
+
+test('Posts: one card per page, in the picked order; pages that don’t resolve are left out', async () => {
+  const calls: string[][] = [];
+  const html = await render(pageWithPosts({ title: 'Read next', posts: [MARS, HIDDEN, ABOUT], perRow: 2 }), resolver([about, mars], calls));
+  assert.deepEqual(calls, [[MARS, HIDDEN, ABOUT]]);
+  assert.match(html, /<ul class="posts" style="--per-row:2">/);
+  assert.deepEqual([...html.matchAll(/class="post-card__link">([^<]+)</g)].map((m) => m[1]), ['Mars', 'About us']);
+  assert.match(html, /<li class="post-card"><img class="post-card__image" src="[^"]*2026\/11\/mars\.png" alt="" width="800" height="500" loading="lazy"\/>/);
+  assert.match(html, /<p class="post-card__type">Landing Page<\/p><h3><a href="\/about" class="post-card__link">About us<\/a><\/h3><p class="post-card__description">Who we are\.<\/p>/);
+});
+
+test('Posts: the slider needs more pages than fit in a row; no pages, no panel', async () => {
+  const pages = resolver([about, mars]);
+  assert.match(await render(pageWithPosts({ title: 'More', posts: [MARS, ABOUT], perRow: 1, slider: true }), pages), /<div class="posts-slider" role="region" aria-label="More: posts"><ul class="posts posts--slider"/);
+  // Two cards fit in a row of three: a plain grid.
+  assert.doesNotMatch(await render(pageWithPosts({ posts: [MARS, ABOUT], slider: true }), pages), /posts-slider/);
+  assert.equal(await render(pageWithPosts({ title: 'Empty', posts: [HIDDEN] }), pages), '');
+  assert.equal(await render(pageWithPosts({ title: 'Empty' }), pages), '');
+});

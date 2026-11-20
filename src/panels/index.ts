@@ -23,6 +23,8 @@ export { featuredMedia, featuredMediaFields } from './featured-media.ts';
 export { featuredPost, featuredPostFields } from './featured-post.ts';
 export type { FeaturedPostLoaded } from './featured-post.load.ts';
 export { gallery, galleryFields } from './gallery.ts';
+export { posts, postsFields } from './posts.ts';
+export type { PostsLoaded } from './posts.load.ts';
 export { quotes, quotesFields } from './quotes.ts';
 export { stats, statsFields } from './stats.ts';
 export { tabs, tabsFields } from './tabs.ts';
@@ -36,6 +38,7 @@ import { decisionTree } from './decision-tree.ts';
 import { featuredMedia } from './featured-media.ts';
 import { featuredPost } from './featured-post.ts';
 import { gallery } from './gallery.ts';
+import { posts } from './posts.ts';
 import { quotes } from './quotes.ts';
 import { stats } from './stats.ts';
 import { tabs } from './tabs.ts';
@@ -43,7 +46,7 @@ import { text } from './text.ts';
 import { textMedia } from './text-media.ts';
 
 /** Every core panel, in the order the admin lists them (by label). */
-export const corePanels = [accordion, blocks, cta, decisionTree, featuredMedia, featuredPost, gallery, quotes, stats, tabs, text, textMedia] as const;
+export const corePanels = [accordion, blocks, cta, decisionTree, featuredMedia, featuredPost, gallery, posts, quotes, stats, tabs, text, textMedia] as const;
 
 export { PanelFrame, type PanelFrameData } from './PanelFrame.tsx';
 export { CtaLink, CtaLinks } from './CtaLinks.tsx';
