@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./next": "./src/next/index.ts",
+    "./next/cache": "./src/next/cache.ts",
     "./panels": "./src/panels/index.ts",
     "./supabase": "./src/supabase/index.ts",
     "./admin": "./src/admin/index.ts",
@@ -23,13 +24,17 @@
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.119.0",
-    "react": "^19.3.1"
+    "react": "^19.3.1",
+    "next": "^16.4.0"
   },
   "peerDependenciesMeta": {
     "@supabase/supabase-js": {
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "next": {
       "optional": true
     }
   },

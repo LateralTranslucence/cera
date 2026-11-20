@@ -26,7 +26,9 @@ If saves or page loads stall for many seconds, check Docker's memory: each local
 
 Vercel builds from `examples/next-site` but installs from the repository root (`cd ../.. && npm ci`), because the site uses the library through the npm workspace. Its environment variables are `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `CERA_PREVIEW_SECRET`.
 
-The same values, plus the hosted admin account, are in `.env.hosted` (not committed). To apply new migrations and seed the hosted project:
+The same values, plus the hosted admin account, are in `.env.hosted` (not committed). Live page reads are cached (`lib/pages.ts`); publishing or unpublishing in the admin clears the cache at once. Changes made any other way, like the seed below, show on the live site within five minutes.
+
+To apply new migrations and seed the hosted project:
 
 ```bash
 supabase db push --linked
@@ -52,6 +54,5 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 
 ## Not done yet
 
-- **Caching.** Pages render per request (`force-dynamic`); `revalidateTag` on publish is next.
 - **Media library management.** Uploading and picking work; deleting or editing library items doesn't yet.
 - **Admin extras.** Drag-to-reorder, a rich-text editor, deleting pages and revision history.

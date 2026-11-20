@@ -16,6 +16,7 @@ import {
   type UserResult,
 } from '@lateraltranslucence/cera/supabase';
 import { contentTypes } from '@/cera';
+import { pagesChanged } from '@lateraltranslucence/cera/next/cache';
 import { requireStaff, userClient } from '@/lib/auth.ts';
 import { serviceClient } from '@/lib/supabase.ts';
 
@@ -30,7 +31,10 @@ export async function savePageAction(input: SaveInput): Promise<SaveResult> {
   if (!ct) {
     return { ok: false, reason: 'invalid', issues: [{ severity: 'error', code: 'invalid-page', path: ['contentType'], message: 'Unknown content type.' }] };
   }
-  return savePage(serviceClient(), ct, input.page, { mode: input.mode, expectedVersion: input.expectedVersion, userId: user.id });
+  const result = await savePage(serviceClient(), ct, input.page, { mode: input.mode, expectedVersion: input.expectedVersion, userId: user.id });
+  // Publishing changes the live site; a draft save doesn't, so it keeps the cache.
+  if (result.ok && input.mode === 'publish') pagesChanged();
+  return result;
 }
 
 /**
@@ -57,6 +61,7 @@ export async function findPagesAction(query: PageQuery): Promise<PageOption[]> {
 export async function unpublishPageAction(pageId: string): Promise<void> {
   const { user } = await requireStaff('editor');
   await unpublishPage(serviceClient(), pageId, user.id);
+  pagesChanged();
 }
 
 /**
