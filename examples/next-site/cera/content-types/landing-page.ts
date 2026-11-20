@@ -1,6 +1,6 @@
 // Ported from DO_Landing_Page (class-landing-page.php).
 import { defineContentType, f } from '@lateraltranslucence/cera';
-import { blocks, featuredPost, textMedia } from '@lateraltranslucence/cera/panels';
+import { corePanels } from '@lateraltranslucence/cera/panels';
 
 const stripHtml = (html = '') => html.replace(/<[^>]+>/g, '').trim();
 
@@ -36,8 +36,8 @@ export const landingPage = defineContentType({
     },
   },
 
-  // Core panels (cera/…). A site's own panels go here too, under their own names.
-  panels: [blocks, featuredPost, textMedia],
+  // Every core panel (cera/…). A site's own panels go here too, under their own names.
+  panels: corePanels,
 
   // Admin settings sit with title and slug; the hero renders like a panel, so it sits with them.
   editor: { pageBoxes: ['admin'], leadBoxes: ['hero'] },

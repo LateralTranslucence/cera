@@ -18,6 +18,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       <nav className="site-nav">
         <a href="/" className="site-nav__brand">Cera</a>
         <a href="/about">About</a>
+        <a href="/panels">Panels</a>
       </nav>
       {children}
     </>
