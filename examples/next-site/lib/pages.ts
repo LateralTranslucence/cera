@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { draftMode } from 'next/headers';
 import { createPageResolver, getDraftPage, getPublishedPage } from '@lateraltranslucence/cera/supabase';
+import { cacheLive } from '@lateraltranslucence/cera/next/cache';
 import type { LoadContext, PageIssue } from '@lateraltranslucence/cera';
 import { contentTypes, landingPage } from '../cera/index.ts';
 import { publicClient, serviceClient } from './supabase.ts';
@@ -12,16 +13,30 @@ function logIssue(slug: string) {
 }
 
 /**
- * Loads a landing page for rendering: the live revision normally, the working
- * copy in draft mode. Returns `null` when there's nothing to show (missing, or
- * hidden outside draft mode). Cached per request, so `generateMetadata` and the
- * page share one query.
+ * Live reads go through Next's data cache (tag `cera:pages`); publishing in
+ * the admin clears it (see `pagesChanged` in app/admin/actions.ts). Issues are
+ * logged when the page is actually read, not on every cache hit.
+ */
+const publishedLandingPage = cacheLive('landing-page', (slug: string) =>
+  getPublishedPage(publicClient(), landingPage, slug, { onIssue: logIssue(slug) }),
+);
+// Clients are made per read, not when this module loads: `next build` loads
+// it without Supabase settings (CI has none).
+const liveLinkedPages = cacheLive('linked-pages', (ids: string[]) =>
+  createPageResolver(publicClient(), contentTypes, { draft: false }).byIds(ids),
+);
+
+/**
+ * Loads a landing page for rendering: the live revision normally (cached),
+ * the working copy in draft mode (never cached). Returns `null` when there's
+ * nothing to show (missing, or hidden outside draft mode). Deduplicated per
+ * request, so `generateMetadata` and the page share one read.
  */
 export const loadLandingPage = cache(async (slug: string) => {
   const { isEnabled: draft } = await draftMode();
   const result = draft
     ? await getDraftPage(serviceClient(), landingPage, slug, { onIssue: logIssue(slug) })
-    : await getPublishedPage(publicClient(), landingPage, slug, { onIssue: logIssue(slug) });
+    : await publishedLandingPage(slug);
 
   if (!result) return null;
   if (!draft && landingPage.hidden?.(result.page)) return null;
@@ -29,10 +44,11 @@ export const loadLandingPage = cache(async (slug: string) => {
 });
 
 /**
- * How panels' `load` looks up linked pages: published pages for visitors,
- * working copies in draft-mode preview (behind the draft-mode cookie, so the
+ * How panels' `load` looks up linked pages: published pages for visitors
+ * (cached, like the pages themselves), working copies in draft-mode preview (behind the draft-mode cookie, so the
  * secret key is safe to use there).
  */
 export function loadContextFor(draft: boolean): Pick<LoadContext, 'pages' | 'draft'> {
-  return { pages: createPageResolver(draft ? serviceClient() : publicClient(), contentTypes, { draft }), draft };
+  if (draft) return { pages: createPageResolver(serviceClient(), contentTypes, { draft }), draft };
+  return { pages: { byIds: (ids) => liveLinkedPages([...ids]) }, draft };
 }

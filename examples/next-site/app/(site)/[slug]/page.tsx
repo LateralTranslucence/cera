@@ -6,8 +6,8 @@ import { LandingPageView } from '@/components/LandingPageView.tsx';
 import { mediaUrl } from '@lateraltranslucence/cera/supabase';
 import { loadContextFor, loadLandingPage } from '@/lib/pages.ts';
 
-// Rendered per request for now. Caching with revalidateTag on publish comes
-// with the admin.
+// Rendered per request (draft-mode preview needs the request); the database
+// reads behind it are cached and cleared on publish (lib/pages.ts).
 export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ slug: string }> };
