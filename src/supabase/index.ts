@@ -3,9 +3,10 @@
  *
  * Which client to pass:
  *   - getPublishedPage: any client (anon is enough).
- *   - getPageForEditing / getDraftPage: a client signed in as a staff user
- *     (row-level security limits working copies to admin/editor/viewer).
- *   - savePage / unpublishPage: a service-role client, on the server only.
+ *   - getPageForEditing / getDraftPage / listPages / pageHistory / pageLinks:
+ *     a client signed in as a staff user (row-level security limits working
+ *     copies to admin/editor/viewer).
+ *   - savePage / unpublishPage / deletePage / restoreRevision: a service-role client, on the server only.
  *     `userId` must come from a verified session (e.g. supabase.auth.getUser()
  *     on the server), never from the request body. The database checks that
  *     this user is an admin or editor.
@@ -329,6 +330,17 @@ export async function savePage<CT extends AnyContentType>(
         p_publish: opts.mode === 'publish',
         p_user: opts.userId,
       });
+  return finishSave(ct, prepared, data, error, opts.mode === 'publish' ? 'published' : 'draft');
+}
+
+/** Maps a save rpc's outcome to a SaveResult and runs the content type's `afterSave`. */
+async function finishSave(
+  ct: AnyContentType,
+  prepared: { page: StoredPage; issues: PageIssue[] },
+  data: unknown,
+  error: { code?: string; message: string } | null,
+  status: 'published' | 'draft',
+): Promise<SaveResult> {
   if (error) {
     const reason = error.code ? REASONS[error.code] : undefined;
     if (reason) return { ok: false, reason, message: error.message, issues: prepared.issues };
@@ -339,7 +351,7 @@ export async function savePage<CT extends AnyContentType>(
   const afterSave = ct.hooks?.afterSave;
   if (afterSave) {
     try {
-      const { page } = readPage(ct, prepared.page, { status: opts.mode === 'publish' ? 'published' : 'draft' });
+      const { page } = readPage(ct, prepared.page, { status });
       await afterSave(page);
     } catch (e) {
       console.error(`cera: afterSave failed for page ${saved.id}`, e);
@@ -371,4 +383,143 @@ export async function publishDuePages(client: SupabaseClient): Promise<number> {
   const { data, error } = await client.rpc('cera_publish_due');
   if (error) fail(error);
   return Number(data ?? 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Deleting                                                            */
+/* ------------------------------------------------------------------ */
+
+export type DeletePageResult =
+  | { ok: true; id: string; contentType: string; slug: string }
+  /** `live`: unpublish it first. `conflict`: someone saved it after the caller loaded it. */
+  | { ok: false; reason: 'live' | 'conflict' | 'forbidden' | 'not-found'; message: string };
+
+const DELETE_REASONS: Record<string, 'live' | 'conflict' | 'forbidden' | 'not-found'> = {
+  CE422: 'live',
+  CE409: 'conflict',
+  '42501': 'forbidden',
+  CE404: 'not-found',
+};
+
+/**
+ * Deletes a page and all its history, for good. Only a page that isn't live,
+ * and only at `expectedVersion` (so nobody deletes changes they haven't seen).
+ * Pages linking to it stop showing it; check `pageLinks` first to warn.
+ * Service-role client only (see top of file).
+ */
+export async function deletePage(client: SupabaseClient, pageId: string, opts: { expectedVersion: number; userId: string }): Promise<DeletePageResult> {
+  const { data, error } = await client.rpc('cera_delete_page', { p_page_id: pageId, p_expected_version: opts.expectedVersion, p_user: opts.userId });
+  if (error) {
+    const reason = error.code ? DELETE_REASONS[error.code] : undefined;
+    if (reason) return { ok: false, reason, message: error.message };
+    fail(error);
+  }
+  return { ok: true, ...(data as { id: string; contentType: string; slug: string }) };
+}
+
+/** Another page that links to a page: `draft` when its working copy does, `live` when its published version does. */
+export interface PageLink {
+  id: string;
+  title: string;
+  slug: string;
+  contentType: string;
+  draft: boolean;
+  live: boolean;
+}
+
+/** The other pages that link to a page (e.g. from a Featured Post panel). Staff client (row-level security). */
+export async function pageLinks(client: SupabaseClient, pageId: string): Promise<PageLink[]> {
+  const { data, error } = await client.rpc('cera_page_links', { p_page_id: pageId });
+  if (error) fail(error);
+  return (data as PageLink[] | null) ?? [];
+}
+
+/* ------------------------------------------------------------------ */
+/* History                                                             */
+/* ------------------------------------------------------------------ */
+
+/** One saved version of a page. */
+export interface PageRevision {
+  version: number;
+  /** How it was saved. A 'schedule' revision's `schedule` says whether it went live. */
+  kind: 'draft' | 'publish' | 'schedule';
+  title: string;
+  slug: string;
+  /** This is the version on the live site now. */
+  live: boolean;
+  createdAt: string;
+  /** Email of whoever saved it, when the caller may see it. */
+  createdBy?: string;
+  schedule?: { at: string; status: 'pending' | 'published' | 'cancelled' | 'failed' };
+  /** Saved by restoring this older version. */
+  restoredFrom?: number;
+}
+
+type HistoryRow = {
+  page_version: number;
+  kind: PageRevision['kind'];
+  title: string;
+  slug: string;
+  is_published: boolean;
+  created_at: string;
+  created_by_email: string | null;
+  scheduled_for: string | null;
+  schedule_status: 'pending' | 'published' | 'cancelled' | 'failed' | null;
+  restored_from: number | null;
+};
+
+/**
+ * A page's saved versions, newest first: `limit` of them (default 30, at most
+ * 100), older than version `before` when given. Staff client (row-level security).
+ */
+export async function pageHistory(client: SupabaseClient, pageId: string, opts: { before?: number; limit?: number } = {}): Promise<PageRevision[]> {
+  const { data, error } = await client.rpc('cera_page_history', { p_page_id: pageId, p_before: opts.before ?? null, p_limit: opts.limit ?? 30 });
+  if (error) fail(error);
+  return ((data as HistoryRow[] | null) ?? []).map((r) => ({
+    version: r.page_version,
+    kind: r.kind,
+    title: r.title,
+    slug: r.slug,
+    live: r.is_published,
+    createdAt: r.created_at,
+    ...(r.created_by_email && { createdBy: r.created_by_email }),
+    ...(r.scheduled_for && r.schedule_status && { schedule: { at: r.scheduled_for, status: r.schedule_status } }),
+    ...(r.restored_from !== null && { restoredFrom: r.restored_from }),
+  }));
+}
+
+/**
+ * Restores an old version: its content becomes the working copy, saved as a
+ * new draft (checked and upgraded like any draft save). The live page is
+ * unchanged until someone publishes. Returns what a draft `savePage` would;
+ * `not-found` when the page has no such version. Service-role client only.
+ */
+export async function restoreRevision<CT extends AnyContentType>(
+  client: SupabaseClient,
+  ct: CT,
+  pageId: string,
+  version: number,
+  opts: { expectedVersion: number; userId: string },
+): Promise<SaveResult> {
+  const { data: row, error: readError } = await client
+    .from('cera_page_revisions')
+    .select(PAGE_COLUMNS)
+    .eq('page_id', pageId)
+    .eq('page_version', version)
+    .maybeSingle();
+  if (readError) fail(readError);
+  if (!row || (row as PageRow).content_type !== ct.name) {
+    return { ok: false, reason: 'not-found', message: `This page has no version ${version}.`, issues: [] };
+  }
+
+  const prepared = await preparePageForSave(ct, toStored(pageId, row as PageRow), { mode: 'draft' });
+  if (!prepared.ok) return { ok: false, reason: 'invalid', issues: prepared.issues };
+
+  const { data, error } = await client.rpc('cera_restore_revision', {
+    p_page: prepared.page,
+    p_from: version,
+    p_expected_version: opts.expectedVersion,
+    p_user: opts.userId,
+  });
+  return finishSave(ct, prepared, data, error, 'draft');
 }

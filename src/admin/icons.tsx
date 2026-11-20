@@ -91,6 +91,13 @@ const PATHS = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  history: (
+    <>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5" />
+      <path d="M3.5 3.5v5h5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />
