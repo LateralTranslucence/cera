@@ -7,8 +7,10 @@
 import { useRouter } from 'next/navigation';
 import type { StoredPage } from '@lateraltranslucence/cera';
 import { mediaUploader, PageEditor } from '@lateraltranslucence/cera/admin';
+import type { PageSchedule } from '@lateraltranslucence/cera/supabase';
 import { contentTypes } from '@/cera';
 import {
+  cancelScheduleAction,
   findMediaAction,
   findPagesAction,
   finishMediaUploadAction,
@@ -26,11 +28,17 @@ export function EditorClient({
   page,
   version,
   published,
+  unpublishedChanges = false,
+  updatedAt,
+  schedule,
   readOnly,
 }: {
   page: StoredPage;
   version: number;
   published: boolean;
+  unpublishedChanges?: boolean;
+  updatedAt?: string;
+  schedule?: PageSchedule;
   readOnly: boolean;
 }) {
   const router = useRouter();
@@ -44,6 +52,9 @@ export function EditorClient({
       page={page}
       version={version}
       published={published}
+      unpublishedChanges={unpublishedChanges}
+      updatedAt={updatedAt}
+      schedule={schedule}
       readOnly={readOnly}
       onSave={savePageAction}
       findPages={findPagesAction}
@@ -51,10 +62,16 @@ export function EditorClient({
       onUnpublish={async () => {
         await unpublishPageAction(page.id);
       }}
+      onCancelSchedule={async () => {
+        await cancelScheduleAction(page.id);
+      }}
       onSaved={() => {
         // A new page lives at /admin/pages/new until its first save.
         if (version === 0) router.replace(`/admin/pages/${page.id}`);
+        // Refresh the server-rendered sidebar (titles, the page count).
+        else router.refresh();
       }}
+      backHref="/admin"
       previewHref={(slug) => `/admin/preview?slug=${encodeURIComponent(slug)}`}
     />
   );

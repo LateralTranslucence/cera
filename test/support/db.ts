@@ -17,7 +17,7 @@ const SUPABASE_STUB = `
   create role service_role nologin bypassrls;
 
   create schema auth;
-  create table auth.users (id uuid primary key, raw_app_meta_data jsonb not null default '{}'::jsonb);
+  create table auth.users (id uuid primary key, email text, raw_app_meta_data jsonb not null default '{}'::jsonb);
   create function auth.jwt() returns jsonb language sql stable as $$
     select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
   $$;
@@ -143,7 +143,13 @@ export function fakeSupabase(
 
   const rpc = async (fn: string, args: Record<string, unknown> = {}) => {
     const keys = Object.keys(args);
-    const sql = `select public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as result`;
+    const call = `public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')})`;
+    // Functions that return rows come back as a JSON array, as PostgREST sends them (times as ISO strings).
+    const procs = await db.query<{ proretset: boolean }>(
+      `select p.proretset from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = $1 limit 1`,
+      [fn],
+    );
+    const sql = procs.rows[0]?.proretset ? `select coalesce(jsonb_agg(t), '[]'::jsonb) as result from ${call} t` : `select ${call} as result`;
     const params = keys.map((k) => {
       const v = args[k];
       return v !== null && typeof v === 'object' ? JSON.stringify(v) : v;

@@ -109,6 +109,20 @@ export interface EditablePage {
   /** Pass to `savePage` as `expectedVersion`. */
   version: number;
   published: boolean;
+  /** The version that's live. */
+  liveVersion?: number;
+  /** Published, and the working copy differs from what's live. */
+  unpublishedChanges: boolean;
+  /** When the working copy was last saved. */
+  updatedAt: string;
+  /** A pending scheduled publish. */
+  schedule?: PageSchedule;
+}
+
+/** A scheduled publish: `version` goes live at `at` (ISO time). `failed` explains one that couldn't. */
+export interface PageSchedule {
+  at: string;
+  version: number;
 }
 
 /**
@@ -118,18 +132,36 @@ export interface EditablePage {
 export async function getPageForEditing(client: SupabaseClient, ct: AnyContentType, id: string): Promise<EditablePage | null> {
   const { data, error } = await client
     .from('cera_pages')
-    .select(`id, version, ${PAGE_COLUMNS}`)
+    .select(`id, version, updated_at, ${PAGE_COLUMNS}`)
     .eq('content_type', ct.name)
     .eq('id', id)
     .maybeSingle();
   if (error) fail(error);
   if (!data) return null;
-  const row = data as PageRow & { id: string; version: number };
+  const row = data as PageRow & { id: string; version: number; updated_at: string };
 
-  const live = await client.from('cera_page_revisions').select('id').eq('page_id', id).eq('is_published', true).maybeSingle();
+  const live = await client.from('cera_page_revisions').select(`page_version, ${PAGE_COLUMNS}`).eq('page_id', id).eq('is_published', true).maybeSingle();
   if (live.error) fail(live.error);
+  const liveRow = live.data as (PageRow & { page_version: number }) | null;
+  const content = (r: PageRow) => JSON.stringify([r.title, r.slug, r.boxes, r.panels]);
+  const pending = await client
+    .from('cera_page_revisions')
+    .select('page_version, scheduled_for')
+    .eq('page_id', id)
+    .eq('schedule_status', 'pending')
+    .maybeSingle();
+  if (pending.error) fail(pending.error);
+  const sched = pending.data as { page_version: number; scheduled_for: string } | null;
 
-  return { page: toStored(row.id, row), version: row.version, published: live.data !== null };
+  return {
+    page: toStored(row.id, row),
+    version: row.version,
+    published: liveRow !== null,
+    liveVersion: liveRow?.page_version,
+    unpublishedChanges: liveRow !== null && content(liveRow) !== content(row),
+    updatedAt: row.updated_at,
+    ...(sched && { schedule: { at: sched.scheduled_for, version: sched.page_version } }),
+  };
 }
 
 /**
@@ -186,21 +218,38 @@ export interface PageSummary {
   title: string;
   version: number;
   updatedAt: string;
+  /** Email of whoever saved last, when the caller may see it. */
+  updatedBy?: string;
+  panelCount: number;
   published: boolean;
+  /** Published, and the saved working copy differs from what's live. */
+  unpublishedChanges: boolean;
+  schedule?: PageSchedule;
+  /** Why the last scheduled publish didn't happen, if nothing newer is live. */
+  scheduleFailed?: string;
 }
+
+type SummaryRow = {
+  id: string;
+  content_type: string;
+  slug: string;
+  title: string;
+  version: number;
+  updated_at: string;
+  updated_by_email: string | null;
+  panel_count: number;
+  live_version: number | null;
+  live_differs: boolean | null;
+  scheduled_for: string | null;
+  scheduled_version: number | null;
+  schedule_failed: string | null;
+};
 
 /** Working copies for the admin's page list, sorted by title. Staff client (row-level security). */
 export async function listPages(client: SupabaseClient, opts: { contentType?: string } = {}): Promise<PageSummary[]> {
-  let query = client.from('cera_pages').select('id, content_type, slug, title, version, updated_at');
-  if (opts.contentType) query = query.eq('content_type', opts.contentType);
-  const { data, error } = await query;
+  const { data, error } = await client.rpc('cera_page_summaries', { p_content_type: opts.contentType ?? null });
   if (error) fail(error);
-
-  const live = await client.from('cera_page_revisions').select('page_id').eq('is_published', true);
-  if (live.error) fail(live.error);
-  const published = new Set((live.data as Array<{ page_id: string }>).map((r) => r.page_id));
-
-  return (data as Array<{ id: string; content_type: string; slug: string; title: string; version: number; updated_at: string }>)
+  return ((data as SummaryRow[] | null) ?? [])
     .map((r) => ({
       id: r.id,
       contentType: r.content_type,
@@ -208,7 +257,12 @@ export async function listPages(client: SupabaseClient, opts: { contentType?: st
       title: r.title,
       version: r.version,
       updatedAt: r.updated_at,
-      published: published.has(r.id),
+      ...(r.updated_by_email && { updatedBy: r.updated_by_email }),
+      panelCount: r.panel_count,
+      published: r.live_version !== null,
+      unpublishedChanges: r.live_differs === true,
+      ...(r.scheduled_for && r.scheduled_version !== null && { schedule: { at: r.scheduled_for, version: r.scheduled_version } }),
+      ...(r.schedule_failed && { scheduleFailed: r.schedule_failed }),
     }))
     .sort((a, b) => (a.title || a.slug).localeCompare(b.title || b.slug));
 }
@@ -218,7 +272,10 @@ export async function listPages(client: SupabaseClient, opts: { contentType?: st
 /* ------------------------------------------------------------------ */
 
 export interface SaveOptions {
-  mode: SaveMode;
+  /** 'schedule' validates like 'publish', saves, and makes this version go live at `publishAt`. */
+  mode: SaveMode | 'schedule';
+  /** For 'schedule': when the page goes live (an ISO time in the future). */
+  publishAt?: string;
   /** 0 to create a page; otherwise the `version` from `getPageForEditing`. */
   expectedVersion: number;
   /** The signed-in user, from a verified server-side session. */
@@ -229,13 +286,14 @@ export type SaveResult =
   /** `page` is what was stored: defaults filled in, panels upgraded, rich text sanitized. */
   | { ok: true; id: string; version: number; revisionId: string; page: StoredPage; issues: PageIssue[] }
   | { ok: false; reason: 'invalid'; issues: PageIssue[] }
-  | { ok: false; reason: 'conflict' | 'forbidden' | 'not-found' | 'slug-taken'; message: string; issues: PageIssue[] };
+  | { ok: false; reason: 'conflict' | 'forbidden' | 'not-found' | 'slug-taken' | 'bad-time'; message: string; issues: PageIssue[] };
 
-const REASONS: Record<string, 'conflict' | 'forbidden' | 'not-found' | 'slug-taken'> = {
+const REASONS: Record<string, 'conflict' | 'forbidden' | 'not-found' | 'slug-taken' | 'bad-time'> = {
   CE409: 'conflict',
   '42501': 'forbidden',
   CE404: 'not-found',
   '23505': 'slug-taken',
+  CE400: 'bad-time',
 };
 
 /**
@@ -249,15 +307,28 @@ export async function savePage<CT extends AnyContentType>(
   raw: unknown,
   opts: SaveOptions,
 ): Promise<SaveResult> {
-  const prepared = await preparePageForSave(ct, raw, { mode: opts.mode });
+  const schedule = opts.mode === 'schedule';
+  const publishAt = schedule ? new Date(String(opts.publishAt ?? '')) : null;
+  if (publishAt && (Number.isNaN(publishAt.getTime()) || publishAt.getTime() <= Date.now())) {
+    return { ok: false, reason: 'bad-time', message: 'Pick a time in the future.', issues: [] };
+  }
+  // A scheduled version must be ready to go live, so it's checked like a publish.
+  const prepared = await preparePageForSave(ct, raw, { mode: schedule ? 'publish' : (opts.mode as SaveMode) });
   if (!prepared.ok) return { ok: false, reason: 'invalid', issues: prepared.issues };
 
-  const { data, error } = await client.rpc('cera_save_page', {
-    p_page: prepared.page,
-    p_expected_version: opts.expectedVersion,
-    p_publish: opts.mode === 'publish',
-    p_user: opts.userId,
-  });
+  const { data, error } = publishAt
+    ? await client.rpc('cera_schedule_page', {
+        p_page: prepared.page,
+        p_expected_version: opts.expectedVersion,
+        p_publish_at: publishAt.toISOString(),
+        p_user: opts.userId,
+      })
+    : await client.rpc('cera_save_page', {
+        p_page: prepared.page,
+        p_expected_version: opts.expectedVersion,
+        p_publish: opts.mode === 'publish',
+        p_user: opts.userId,
+      });
   if (error) {
     const reason = error.code ? REASONS[error.code] : undefined;
     if (reason) return { ok: false, reason, message: error.message, issues: prepared.issues };
@@ -278,8 +349,26 @@ export async function savePage<CT extends AnyContentType>(
   return { ok: true, ...saved, page: prepared.page, issues: prepared.issues };
 }
 
-/** Takes a page off the live site. Service-role client only (see top of file). */
+/** Takes a page off the live site, and cancels a pending scheduled publish. Service-role client only (see top of file). */
 export async function unpublishPage(client: SupabaseClient, pageId: string, userId: string): Promise<void> {
   const { error } = await client.rpc('cera_unpublish_page', { p_page_id: pageId, p_user: userId });
   if (error) fail(error);
+}
+
+/** Cancels a page's pending scheduled publish. Service-role client only. */
+export async function cancelSchedule(client: SupabaseClient, pageId: string, userId: string): Promise<void> {
+  const { error } = await client.rpc('cera_cancel_schedule', { p_page_id: pageId, p_user: userId });
+  if (error) fail(error);
+}
+
+/**
+ * Publishes every scheduled version that's due; returns how many went live.
+ * On Supabase a pg_cron job already runs this every minute (migration
+ * 20261121000000); call it yourself only where pg_cron isn't available.
+ * Service-role client only.
+ */
+export async function publishDuePages(client: SupabaseClient): Promise<number> {
+  const { data, error } = await client.rpc('cera_publish_due');
+  if (error) fail(error);
+  return Number(data ?? 0);
 }

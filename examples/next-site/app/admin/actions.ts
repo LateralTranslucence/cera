@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { CeraRole, MediaDeleteResult, MediaItem, MediaQuery, MediaUpdate, MediaUse, MediaUploadDone, MediaUploadPrepared, MediaUploadRequest, MediaUploadResult } from '@lateraltranslucence/cera';
 import type { PageOption, PageQuery, SaveInput } from '@lateraltranslucence/cera/admin';
 import {
+  cancelSchedule,
   createCeraUser,
   deleteMedia,
   finishMediaUpload,
@@ -34,7 +35,7 @@ export async function savePageAction(input: SaveInput): Promise<SaveResult> {
   if (!ct) {
     return { ok: false, reason: 'invalid', issues: [{ severity: 'error', code: 'invalid-page', path: ['contentType'], message: 'Unknown content type.' }] };
   }
-  const result = await savePage(serviceClient(), ct, input.page, { mode: input.mode, expectedVersion: input.expectedVersion, userId: user.id });
+  const result = await savePage(serviceClient(), ct, input.page, { mode: input.mode, publishAt: input.publishAt, expectedVersion: input.expectedVersion, userId: user.id });
   // Publishing changes the live site; a draft save doesn't, so it keeps the cache.
   if (result.ok && input.mode === 'publish') pagesChanged();
   return result;
@@ -65,6 +66,16 @@ export async function unpublishPageAction(pageId: string): Promise<void> {
   const { user } = await requireStaff('editor');
   await unpublishPage(serviceClient(), pageId, user.id);
   pagesChanged();
+}
+
+/**
+ * Cancels a page's scheduled publish. Scheduling itself goes through
+ * savePageAction (mode 'schedule'); the database's pg_cron job publishes it
+ * when due, and the cached live page catches up within its revalidate time.
+ */
+export async function cancelScheduleAction(pageId: string): Promise<void> {
+  const { user } = await requireStaff('editor');
+  await cancelSchedule(serviceClient(), pageId, user.id);
 }
 
 /**

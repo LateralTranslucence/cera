@@ -1,24 +1,35 @@
 'use client';
 /**
- * The page editor: page fields, boxes and the panel list, with save draft /
- * publish. It edits the raw stored page and hands it to `onSave` (a server
- * action that calls `savePage`), so validation and the database checks all
- * happen on the server.
+ * The page editor: a sticky top bar (back, title, state, save draft,
+ * schedule, publish) over a stack of cards: Page settings, then the lead
+ * boxes (the hero), then the panels, which drag to reorder.
+ *
+ * It edits the raw stored page and hands it to `onSave` (a server action
+ * that calls `savePage`), so validation and the database checks all happen
+ * on the server.
  */
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { AnyContentType, BoxMap } from '../content-type.ts';
-import type { OptionsContext } from '../fields.ts';
+import type { FieldMap, OptionsContext } from '../fields.ts';
 import type { PageIssue, SaveMode, StoredPage } from '../document.ts';
 import { upgradePanel, type StoredPanel } from '../migrate.ts';
 import type { AnyPanel } from '../panel.ts';
-import type { SaveResult } from '../supabase/index.ts';
+import type { PageSchedule, SaveResult } from '../supabase/index.ts';
+import { Dialog } from './Dialog.tsx';
 import { FieldMapForm, IssueList, type FormContext } from './fields.tsx';
-import { humanize, issuesAt, moveItem, newPanel, removeItem, setIn, slugify } from './state.ts';
+import { GripIcon, Icon } from './icons.tsx';
+import { formatScheduled, formatWhen } from './PageList.tsx';
+import { duplicatePanel, humanize, issuesAt, moveItem, newPanel, panelName, panelSummary, removeItem, setIn, slugify } from './state.ts';
 
 export interface SaveInput {
   page: StoredPage;
   expectedVersion: number;
-  mode: SaveMode;
+  /** 'schedule' saves and makes this version go live at `publishAt`. */
+  mode: SaveMode | 'schedule';
+  publishAt?: string;
 }
 
 export interface PageEditorProps {
@@ -27,13 +38,23 @@ export interface PageEditorProps {
   /** 0 for a page that hasn't been saved yet. */
   version: number;
   published: boolean;
+  /** Published, and the saved working copy differs from what's live. */
+  unpublishedChanges?: boolean;
+  /** When the working copy was last saved. */
+  updatedAt?: string;
+  /** A pending scheduled publish. */
+  schedule?: PageSchedule;
   onSave: (input: SaveInput) => Promise<SaveResult>;
   /** Takes the page off the live site. Shown when the page is published. */
   onUnpublish?: () => Promise<void>;
+  /** Cancels a pending scheduled publish. Without it, the editor can't schedule. */
+  onCancelSchedule?: () => Promise<void>;
   /** Called after a successful save, e.g. to move from /new to the page's URL. */
-  onSaved?: (result: Extract<SaveResult, { ok: true }>, mode: SaveMode) => void;
+  onSaved?: (result: Extract<SaveResult, { ok: true }>, mode: SaveInput['mode']) => void;
   /** Link that opens the page in draft-mode preview. */
   previewHref?: (slug: string) => string;
+  /** The "Pages" link in the top bar. */
+  backHref?: string;
   /** Content types offered to `selectFrom` option sources. */
   contentTypes?: OptionsContext['contentTypes'];
   /** Finds pages for `relation` fields' page picker (a server action). Without it, relations take pasted ids. */
@@ -45,6 +66,11 @@ export interface PageEditorProps {
 }
 
 type Status = { tone: 'info' | 'success' | 'error'; text: string; reload?: boolean } | null;
+type Dialogs = 'unpublish' | 'schedule' | 'add' | null;
+
+const SETTINGS = '__settings';
+/** The editor announces moves itself (with panel names), so dnd-kit's generic announcements are off. */
+const QUIET = { announcements: { onDragStart: () => undefined, onDragOver: () => undefined, onDragEnd: () => undefined, onDragCancel: () => undefined } };
 
 /**
  * Upgrades known panels to their current version so the form matches the
@@ -64,15 +90,33 @@ function upgradeForEditing(ct: AnyContentType, page: StoredPage): StoredPage {
   return { ...page, panels };
 }
 
+/** Tomorrow at 9:00 in the browser's time zone, as a datetime-local value. */
+function defaultScheduleTime(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(9, 0, 0, 0);
+  return toLocalInput(d);
+}
+
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function PageEditor({
   contentType: ct,
   page: initialPage,
   version: initialVersion,
   published: initialPublished,
+  unpublishedChanges: initialUnpublished = false,
+  updatedAt,
+  schedule: initialSchedule,
   onSave,
   onUnpublish,
+  onCancelSchedule,
   onSaved,
   previewHref,
+  backHref,
   contentTypes,
   findPages,
   media,
@@ -81,17 +125,27 @@ export function PageEditor({
   const [page, setPage] = useState(() => upgradeForEditing(ct, initialPage));
   const [version, setVersion] = useState(initialVersion);
   const [published, setPublished] = useState(initialPublished);
+  const [unpublished, setUnpublished] = useState(initialUnpublished);
+  const [schedule, setSchedule] = useState(initialSchedule);
+  const [savedAt, setSavedAt] = useState(updatedAt);
   const [issues, setIssues] = useState<PageIssue[]>([]);
   const [status, setStatus] = useState<Status>(null);
   const [dirty, setDirty] = useState(false);
   const [slugTouched, setSlugTouched] = useState(initialVersion > 0);
   const [saving, startSaving] = useTransition();
-  const [addType, setAddType] = useState<string>(ct.panels[0]?.type ?? '');
-  // Which panels are expanded. Newly added panels start open.
-  const [openPanels, setOpenPanels] = useState<Set<string>>(() => new Set());
-  const [pageOpen, setPageOpen] = useState(true);
-  // A panel just added from the Page section: bring it into view once rendered.
+  const [dialog, setDialog] = useState<Dialogs>(null);
+  const [scheduleAt, setScheduleAt] = useState('');
+  // Which cards are open. A new page opens its settings, since it needs a title.
+  const [open, setOpen] = useState<Set<string>>(() => new Set(initialVersion === 0 ? [SETTINGS] : []));
+  const [deleted, setDeleted] = useState<{ panel: StoredPanel; index: number; name: string } | null>(null);
+  const [announcement, setAnnouncement] = useState('');
   const [scrollTo, setScrollTo] = useState<string | null>(null);
+  // Re-render now and then so "Saved 5 min ago" stays true.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
   useEffect(() => {
     if (!scrollTo) return;
     document.getElementById(`cera-panel-${scrollTo}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -99,10 +153,7 @@ export function PageEditor({
   }, [scrollTo]);
 
   const defs = useMemo(() => new Map<string, AnyPanel>(ct.panels.map((p: AnyPanel) => [p.type, p])), [ct]);
-  const options = useMemo<OptionsContext>(
-    () => ({ contentTypes: contentTypes ?? [{ name: ct.name, label: ct.label, public: true }] }),
-    [contentTypes, ct],
-  );
+  const options = useMemo<OptionsContext>(() => ({ contentTypes: contentTypes ?? [{ name: ct.name, label: ct.label, public: true }] }), [contentTypes, ct]);
   const ctx: FormContext = { issues, options, readOnly, findPages, media };
 
   // Warn before leaving with unsaved changes.
@@ -118,23 +169,37 @@ export function PageEditor({
     setDirty(true);
   };
   const setPanels = (panels: StoredPanel[]) => update({ ...page, panels });
+  const toggle = (key: string) =>
+    setOpen((s) => {
+      const next = new Set(s);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // The latest page state, readable after an await in the save handler.
   const pageRef = useRef(page);
   pageRef.current = page;
 
-  const save = (mode: SaveMode) => {
-    // Outside the transition, so it shows immediately (updates inside a
-    // transition are held back until it finishes).
-    setStatus({ tone: 'info', text: mode === 'publish' ? 'Publishing…' : 'Saving…' });
+  const save = (mode: SaveInput['mode'], publishAt?: string) => {
+    // Outside the transition, so it shows immediately (updates inside a transition are held back until it finishes).
+    setStatus({ tone: 'info', text: mode === 'publish' ? 'Publishing…' : mode === 'schedule' ? 'Scheduling…' : 'Saving…' });
     const sent = page;
     startSaving(async () => {
       try {
-        const result = await onSave({ page: sent, expectedVersion: version, mode });
+        const result = await onSave({ page: sent, expectedVersion: version, mode, ...(publishAt && { publishAt }) });
         setIssues(result.issues);
         if (result.ok) {
           setVersion(result.version);
-          if (mode === 'publish') setPublished(true);
+          setSavedAt(new Date().toISOString());
+          if (mode === 'publish') {
+            setPublished(true);
+            setUnpublished(false);
+            setSchedule(undefined);
+          } else {
+            setUnpublished(published);
+            if (mode === 'schedule' && publishAt) setSchedule({ at: publishAt, version: result.version });
+          }
           // Show what was stored (sanitized rich text, filled-in defaults), unless
           // the editor kept typing during the save: then keep their newer edits.
           if (pageRef.current === sent) {
@@ -143,13 +208,23 @@ export function PageEditor({
           }
           setSlugTouched(true);
           const warnings = result.issues.length ? ` ${result.issues.length} warning${result.issues.length === 1 ? '' : 's'} below.` : '';
-          setStatus({ tone: 'success', text: (mode === 'publish' ? 'Published.' : 'Draft saved. The live page is unchanged.') + warnings });
+          const done =
+            mode === 'publish'
+              ? 'Published.'
+              : mode === 'schedule' && publishAt
+                ? `Scheduled to publish ${formatScheduled(publishAt)}. Changes you make now wait for the next publish.`
+                : published
+                  ? 'Draft saved. The live page is unchanged.'
+                  : 'Draft saved.';
+          setStatus({ tone: 'success', text: done + warnings });
           onSaved?.(result, mode);
           return;
         }
+        const verb = mode === 'publish' ? 'published' : mode === 'schedule' ? 'scheduled' : 'saved';
         switch (result.reason) {
           case 'invalid':
-            setStatus({ tone: 'error', text: mode === 'publish' ? 'Not published. Fix the errors below.' : 'Not saved. Fix the errors below.' });
+            setStatus({ tone: 'error', text: `Not ${verb}. Fix the errors below.` });
+            setOpen((s) => new Set(s).add(SETTINGS));
             break;
           case 'conflict':
             setStatus({ tone: 'error', text: 'Someone else saved this page after you opened it. Reload to get their version (your unsaved changes will be lost).', reload: true });
@@ -158,10 +233,14 @@ export function PageEditor({
             setStatus({ tone: 'error', text: 'Your account is not allowed to edit pages.' });
             break;
           case 'slug-taken':
-            setStatus({ tone: 'error', text: `Another page already uses the slug “${page.slug}”.` });
+            setStatus({ tone: 'error', text: `Another page already uses the address “/${page.slug}”.` });
+            setOpen((s) => new Set(s).add(SETTINGS));
             break;
           case 'not-found':
             setStatus({ tone: 'error', text: 'This page no longer exists.' });
+            break;
+          case 'bad-time':
+            setStatus({ tone: 'error', text: 'Not scheduled. Pick a time in the future.' });
             break;
         }
       } catch (e) {
@@ -171,12 +250,15 @@ export function PageEditor({
   };
 
   const unpublish = () => {
-    if (!onUnpublish || !window.confirm('Take this page off the live site? Your saved content and history are kept.')) return;
+    if (!onUnpublish) return;
+    setDialog(null);
     setStatus({ tone: 'info', text: 'Unpublishing…' });
     startSaving(async () => {
       try {
         await onUnpublish();
         setPublished(false);
+        setUnpublished(false);
+        setSchedule(undefined);
         setStatus({ tone: 'success', text: 'Unpublished. The page is no longer on the live site.' });
       } catch (e) {
         setStatus({ tone: 'error', text: `Unpublish failed: ${e instanceof Error ? e.message : String(e)}` });
@@ -184,242 +266,511 @@ export function PageEditor({
     });
   };
 
-  const pageIssues = [...issuesAt(issues, ['title']), ...issuesAt(issues, ['slug'])];
+  const cancelSchedule = () => {
+    if (!onCancelSchedule) return;
+    startSaving(async () => {
+      try {
+        await onCancelSchedule();
+        setSchedule(undefined);
+        setStatus({ tone: 'success', text: 'Schedule canceled.' });
+      } catch (e) {
+        setStatus({ tone: 'error', text: `Couldn’t cancel the schedule: ${e instanceof Error ? e.message : String(e)}` });
+      }
+    });
+  };
 
-  // Where each box goes, from the content type's `editor` layout.
-  const inPage = new Set<string>(ct.editor?.pageBoxes ?? []);
+  const removePanel = (index: number) => {
+    const panel = page.panels[index];
+    if (!panel) return;
+    setDeleted({ panel, index, name: panelName(defs.get(panel.type), panel.data, panel.type) });
+    setPanels(removeItem(page.panels, index));
+  };
+
+  const addPanel = (def: AnyPanel) => {
+    const panel = newPanel(def);
+    setOpen((s) => new Set(s).add(panel.id));
+    setScrollTo(panel.id);
+    setPanels([...page.panels, panel]);
+    setDialog(null);
+  };
+
+  // Where each box goes, from the content type's `editor` layout: page and
+  // other boxes in Page settings, lead boxes (the hero) as fixed cards.
   const lead = new Set<string>(ct.editor?.leadBoxes ?? []);
   const allBoxes = Object.entries(ct.boxes as BoxMap);
-  const pageBoxes = allBoxes.filter(([name]) => inPage.has(name));
-  const leadBoxes = allBoxes.filter(([name]) => lead.has(name) && !inPage.has(name));
-  const otherBoxes = allBoxes.filter(([name]) => !inPage.has(name) && !lead.has(name));
-  // The Page section stays open while anything in it has an issue, so errors can't hide.
-  const pageSectionHasIssues = pageIssues.length > 0 || pageBoxes.some(([name]) => issuesAt(issues, ['boxes', name]).length > 0);
+  const settingsBoxes = allBoxes.filter(([name]) => !lead.has(name) || (ct.editor?.pageBoxes ?? []).includes(name));
+  const leadBoxes = allBoxes.filter(([name]) => lead.has(name) && !(ct.editor?.pageBoxes ?? []).includes(name));
+  const settingsIssues = [...issuesAt(issues, ['title']), ...issuesAt(issues, ['slug']), ...settingsBoxes.flatMap(([name]) => issuesAt(issues, ['boxes', name]))];
   const errorCount = issues.filter((i) => i.severity === 'error').length;
+  const changes = published && (dirty || unpublished);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const nameAt = (i: number) => {
+    const p = page.panels[i];
+    return p ? panelName(defs.get(p.type), p.data, p.type) : '';
+  };
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= page.panels.length || from === to) return;
+    setAnnouncement(`${nameAt(from)} moved to position ${to + 1} of ${page.panels.length}.`);
+    setPanels(moveItem(page.panels, from, to));
+  };
+  const onDragStart = (e: DragStartEvent) => {
+    const i = page.panels.findIndex((p) => p.id === e.active.id);
+    setAnnouncement(`Picked up ${nameAt(i)}.`);
+  };
+  const onDragEnd = (e: DragEndEvent) => {
+    const from = page.panels.findIndex((p) => p.id === e.active.id);
+    const to = e.over ? page.panels.findIndex((p) => p.id === e.over!.id) : from;
+    if (from !== to) move(from, to);
+    else setAnnouncement(`${nameAt(from)} dropped.`);
+  };
 
   return (
     <div className="cera-editor">
-      <header className="cera-toolbar">
-        <div className="cera-toolbar__title">
+      <header className="cera-topbar">
+        {backHref && (
+          <a className="cera-back" href={backHref} aria-label="Back to Pages">
+            <Icon name="chevronLeft" size={16} strokeWidth={2} />
+            Pages
+          </a>
+        )}
+        <div className="cera-topbar__title">
           <h1>{page.title || 'Untitled page'}</h1>
-          <p className="cera-badges">
-            <span className={`cera-badge${published ? ' cera-badge--live' : ''}`}>{published ? 'Published' : 'Not published'}</span>
-            {dirty && <span className="cera-badge cera-badge--dirty">Unsaved changes</span>}
-            {version > 0 && <span className="cera-badge">Version {version}</span>}
-          </p>
+          <StateLine version={version} published={published} changes={changes} schedule={schedule} onCancelSchedule={!readOnly && onCancelSchedule ? cancelSchedule : undefined} />
         </div>
-        <div className="cera-toolbar__actions">
+        <div className="cera-topbar__actions">
+          {!readOnly && (
+            <span className={`cera-topbar__saved${dirty ? ' is-dirty' : ''}`} aria-live="polite" suppressHydrationWarning>
+              {saving ? 'Saving…' : dirty ? 'Unsaved changes' : version > 0 && savedAt ? `Saved ${formatWhen(savedAt).toLowerCase()}` : ''}
+            </span>
+          )}
+          {!readOnly && published && onUnpublish && (
+            <>
+              <button type="button" className="cera-button cera-button--lg cera-button--danger" disabled={saving} onClick={() => setDialog('unpublish')}>
+                Unpublish
+              </button>
+              <span className="cera-divider" aria-hidden="true" />
+            </>
+          )}
           {previewHref && version > 0 && (
-            <a className="cera-button" href={previewHref(page.slug)} target="_blank" rel="noreferrer" title={dirty ? 'Preview shows the last saved draft' : undefined}>
+            <a className="cera-button cera-button--lg" href={previewHref(page.slug)} target="_blank" rel="noreferrer" title={dirty ? 'Preview shows the last saved draft' : undefined}>
+              <Icon name="eye" />
               Preview
             </a>
           )}
           {!readOnly && (
             <>
-              {published && onUnpublish && (
-                <button type="button" className="cera-button" disabled={saving} onClick={unpublish}>
-                  Unpublish
-                </button>
-              )}
-              <button type="button" className="cera-button" disabled={saving} onClick={() => save('draft')}>
+              <button type="button" className="cera-button cera-button--lg" disabled={saving || (!dirty && version > 0)} onClick={() => save('draft')}>
                 Save draft
               </button>
-              <button type="button" className="cera-button cera-button--primary" disabled={saving} onClick={() => save('publish')}>
-                Publish
+              {onCancelSchedule && (
+                <button
+                  type="button"
+                  className="cera-button cera-button--lg"
+                  disabled={saving}
+                  onClick={() => {
+                    setScheduleAt(schedule ? toLocalInput(new Date(schedule.at)) : defaultScheduleTime());
+                    setDialog('schedule');
+                  }}
+                >
+                  <Icon name="clock" />
+                  Schedule
+                </button>
+              )}
+              <button type="button" className="cera-button cera-button--lg cera-button--primary" disabled={saving || (published && !changes)} onClick={() => save('publish')}>
+                {published ? 'Publish changes' : 'Publish'}
               </button>
             </>
           )}
         </div>
       </header>
 
-      {readOnly && <p className="cera-status cera-status--info">You can view this page but not change it.</p>}
-      {status && (
-        <p className={`cera-status cera-status--${status.tone}`} role="status">
-          {status.text}
-          {status.reload && (
-            <button type="button" className="cera-button cera-button--small" onClick={() => window.location.reload()}>
-              Reload
-            </button>
-          )}
-        </p>
-      )}
-      {errorCount > 0 && <p className="cera-note">{errorCount} error{errorCount === 1 ? '' : 's'}; each is shown next to its field.</p>}
-
-      <section className="cera-section">
-        <details
-          open={pageOpen || pageSectionHasIssues}
-          onToggle={(e) => setPageOpen((e.currentTarget as HTMLDetailsElement).open)}
-        >
-          <summary>
-            <h2>Page</h2>
-          </summary>
-          <div className="cera-fields">
-            <div className="cera-field">
-              <label htmlFor="cera-title" className="cera-field__label">Title</label>
-              <input
-                id="cera-title"
-                type="text"
-                value={page.title}
-                readOnly={readOnly}
-                onChange={(e) => {
-                  const title = e.target.value;
-                  update({ ...page, title, ...(slugTouched ? {} : { slug: slugify(title) }) });
-                }}
-              />
-            </div>
-            <div className="cera-field">
-              <label htmlFor="cera-slug" className="cera-field__label">Slug</label>
-              <input
-                id="cera-slug"
-                type="text"
-                value={page.slug}
-                readOnly={readOnly}
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  update({ ...page, slug: e.target.value });
-                }}
-              />
-              <p className="cera-note">The page’s address: lowercase words joined by hyphens. “home” is the front page.</p>
-            </div>
-            <IssueList issues={pageIssues} />
-            {pageBoxes.map(([name, fields]) => (
-              <FieldMapForm key={name} fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
-            ))}
-            {!readOnly && ct.panels.length > 0 && (
-              <div className="cera-field">
-                <label htmlFor="cera-add-panel" className="cera-field__label">Add a panel</label>
-                <div className="cera-add-panel">
-                  <select id="cera-add-panel" value={addType} onChange={(e) => setAddType(e.target.value)}>
-                    {ct.panels.map((p: AnyPanel) => (
-                      <option key={p.type} value={p.type}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="cera-button"
-                    onClick={() => {
-                      const def = defs.get(addType);
-                      if (!def) return;
-                      const panel = newPanel(def);
-                      setOpenPanels((s) => new Set(s).add(panel.id));
-                      setScrollTo(panel.id);
-                      setPanels([...page.panels, panel]);
-                    }}
-                  >
-                    Add
-                  </button>
-                </div>
-                <p className="cera-note">
-                  {page.panels.length === 0 ? 'No panels yet. ' : `${page.panels.length} panel${page.panels.length === 1 ? '' : 's'} below. `}
-                  New panels are added at the end; use ↑ ↓ on a panel to move it.
-                </p>
-              </div>
+      <div className="cera-stack">
+        {readOnly && <p className="cera-status cera-status--info">You can view this page but not change it.</p>}
+        {status && (
+          <p className={`cera-status cera-status--${status.tone}`} role={status.tone === 'error' ? 'alert' : 'status'}>
+            {status.text}
+            {errorCount > 0 && status.tone === 'error' && ` ${errorCount} error${errorCount === 1 ? '' : 's'}, each next to its field.`}
+            {status.reload && (
+              <button type="button" className="cera-button cera-button--small" onClick={() => window.location.reload()}>
+                Reload
+              </button>
             )}
+          </p>
+        )}
+
+        {/* Page settings: title, address and the content type's boxes. */}
+        <Card
+          id={SETTINGS}
+          badge="Settings"
+          name="Page settings"
+          summary={<span className="cera-mono">{page.slug === 'home' ? '/' : `/${page.slug || '…'}`}</span>}
+          open={open.has(SETTINGS) || settingsIssues.length > 0}
+          onToggle={() => toggle(SETTINGS)}
+          hasError={settingsIssues.some((i) => i.severity === 'error')}
+        >
+          <div className="cera-panel-card__group">
+            <div className="cera-fields">
+              <div className="cera-field cera-field--text" data-field="title">
+                <label htmlFor="cera-title" className="cera-field__label">
+                  Title
+                </label>
+                <input
+                  id="cera-title"
+                  type="text"
+                  value={page.title}
+                  readOnly={readOnly}
+                  onChange={(e) => {
+                    const title = e.target.value;
+                    update({ ...page, title, ...(slugTouched ? {} : { slug: slugify(title) }) });
+                  }}
+                />
+                <IssueList issues={issuesAt(issues, ['title'])} />
+              </div>
+              <div className="cera-field cera-field--text" data-field="slug">
+                <label htmlFor="cera-slug" className="cera-field__label">
+                  Address
+                </label>
+                <input
+                  id="cera-slug"
+                  type="text"
+                  className="cera-code"
+                  value={page.slug}
+                  readOnly={readOnly}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    update({ ...page, slug: e.target.value });
+                  }}
+                />
+                <p className="cera-note">Lowercase words joined by hyphens. “home” is the front page.</p>
+                <IssueList issues={issuesAt(issues, ['slug'])} />
+              </div>
+            </div>
           </div>
-        </details>
-      </section>
+          {settingsBoxes.map(([name, fields]) => (
+            <div key={name} className="cera-panel-card__group">
+              <h3>{humanize(name)}</h3>
+              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
+            </div>
+          ))}
+        </Card>
 
-      {otherBoxes.map(([name, fields]) => (
-        <section key={name} className="cera-section">
-          <details open={issuesAt(issues, ['boxes', name]).length > 0}>
-            <summary>
-              <h2>{humanize(name)}</h2>
-            </summary>
-            <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
-          </details>
-        </section>
-      ))}
+        {/* Lead boxes (the hero) render like panels, but can't be moved, hidden or removed. */}
+        {leadBoxes.map(([name, fields]) => {
+          const data = (page.boxes[name] ?? {}) as Record<string, unknown>;
+          const boxIssues = issuesAt(issues, ['boxes', name]);
+          return (
+            <Card
+              key={name}
+              id={name}
+              lead
+              badge={humanize(name)}
+              name={panelName(undefined, data, humanize(name))}
+              summary={panelSummary(fields as FieldMap, data)}
+              open={open.has(name) || boxIssues.length > 0}
+              onToggle={() => toggle(name)}
+              hasError={boxIssues.some((i) => i.severity === 'error')}
+            >
+              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
+            </Card>
+          );
+        })}
 
-      {/* Lead boxes (e.g. the hero) render like panels, so they sit with them, but can't be moved or removed. */}
-      {leadBoxes.map(([name, fields]) => (
-        <section key={name} className="cera-section cera-panel cera-panel--fixed">
-          <details open>
-            <summary>
-              <h2 className="cera-panel__type">{humanize(name)}</h2>
-              <span className="cera-panel__title">Always first on the page</span>
-            </summary>
-            <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
-          </details>
-        </section>
-      ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} accessibility={QUIET} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setAnnouncement('Move canceled.')}>
+          <SortableContext items={page.panels.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+            {page.panels.map((p, i) => {
+              const def = defs.get(p.type);
+              const path = ['panels', i];
+              const all = issuesAt(issues, path);
+              return (
+                <SortableCard
+                  key={p.id}
+                  id={p.id}
+                  index={i}
+                  count={page.panels.length}
+                  readOnly={readOnly}
+                  onMove={move}
+                  badge={def?.label ?? p.type}
+                  name={panelName(def, p.data, p.type)}
+                  summary={panelSummary(def?.fields, p.data)}
+                  hidden={p.hidden}
+                  open={!def || open.has(p.id) || all.length > 0}
+                  onToggle={() => toggle(p.id)}
+                  hasError={all.some((x) => x.severity === 'error')}
+                  actions={
+                    !readOnly && (
+                      <>
+                        <button
+                          type="button"
+                          className="cera-icon-button"
+                          aria-label={p.hidden ? 'Show panel on the page' : 'Hide panel from the page'}
+                          title={p.hidden ? 'Show panel on the page' : 'Hide panel from the page'}
+                          onClick={() => setPanels(setIn(page.panels, [i, 'hidden'], !p.hidden))}
+                        >
+                          <Icon name={p.hidden ? 'eyeOff' : 'eye'} />
+                        </button>
+                        <button type="button" className="cera-icon-button" aria-label="Duplicate panel" title="Duplicate panel" onClick={() => setPanels(duplicatePanel(page.panels, i))}>
+                          <Icon name="duplicate" />
+                        </button>
+                        <button type="button" className="cera-icon-button cera-danger" aria-label="Delete panel" title="Delete panel" onClick={() => removePanel(i)}>
+                          <Icon name="trash" />
+                        </button>
+                        <span className="cera-divider" aria-hidden="true" />
+                      </>
+                    )
+                  }
+                >
+                  <IssueList issues={issuesAt(issues, path, true)} />
+                  {def ? (
+                    <FieldMapForm fields={def.fields} value={p.data} onChange={(data) => setPanels(setIn(page.panels, [i, 'data'], data))} path={[...path, 'data']} ctx={ctx} />
+                  ) : (
+                    <p className="cera-note">This site has no definition for “{p.type}” panels, so it can’t be edited here. It is kept exactly as stored when you save.</p>
+                  )}
+                </SortableCard>
+              );
+            })}
+          </SortableContext>
+        </DndContext>
+        <p className="cera-visually-hidden" aria-live="assertive">
+          {announcement}
+        </p>
 
-      {/* Each panel is a top-level section. */}
-      {page.panels.map((p, i) => {
-        const def = defs.get(p.type);
-        const path = ['panels', i];
-        const own = issuesAt(issues, path, true);
-        const title = typeof p.data.title === 'string' && p.data.title ? p.data.title : null;
-        return (
-          <section
-            key={p.id}
-            id={`cera-panel-${p.id}`}
-            className={`cera-section cera-panel${p.hidden ? ' is-hidden' : ''}${issuesAt(issues, path).length ? ' has-warning' : ''}`}
-          >
-            <details
-              open={!def || openPanels.has(p.id) || issuesAt(issues, path).length > 0}
-              onToggle={(e) => {
-                const isOpen = (e.currentTarget as HTMLDetailsElement).open;
-                setOpenPanels((s) => {
-                  const next = new Set(s);
-                  if (isOpen) next.add(p.id);
-                  else next.delete(p.id);
-                  return next;
-                });
+        {deleted && (
+          <p className="cera-status cera-status--info" role="status">
+            Deleted the {deleted.name} panel. It’s gone from the page when you next save.
+            <button
+              type="button"
+              className="cera-button cera-button--small"
+              onClick={() => {
+                const list = [...page.panels];
+                list.splice(Math.min(deleted.index, list.length), 0, deleted.panel);
+                setPanels(list);
+                setDeleted(null);
               }}
             >
-              <summary>
-                <h2 className="cera-panel__type">{def?.label ?? p.type}</h2>
-                {title && <span className="cera-panel__title">{title}</span>}
-                {p.hidden && <span className="cera-badge">Hidden</span>}
-                <span className="cera-item-buttons">
-                  <button
-                    type="button"
-                    className="cera-icon-button"
-                    aria-label={p.hidden ? 'Show panel' : 'Hide panel'}
-                    title={p.hidden ? 'Show on the page' : 'Hide from the page'}
-                    disabled={readOnly}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPanels(setIn(page.panels, [i, 'hidden'], !p.hidden));
-                    }}
-                  >
-                    {p.hidden ? '◌' : '●'}
-                  </button>
-                  <button type="button" className="cera-icon-button" aria-label="Move panel up" title="Move up" disabled={readOnly || i === 0} onClick={(e) => { e.preventDefault(); setPanels(moveItem(page.panels, i, i - 1)); }}>
-                    ↑
-                  </button>
-                  <button type="button" className="cera-icon-button" aria-label="Move panel down" title="Move down" disabled={readOnly || i === page.panels.length - 1} onClick={(e) => { e.preventDefault(); setPanels(moveItem(page.panels, i, i + 1)); }}>
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className="cera-icon-button cera-danger"
-                    aria-label="Remove panel"
-                    title="Remove"
-                    disabled={readOnly}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (window.confirm(`Remove this ${def?.label ?? p.type} panel? It disappears when you next save.`)) setPanels(removeItem(page.panels, i));
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              </summary>
-              <IssueList issues={own} />
-              {def ? (
-                <FieldMapForm fields={def.fields} value={p.data} onChange={(data) => setPanels(setIn(page.panels, [i, 'data'], data))} path={[...path, 'data']} ctx={ctx} />
-              ) : (
-                <p className="cera-note">
-                  This site has no definition for “{p.type}” panels, so it can’t be edited here. It is kept exactly as stored when you save.
-                </p>
-              )}
-            </details>
-          </section>
-        );
-      })}
+              Undo
+            </button>
+          </p>
+        )}
+
+        {!readOnly && ct.panels.length > 0 && (
+          <button type="button" className="cera-add-panel" onClick={() => setDialog('add')}>
+            <Icon name="plus" strokeWidth={2} />
+            Add panel
+          </button>
+        )}
+      </div>
+
+      <Dialog open={dialog === 'unpublish'} onClose={() => setDialog(null)} title="Unpublish this page?">
+        <p>
+          It comes off the live site{schedule ? ', and its scheduled publish is canceled' : ''}. Its content and history are kept, and you can publish it again at any time.
+        </p>
+        <div className="cera-dialog__buttons">
+          <button type="button" className="cera-button" onClick={() => setDialog(null)}>
+            Keep it live
+          </button>
+          <button type="button" className="cera-button cera-button--danger" onClick={unpublish}>
+            Unpublish
+          </button>
+        </div>
+      </Dialog>
+
+      <Dialog open={dialog === 'schedule'} onClose={() => setDialog(null)} title={schedule ? 'Change the schedule' : 'Schedule publishing'}>
+        <form
+          className="cera-dialog__body"
+          style={{ padding: 0 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const at = new Date(scheduleAt);
+            if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) {
+              setStatus({ tone: 'error', text: 'Not scheduled. Pick a time in the future.' });
+            } else {
+              save('schedule', at.toISOString());
+            }
+            setDialog(null);
+          }}
+        >
+          <label className="cera-inline">
+            Publish on
+            <input type="datetime-local" required value={scheduleAt} min={toLocalInput(new Date())} onChange={(e) => setScheduleAt(e.target.value)} />
+          </label>
+          <p className="cera-note">
+            This saves the page as it is now and publishes that version at the time you pick (your time zone). Changes you make afterwards wait for the next publish. It goes
+            live within a few minutes of the time.
+          </p>
+          <div className="cera-dialog__buttons">
+            <button type="button" className="cera-button" onClick={() => setDialog(null)}>
+              Cancel
+            </button>
+            <button type="submit" className="cera-button cera-button--primary">
+              {schedule ? 'Change schedule' : 'Schedule'}
+            </button>
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog open={dialog === 'add'} onClose={() => setDialog(null)} title="Add a panel" wide>
+        <p className="cera-note">New panels go at the end of the page. Drag them by the handle to move them.</p>
+        <ul className="cera-picker-grid">
+          {ct.panels.map((def: AnyPanel) => (
+            <li key={def.type}>
+              <button type="button" onClick={() => addPanel(def)}>
+                <strong>{def.label}</strong>
+                {def.description && <span>{def.description}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Dialog>
     </div>
   );
+}
+
+function StateLine({
+  version,
+  published,
+  changes,
+  schedule,
+  onCancelSchedule,
+}: {
+  version: number;
+  published: boolean;
+  changes: boolean;
+  schedule?: PageSchedule;
+  onCancelSchedule?: () => void;
+}) {
+  const cancel = onCancelSchedule && (
+    <button type="button" className="cera-text-button" style={{ height: 28, padding: '0 6px', fontSize: 13 }} onClick={onCancelSchedule}>
+      Cancel schedule
+    </button>
+  );
+  if (published) {
+    return (
+      <span className="cera-state">
+        <span className="cera-state__dot" aria-hidden="true" />
+        Published
+        {changes && (
+          <>
+            {' · '}
+            <span className="cera-state__changes">unpublished changes</span>
+          </>
+        )}
+        {schedule && (
+          <>
+            {' · '}
+            <span suppressHydrationWarning>update scheduled for {formatScheduled(schedule.at)}</span>
+            {cancel}
+          </>
+        )}
+      </span>
+    );
+  }
+  if (schedule) {
+    return (
+      <span className="cera-state">
+        <span className="cera-state__dot cera-state__dot--scheduled" aria-hidden="true" />
+        <span suppressHydrationWarning>Scheduled for {formatScheduled(schedule.at)}</span>
+        {cancel}
+      </span>
+    );
+  }
+  return (
+    <span className="cera-state">
+      <span className="cera-state__dot cera-state__dot--draft" aria-hidden="true" />
+      {version === 0 ? 'New page, not saved yet' : 'Draft'}
+    </span>
+  );
+}
+
+interface CardProps {
+  id: string;
+  badge: string;
+  name: string;
+  summary?: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  hasError?: boolean;
+  hidden?: boolean;
+  lead?: boolean;
+  actions?: ReactNode;
+  grip?: ReactNode;
+  children: ReactNode;
+}
+
+const Card = ({ ref, style, dragging, ...props }: CardProps & { ref?: (el: HTMLElement | null) => void; style?: CSSProperties; dragging?: boolean }) => {
+  const { id, badge, name, summary, open, onToggle, hasError, hidden, lead, actions, grip, children } = props;
+  const bodyId = `cera-panel-body-${id}`;
+  return (
+    <section
+      ref={ref}
+      style={style}
+      id={`cera-panel-${id}`}
+      className={`cera-panel-card${open ? ' is-open' : ''}${hidden ? ' is-hidden' : ''}${hasError ? ' has-error' : ''}${lead ? ' cera-panel-card--lead' : ''}${dragging ? ' is-dragging' : ''}`}
+      aria-label={`${badge}: ${name}`}
+    >
+      <div className="cera-panel-card__head">
+        {grip ?? <span className="cera-grip-spacer" aria-hidden="true" />}
+        <div className="cera-panel-card__label">
+          <span className={`cera-badge${open ? ' cera-badge--open' : ''}`}>{badge}</span>
+          <span className="cera-panel-card__name">{name}</span>
+          {!open && summary && <span className="cera-panel-card__summary">{summary}</span>}
+          {hidden && <span className="cera-tag">Hidden</span>}
+        </div>
+        <div className="cera-panel-card__actions">
+          {actions}
+          <button
+            type="button"
+            className="cera-icon-button cera-panel-card__chevron"
+            aria-expanded={open}
+            aria-controls={bodyId}
+            aria-label={open ? `Fold ${name}` : `Open ${name}`}
+            title={open ? 'Fold' : 'Open'}
+            onClick={onToggle}
+          >
+            <Icon name="chevronDown" strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+      <div className="cera-panel-card__body" id={bodyId} hidden={!open}>
+        {open && children}
+      </div>
+    </section>
+  );
+};
+
+function SortableCard({
+  index,
+  count,
+  readOnly,
+  onMove,
+  ...props
+}: CardProps & { index: number; count: number; readOnly: boolean; onMove: (from: number, to: number) => void }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: props.id, disabled: readOnly });
+  const hintId = `cera-grip-hint-${props.id}`;
+  const grip = readOnly ? undefined : (
+    <>
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        className="cera-grip"
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+        aria-describedby={hintId}
+        // dnd-kit's own keyboard dragging is off; arrow keys move the panel one place.
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            onMove(index, index + (e.key === 'ArrowUp' ? -1 : 1));
+          }
+        }}
+      >
+        <GripIcon />
+      </button>
+      <span id={hintId} hidden>
+        Panel {index + 1} of {count}. Use the up and down arrow keys to move it.
+      </span>
+    </>
+  );
+  return <Card {...props} ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} dragging={isDragging} grip={grip} />;
 }

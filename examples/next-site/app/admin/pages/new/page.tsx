@@ -11,7 +11,7 @@ export default async function NewPage() {
   const staff = await requireStaff('editor');
   const page: StoredPage = { id: randomUUID(), contentType: landingPage.name, slug: '', title: '', boxes: {}, panels: [] };
   return (
-    <Shell staff={staff}>
+    <Shell staff={staff} active="pages">
       <EditorClient page={page} version={0} published={false} readOnly={false} />
     </Shell>
   );

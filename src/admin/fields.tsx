@@ -141,7 +141,7 @@ function FieldRow(props: FieldProps) {
   if (group) {
     // Several inputs: a labeled group rather than a fieldset, so the label can sit in the left column.
     return (
-      <div className={className} role="group" aria-labelledby={`${id}-label`}>
+      <div className={className} role="group" aria-labelledby={`${id}-label`} data-field={name}>
         <span id={`${id}-label`} className="cera-field__label">
           {label}
         </span>
@@ -152,7 +152,7 @@ function FieldRow(props: FieldProps) {
   }
 
   return (
-    <div className={className}>
+    <div className={className} data-field={name}>
       <label htmlFor={id} className="cera-field__label">
         {label}
       </label>

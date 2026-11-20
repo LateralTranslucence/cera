@@ -7,11 +7,16 @@ export const metadata = { title: 'Media' };
 export default async function MediaPage() {
   const staff = await requireStaff();
   return (
-    <Shell staff={staff}>
-      <div className="cera-page-head">
-        <h1>Media</h1>
+    <Shell staff={staff} active="media">
+      <div className="cera-screen">
+        <div className="cera-screen__head">
+          <div>
+            <p className="cera-breadcrumb">Library</p>
+            <h1 className="cera-screen__title">Media</h1>
+          </div>
+        </div>
+        <MediaClient canEdit={canEdit(staff.role)} />
       </div>
-      <MediaClient canEdit={canEdit(staff.role)} />
     </Shell>
   );
 }

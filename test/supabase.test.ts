@@ -108,7 +108,7 @@ test('unpublish removes the live page', async () => {
   assert.equal(await getPublishedPage(anon, landingPage, 'temporary'), null);
 });
 
-test('listPages shows staff every working copy with its live status; anon sees none', async () => {
+test('listPages shows staff every working copy with its live status; visitors are refused', async () => {
   const live = newPage('list-live');
   live.title = 'AAA live';
   const draft = newPage('list-draft');
@@ -125,7 +125,8 @@ test('listPages shows staff every working copy with its live status; anon sees n
       ['AAB draft', false, 1],
     ],
   );
-  assert.deepEqual(await listPages(anon), []);
+  // Visitors can't list pages at all.
+  await assert.rejects(listPages(anon), { code: '42501' });
 });
 
 test('page resolver: the live site sees only published, visible pages; preview sees working copies', async () => {
