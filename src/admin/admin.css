@@ -360,6 +360,23 @@
 .cera-picker-grid strong { font-size: 15px; }
 .cera-picker-grid span { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 
+/* Page settings: History and Delete page */
+.cera-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* History dialog */
+.cera-history { list-style: none; margin: 0; padding: 0; max-height: min(60vh, 520px); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.cera-history__row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.cera-history__row + .cera-history__row { border-top: 1px solid var(--line); }
+.cera-history__main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.cera-history__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.cera-history__head .cera-pill, .cera-history__head .cera-tag { height: 22px; font-size: 12px; }
+.cera-history__meta, .cera-history__diff { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.cera-history__diff { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+
+/* Delete dialog: pages that link to this one */
+.cera-link-list { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+.cera-link-list .cera-pill { height: 22px; font-size: 12px; margin-left: 4px; }
+
 /* Dialogs */
 .cera-dialog { width: min(480px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-raised); color: var(--ink); font: 400 15px/22px var(--font-sans); }
 .cera-dialog::backdrop { background: rgb(28 26 22 / 0.4); }

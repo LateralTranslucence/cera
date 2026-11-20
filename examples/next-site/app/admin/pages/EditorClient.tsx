@@ -11,10 +11,14 @@ import type { PageSchedule } from '@lateraltranslucence/cera/supabase';
 import { contentTypes } from '@/cera';
 import {
   cancelScheduleAction,
+  deletePageAction,
   findMediaAction,
   findPagesAction,
   finishMediaUploadAction,
+  pageHistoryAction,
+  pageLinksAction,
   prepareMediaUploadAction,
+  restoreRevisionAction,
   savePageAction,
   unpublishPageAction,
 } from '../actions.ts';
@@ -71,6 +75,11 @@ export function EditorClient({
         // Refresh the server-rendered sidebar (titles, the page count).
         else router.refresh();
       }}
+      loadHistory={(before) => pageHistoryAction({ pageId: page.id, before })}
+      onRestore={(input) => restoreRevisionAction({ pageId: page.id, contentType: page.contentType, ...input })}
+      onDelete={(input) => deletePageAction({ pageId: page.id, ...input })}
+      findLinks={() => pageLinksAction(page.id)}
+      onDeleted={() => router.replace(`/admin?deleted=${encodeURIComponent(page.title || 'Untitled page')}`)}
       backHref="/admin"
       previewHref={(slug) => `/admin/preview?slug=${encodeURIComponent(slug)}`}
     />

@@ -7,9 +7,9 @@ import { PageListClient } from './PageListClient.tsx';
 
 export const metadata = { title: 'Pages' };
 
-export default async function AdminHome({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function AdminHome({ searchParams }: { searchParams: Promise<{ error?: string; deleted?: string }> }) {
   const staff = await requireStaff();
-  const { error } = await searchParams;
+  const { error, deleted } = await searchParams;
   const pages = await listPages(staff.client, { contentType: landingPage.name });
 
   return (
@@ -28,6 +28,11 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           )}
         </div>
         {error === 'forbidden' && <p className="cera-status cera-status--error">Your role can’t do that.</p>}
+        {deleted && (
+          <p className="cera-status cera-status--success" role="status">
+            Deleted “{deleted}”.
+          </p>
+        )}
         <PageListClient pages={pages} />
       </div>
     </Shell>

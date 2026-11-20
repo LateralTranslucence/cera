@@ -17,7 +17,7 @@ import type { FieldMap, OptionsContext } from '../fields.ts';
 import type { PageIssue, SaveMode, StoredPage } from '../document.ts';
 import { upgradePanel, type StoredPanel } from '../migrate.ts';
 import type { AnyPanel } from '../panel.ts';
-import type { PageSchedule, SaveResult } from '../supabase/index.ts';
+import type { DeletePageResult, PageLink, PageRevision, PageSchedule, SaveResult } from '../supabase/index.ts';
 import { Dialog } from './Dialog.tsx';
 import { FieldMapForm, IssueList, type FormContext } from './fields.tsx';
 import { GripIcon, Icon } from './icons.tsx';
@@ -63,10 +63,23 @@ export interface PageEditorProps {
   media?: FormContext['media'];
   /** Viewers can look but not save. */
   readOnly?: boolean;
+  /** Loads saved versions, newest first (older than `before` when given). Shows History in Page settings. */
+  loadHistory?: (before?: number) => Promise<PageRevision[]>;
+  /** Restores an old version as a new draft (a server action that calls `restoreRevision`). */
+  onRestore?: (input: { version: number; expectedVersion: number }) => Promise<SaveResult>;
+  /** Deletes the page (a server action that calls `deletePage`). Shows Delete page in Page settings. */
+  onDelete?: (input: { expectedVersion: number }) => Promise<DeletePageResult>;
+  /** The other pages that link to this one, listed before deleting. */
+  findLinks?: () => Promise<PageLink[]>;
+  /** Called after the page is deleted, e.g. to go back to the page list. */
+  onDeleted?: () => void;
 }
 
 type Status = { tone: 'info' | 'success' | 'error'; text: string; reload?: boolean } | null;
-type Dialogs = 'unpublish' | 'schedule' | 'add' | null;
+type Dialogs = 'unpublish' | 'schedule' | 'add' | 'history' | 'delete' | null;
+
+/** How many versions the History dialog loads at a time. */
+const HISTORY_PAGE = 30;
 
 const SETTINGS = '__settings';
 /** The editor announces moves itself (with panel names), so dnd-kit's generic announcements are off. */
@@ -121,6 +134,11 @@ export function PageEditor({
   findPages,
   media,
   readOnly = false,
+  loadHistory,
+  onRestore,
+  onDelete,
+  findLinks,
+  onDeleted,
 }: PageEditorProps) {
   const [page, setPage] = useState(() => upgradeForEditing(ct, initialPage));
   const [version, setVersion] = useState(initialVersion);
@@ -140,6 +158,10 @@ export function PageEditor({
   const [deleted, setDeleted] = useState<{ panel: StoredPanel; index: number; name: string } | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [scrollTo, setScrollTo] = useState<string | null>(null);
+  // History dialog: the versions loaded so far, and whether there are older ones.
+  const [history, setHistory] = useState<{ items: PageRevision[]; more: boolean; loading: boolean; error?: string }>({ items: [], more: false, loading: false });
+  // Delete dialog: the pages that link here (null while loading).
+  const [links, setLinks] = useState<PageLink[] | null>(null);
   // Re-render now and then so "Saved 5 min ago" stays true.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -275,6 +297,105 @@ export function PageEditor({
         setStatus({ tone: 'success', text: 'Schedule canceled.' });
       } catch (e) {
         setStatus({ tone: 'error', text: `Couldn’t cancel the schedule: ${e instanceof Error ? e.message : String(e)}` });
+      }
+    });
+  };
+
+  const fetchHistory = (before?: number) => {
+    if (!loadHistory) return;
+    setHistory((h) => ({ ...h, loading: true, error: undefined }));
+    loadHistory(before)
+      .then((items) =>
+        setHistory((h) => ({ items: before === undefined ? items : [...h.items, ...items], more: items.length >= HISTORY_PAGE, loading: false })),
+      )
+      .catch((e: unknown) => setHistory((h) => ({ ...h, loading: false, error: e instanceof Error ? e.message : String(e) })));
+  };
+  const openHistory = () => {
+    setHistory({ items: [], more: false, loading: true });
+    setDialog('history');
+    fetchHistory();
+  };
+
+  const restore = (from: number) => {
+    if (!onRestore) return;
+    setDialog(null);
+    setStatus({ tone: 'info', text: `Restoring version ${from}…` });
+    startSaving(async () => {
+      try {
+        const result = await onRestore({ version: from, expectedVersion: version });
+        setIssues(result.issues);
+        if (result.ok) {
+          setVersion(result.version);
+          setSavedAt(new Date().toISOString());
+          setPage(upgradeForEditing(ct, result.page));
+          setDirty(false);
+          setDeleted(null);
+          setUnpublished(published);
+          setStatus({
+            tone: 'success',
+            text: `Restored version ${from} as a new draft (version ${result.version}).${published ? ' The live page is unchanged until you publish.' : ''}`,
+          });
+          onSaved?.(result, 'draft');
+          return;
+        }
+        switch (result.reason) {
+          case 'conflict':
+            setStatus({ tone: 'error', text: 'Not restored. Someone else saved this page after you opened it. Reload to see their version.', reload: true });
+            break;
+          case 'slug-taken':
+            setStatus({ tone: 'error', text: `Not restored. Another page now uses that version’s address. Change that page’s address first, or copy what you need from the old version.` });
+            break;
+          case 'forbidden':
+            setStatus({ tone: 'error', text: 'Your account is not allowed to edit pages.' });
+            break;
+          case 'not-found':
+            setStatus({ tone: 'error', text: `Not restored. Version ${from} no longer exists.` });
+            break;
+          default:
+            setStatus({ tone: 'error', text: `Not restored. Version ${from} has errors that can’t be saved.` });
+        }
+      } catch (e) {
+        setStatus({ tone: 'error', text: `Restore failed: ${e instanceof Error ? e.message : String(e)}` });
+      }
+    });
+  };
+
+  const openDelete = () => {
+    setDialog('delete');
+    if (published) return;
+    if (!findLinks) {
+      setLinks([]);
+      return;
+    }
+    setLinks(null);
+    findLinks()
+      .then(setLinks)
+      .catch(() => setLinks([]));
+  };
+
+  const removePage = () => {
+    if (!onDelete) return;
+    setDialog(null);
+    setStatus({ tone: 'info', text: 'Deleting…' });
+    startSaving(async () => {
+      try {
+        const result = await onDelete({ expectedVersion: version });
+        if (result.ok) {
+          // Nothing left to save: don't warn about unsaved changes on the way out.
+          setDirty(false);
+          setStatus({ tone: 'success', text: 'Page deleted.' });
+          onDeleted?.();
+          return;
+        }
+        const text = {
+          live: 'Not deleted. The page is live: unpublish it first.',
+          conflict: 'Not deleted. Someone else saved this page after you opened it. Reload to see their version.',
+          forbidden: 'Your account is not allowed to delete pages.',
+          'not-found': 'This page was already deleted.',
+        }[result.reason];
+        setStatus({ tone: 'error', text, reload: result.reason === 'conflict' });
+      } catch (e) {
+        setStatus({ tone: 'error', text: `Delete failed: ${e instanceof Error ? e.message : String(e)}` });
       }
     });
   };
@@ -453,6 +574,22 @@ export function PageEditor({
               <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
             </div>
           ))}
+          {version > 0 && (loadHistory || (!readOnly && onDelete)) && (
+            <div className="cera-panel-card__group cera-settings-actions">
+              {loadHistory && (
+                <button type="button" className="cera-button" onClick={openHistory}>
+                  <Icon name="history" />
+                  History
+                </button>
+              )}
+              {!readOnly && onDelete && (
+                <button type="button" className="cera-button cera-button--danger" disabled={saving} onClick={openDelete}>
+                  <Icon name="trash" />
+                  Delete page
+                </button>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Lead boxes (the hero) render like panels, but can't be moved, hidden or removed. */}
@@ -609,6 +746,100 @@ export function PageEditor({
         </form>
       </Dialog>
 
+      <Dialog open={dialog === 'history'} onClose={() => setDialog(null)} title="Page history" wide>
+        <p className="cera-note">
+          Every save is kept. Restoring a version saves its content as a new draft{published ? ', and the live page stays as it is until you publish' : ''}. You can undo a
+          restore by restoring the version before it.
+        </p>
+        {dirty && !readOnly && <p className="cera-status cera-status--info">You have unsaved changes. Restoring a version replaces them.</p>}
+        {history.error && <p className="cera-status cera-status--error">Couldn’t load the history: {history.error}</p>}
+        {history.items.length > 0 && (
+          <ol className="cera-history">
+            {history.items.map((r) => (
+              <li key={r.version} className="cera-history__row">
+                <div className="cera-history__main">
+                  <p className="cera-history__head">
+                    <strong>Version {r.version}</strong>
+                    {r.live && <span className="cera-pill">Live</span>}
+                    {r.version === version && <span className="cera-tag">Current</span>}
+                  </p>
+                  <p className="cera-history__meta" suppressHydrationWarning>
+                    {revisionKind(r)} · {formatWhen(r.createdAt)}
+                    {r.createdBy && ` by ${r.createdBy}`}
+                  </p>
+                  {(r.title !== page.title || r.slug !== page.slug) && (
+                    <p className="cera-history__diff">
+                      {r.title !== page.title && <span>Title: {r.title || 'Untitled'}</span>}
+                      {r.slug !== page.slug && <span className="cera-mono">/{r.slug}</span>}
+                    </p>
+                  )}
+                </div>
+                {!readOnly && onRestore && r.version !== version && (
+                  <button type="button" className="cera-button cera-button--small" disabled={saving} onClick={() => restore(r.version)}>
+                    Restore
+                  </button>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+        {history.loading && <p className="cera-note">Loading…</p>}
+        <div className="cera-dialog__buttons">
+          {history.more && !history.loading && (
+            <button type="button" className="cera-button" onClick={() => fetchHistory(history.items[history.items.length - 1]?.version)}>
+              Show older versions
+            </button>
+          )}
+          <button type="button" className="cera-button" onClick={() => setDialog(null)}>
+            Close
+          </button>
+        </div>
+      </Dialog>
+
+      <Dialog open={dialog === 'delete'} onClose={() => setDialog(null)} title={published ? 'Unpublish before deleting' : 'Delete this page?'}>
+        {published ? (
+          <>
+            <p>“{page.title || 'Untitled page'}” is on the live site. Unpublish it first, then delete it.</p>
+            <div className="cera-dialog__buttons">
+              <button type="button" className="cera-button" onClick={() => setDialog(null)}>
+                Close
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p>
+              “{page.title || 'Untitled page'}” and all its saved versions are deleted for good{schedule ? ', and its scheduled publish is canceled' : ''}. This can’t be undone.
+              {dirty && ' Your unsaved changes are lost too.'}
+            </p>
+            {links === null ? (
+              <p className="cera-note">Checking which pages link to it…</p>
+            ) : (
+              links.length > 0 && (
+                <div>
+                  <p>{links.length === 1 ? 'This page links to it and will stop showing it:' : 'These pages link to it and will stop showing it:'}</p>
+                  <ul className="cera-link-list">
+                    {links.map((l) => (
+                      <li key={l.id}>
+                        {l.title || 'Untitled'} <span className="cera-mono">/{l.slug}</span> {l.live ? <span className="cera-pill">Live</span> : <span className="cera-pill cera-pill--draft">Draft</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            )}
+            <div className="cera-dialog__buttons">
+              <button type="button" className="cera-button" onClick={() => setDialog(null)}>
+                Keep page
+              </button>
+              <button type="button" className="cera-button cera-button--danger" disabled={links === null} onClick={removePage}>
+                Delete page
+              </button>
+            </div>
+          </>
+        )}
+      </Dialog>
+
       <Dialog open={dialog === 'add'} onClose={() => setDialog(null)} title="Add a panel" wide>
         <p className="cera-note">New panels go at the end of the page. Drag them by the handle to move them.</p>
         <ul className="cera-picker-grid">
@@ -624,6 +855,22 @@ export function PageEditor({
       </Dialog>
     </div>
   );
+}
+
+/** What kind of save a revision was, for the History dialog. */
+function revisionKind(r: PageRevision): string {
+  if (r.restoredFrom !== undefined) return `Restored from version ${r.restoredFrom}`;
+  if (r.kind === 'publish') return 'Published';
+  if (r.kind === 'schedule' && r.schedule) {
+    const when = formatScheduled(r.schedule.at);
+    return {
+      pending: `Scheduled for ${when}`,
+      published: `Scheduled, went live ${when}`,
+      cancelled: `Scheduled for ${when}, canceled`,
+      failed: `Scheduled for ${when}, failed`,
+    }[r.schedule.status];
+  }
+  return 'Draft saved';
 }
 
 function StateLine({

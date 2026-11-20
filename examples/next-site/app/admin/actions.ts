@@ -6,16 +6,23 @@ import {
   cancelSchedule,
   createCeraUser,
   deleteMedia,
+  deletePage,
   finishMediaUpload,
   listMedia,
   listPages,
   mediaUsage,
+  pageHistory,
+  pageLinks,
   prepareMediaUpload,
+  restoreRevision,
   savePage,
   setCeraRole,
   unpublishPage,
   updateMedia,
   type CreateUserResult,
+  type DeletePageResult,
+  type PageLink,
+  type PageRevision,
   type SaveResult,
   type UserResult,
 } from '@lateraltranslucence/cera/supabase';
@@ -76,6 +83,35 @@ export async function unpublishPageAction(pageId: string): Promise<void> {
 export async function cancelScheduleAction(pageId: string): Promise<void> {
   const { user } = await requireStaff('editor');
   await cancelSchedule(serviceClient(), pageId, user.id);
+}
+
+/**
+ * Deletes a page for good. The database refuses a live page, so nothing on
+ * the live site changes and the page cache stays.
+ */
+export async function deletePageAction(input: { pageId: string; expectedVersion: number }): Promise<DeletePageResult> {
+  const { user } = await requireStaff('editor');
+  return deletePage(serviceClient(), input.pageId, { expectedVersion: input.expectedVersion, userId: user.id });
+}
+
+/** The other pages that link to a page, read as the signed-in user. */
+export async function pageLinksAction(pageId: string): Promise<PageLink[]> {
+  const staff = await requireStaff();
+  return pageLinks(staff.client, pageId);
+}
+
+/** A page's saved versions, newest first, read as the signed-in user. */
+export async function pageHistoryAction(input: { pageId: string; before?: number }): Promise<PageRevision[]> {
+  const staff = await requireStaff();
+  return pageHistory(staff.client, input.pageId, { before: input.before });
+}
+
+/** Restores an old version as a new draft. Drafts don't change the live site, so the cache stays. */
+export async function restoreRevisionAction(input: { pageId: string; contentType: string; version: number; expectedVersion: number }): Promise<SaveResult> {
+  const { user } = await requireStaff('editor');
+  const ct = contentTypes.find((c) => c.name === input.contentType);
+  if (!ct) return { ok: false, reason: 'not-found', message: 'Unknown content type.', issues: [] };
+  return restoreRevision(serviceClient(), ct, input.pageId, input.version, { expectedVersion: input.expectedVersion, userId: user.id });
 }
 
 /**
