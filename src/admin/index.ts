@@ -6,3 +6,4 @@
 export { PageEditor, type PageEditorProps, type SaveInput } from './PageEditor.tsx';
 export { FieldMapForm, IssueList, type FormContext, type PageOption, type PageQuery } from './fields.tsx';
 export * from './state.ts';
+export { MediaInput, mediaUploader, type MediaContext } from './media.tsx';

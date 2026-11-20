@@ -6,9 +6,21 @@
  */
 import { useRouter } from 'next/navigation';
 import type { StoredPage } from '@lateraltranslucence/cera';
-import { PageEditor } from '@lateraltranslucence/cera/admin';
+import { mediaUploader, PageEditor } from '@lateraltranslucence/cera/admin';
 import { contentTypes } from '@/cera';
-import { findPagesAction, savePageAction, unpublishPageAction } from '../actions.ts';
+import {
+  findMediaAction,
+  findPagesAction,
+  finishMediaUploadAction,
+  prepareMediaUploadAction,
+  savePageAction,
+  unpublishPageAction,
+} from '../actions.ts';
+
+const media = {
+  upload: mediaUploader({ prepare: prepareMediaUploadAction, finish: finishMediaUploadAction }),
+  find: findMediaAction,
+};
 
 export function EditorClient({
   page,
@@ -35,6 +47,7 @@ export function EditorClient({
       readOnly={readOnly}
       onSave={savePageAction}
       findPages={findPagesAction}
+      media={media}
       onUnpublish={async () => {
         await unpublishPageAction(page.id);
       }}

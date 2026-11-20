@@ -53,7 +53,8 @@ async function seedAdmin(): Promise<void> {
   const password = process.env.CERA_ADMIN_PASSWORD;
   if (!email || !password) throw new Error('CERA_ADMIN_EMAIL / CERA_ADMIN_PASSWORD missing. Run `npm run env` again.');
   await ensureUser(email, password, 'admin');
-  console.log(`Admin account ${email} is ready (password in .env.local).`);
+  // The env file is .env.local for the local stack and .env.hosted for the hosted one.
+  console.log(`Admin account ${email} is ready (password: CERA_ADMIN_PASSWORD in the env file you ran this with).`);
 }
 
 const pages: StoredPage[] = [

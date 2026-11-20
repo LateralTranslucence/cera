@@ -19,6 +19,20 @@ npm run dev -w cera-next-site       # http://localhost:3100
 
 If saves or page loads stall for many seconds, check Docker's memory: each local Supabase stack needs a few hundred MB, and a 1.4 GB Docker VM running several stacks starts swapping.
 
+## Deployed
+
+- **Live:** the repository's Vercel project (deploys `main` on every push; pull requests get previews behind Vercel sign-in).
+- **Database:** a hosted Supabase project. Production and previews share it.
+
+Vercel builds from `examples/next-site` but installs from the repository root (`cd ../.. && npm ci`), because the site uses the library through the npm workspace. Its environment variables are `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `CERA_PREVIEW_SECRET`.
+
+The same values, plus the hosted admin account, are in `.env.hosted` (not committed). To apply new migrations and seed the hosted project:
+
+```bash
+supabase db push --linked
+cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.ts
+```
+
 ## What's here
 
 | Path | Purpose |
@@ -26,7 +40,7 @@ If saves or page loads stall for many seconds, check Docker's memory: each local
 | `cera/` | The `landing_page` content type. Its panels come from the package (`cera/blocks`, …); a site's own panels would sit here too, under names without the reserved `cera/` prefix |
 | `app/(site)/` | Live pages: `getPublishedPage` → `<Panels>`, with `generateMetadata` from `pageMetadata` |
 | `app/admin/` | Sign-in, page list and the editor (`PageEditor` from `@lateraltranslucence/cera/admin`) |
-| `app/admin/actions.ts` | Server actions: save/publish via `savePage` with the user from the verified session; sign in/out |
+| `app/admin/actions.ts` | Server actions: save/publish via `savePage` with the user from the verified session; media upload (prepare and finish, editors only) and the library; sign in/out |
 | `app/admin/preview` | Preview from the admin: checks the session, enables draft mode |
 | `app/api/draft` | Preview for external tools: `/api/draft?secret=…&slug=about` |
 | `proxy.ts` | Refreshes the admin's Supabase session cookies |
@@ -38,5 +52,5 @@ If saves or page loads stall for many seconds, check Docker's memory: each local
 ## Not done yet
 
 - **Caching.** Pages render per request (`force-dynamic`); `revalidateTag` on publish is next.
-- **Media uploads.** Media fields take a path typed by hand; there is no upload flow or library yet.
+- **Media library management.** Uploading and picking work; deleting or editing library items doesn't yet.
 - **Admin extras.** Drag-to-reorder, a rich-text editor, deleting pages and revision history.

@@ -7,7 +7,7 @@ import type { textMediaFields } from './text-media.fields.ts';
 export default function TextMedia({ data, panel }: PanelPropsOf<typeof textMediaFields>) {
   // "alternate" flips sides on every other panel of the page.
   const side = data.alignment === 'alternate' ? (panel.index % 2 === 0 ? 'left' : 'right') : data.alignment;
-  const image = data.media && <img src={mediaUrl(data.media)} alt={data.media.alt ?? ''} />;
+  const image = data.media && <img src={mediaUrl(data.media)} alt={data.media.alt ?? ''} width={data.media.width} height={data.media.height} loading="lazy" />;
 
   return (
     <section id={data.anchorId} className={`panel panel--text-media media-${side}`} data-index={panel.index}>

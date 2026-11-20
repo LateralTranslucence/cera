@@ -38,6 +38,8 @@ export interface PageEditorProps {
   contentTypes?: OptionsContext['contentTypes'];
   /** Finds pages for `relation` fields' page picker (a server action). Without it, relations take pasted ids. */
   findPages?: FormContext['findPages'];
+  /** Uploads and the media library (see `mediaUploader`). Without it, media fields take typed paths and URLs. */
+  media?: FormContext['media'];
   /** Viewers can look but not save. */
   readOnly?: boolean;
 }
@@ -73,6 +75,7 @@ export function PageEditor({
   previewHref,
   contentTypes,
   findPages,
+  media,
   readOnly = false,
 }: PageEditorProps) {
   const [page, setPage] = useState(() => upgradeForEditing(ct, initialPage));
@@ -100,7 +103,7 @@ export function PageEditor({
     () => ({ contentTypes: contentTypes ?? [{ name: ct.name, label: ct.label, public: true }] }),
     [contentTypes, ct],
   );
-  const ctx: FormContext = { issues, options, readOnly, findPages };
+  const ctx: FormContext = { issues, options, readOnly, findPages, media };
 
   // Warn before leaving with unsaved changes.
   useEffect(() => {

@@ -24,7 +24,10 @@ import {
 } from '../document.ts';
 import type { StoredPanel } from '../migrate.ts';
 
+import { CeraDatabaseError, fail } from './errors.ts';
+
 export { mediaUrl } from '../media-url.ts';
+export { finishMediaUpload, formatBytes, listMedia, MEDIA_BUCKET, mediaPathFor, prepareMediaUpload } from './media.ts';
 
 const PAGE_COLUMNS = 'content_type, slug, title, boxes, panels';
 
@@ -40,19 +43,7 @@ function toStored(id: string, row: PageRow): StoredPage {
   return { id, contentType: row.content_type, slug: row.slug, title: row.title, boxes: row.boxes, panels: row.panels };
 }
 
-export class CeraDatabaseError extends Error {
-  constructor(
-    message: string,
-    readonly code?: string,
-  ) {
-    super(message);
-    this.name = 'CeraDatabaseError';
-  }
-}
-
-function fail(error: { message: string; code?: string }): never {
-  throw new CeraDatabaseError(error.message, error.code);
-}
+export { CeraDatabaseError };
 
 /* ------------------------------------------------------------------ */
 /* Reading                                                             */
