@@ -37,7 +37,7 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 
 | Path | Purpose |
 |---|---|
-| `cera/` | The `landing_page` content type. Its panels come from the package (`cera/blocks`, …); a site's own panels would sit here too, under names without the reserved `cera/` prefix |
+| `cera/` | The `landing_page` content type, with every core panel (`/panels` shows one of each). Its panels come from the package (`cera/blocks`, …); a site's own panels would sit here too, under names without the reserved `cera/` prefix |
 | `app/(site)/` | Live pages: `getPublishedPage` → `<Panels>`, with `generateMetadata` from `pageMetadata` |
 | `app/admin/` | Sign-in, page list and the editor (`PageEditor` from `@lateraltranslucence/cera/admin`) |
 | `app/admin/users`, `app/admin/account` | People (admins: add people, set roles) and Account (change your password) |

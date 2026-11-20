@@ -4,6 +4,7 @@ import type { CTA, LinkedPage, MediaRef, PageOf, PanelData, PanelDefinition, Pan
 import type { blocksFields } from '../src/panels/blocks.fields.ts';
 import type { blocks } from '../src/panels/blocks.ts';
 import type { featuredPost } from '../src/panels/featured-post.ts';
+import type { decisionTree } from '../src/panels/decision-tree.ts';
 import type { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
@@ -11,6 +12,7 @@ type Expect<T extends true> = T;
 
 type Blocks = PanelData<typeof blocks>;
 type Featured = PanelData<typeof featuredPost>;
+type DecisionTree = PanelData<typeof decisionTree>;
 type Page = PageOf<typeof landingPage>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,7 +38,23 @@ export type _tests = [
   Expect<Equal<Page['boxes']['seo']['image'], MediaRef | undefined>>,
   Expect<Equal<Page['boxes']['admin']['schemaType'], 'WebPage' | 'AboutPage' | 'ContactPage' | 'SearchResultsPage'>>,
   // panels are a discriminated union
-  Expect<Equal<Page['panels'][number]['type'], 'cera/blocks' | 'cera/featured-post' | 'cera/text-media'>>,
+  Expect<
+    Equal<
+      Page['panels'][number]['type'],
+      | 'cera/blocks'
+      | 'cera/cta'
+      | 'cera/decision-tree'
+      | 'cera/featured-media'
+      | 'cera/featured-post'
+      | 'cera/quotes'
+      | 'cera/tabs'
+      | 'cera/text'
+      | 'cera/text-media'
+    >
+  >,
+  // nested repeaters keep their item types
+  Expect<Equal<DecisionTree['cards'][number]['list'][number]['url'], string | undefined>>,
+  Expect<Equal<DecisionTree['cards'][number]['cta'], CTA | undefined>>,
   // load(): its awaited result is inferred and becomes the component's `loaded` prop
   Expect<Equal<LoadedOf<typeof featuredPost>, { page: LinkedPage | null }>>,
   // panels without load() have no `loaded` prop at all
@@ -53,7 +71,8 @@ export function narrow(p: Page['panels'][number]) {
     const a: 'left' | 'right' | 'alternate' = p.data.alignment;
     return a;
   }
-  return p.data.linkTarget;
+  if (p.type === 'cera/featured-post') return p.data.linkTarget;
+  return null;
 }
 
 // @ts-expect-error — not an option key
