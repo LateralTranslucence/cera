@@ -246,3 +246,29 @@
 .cera-gallery__items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .cera-gallery__item { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-surface); }
 .cera-gallery__item > img { width: 72px; height: 54px; object-fit: cover; border-radius: 4px; }
+
+/* Media page */
+.cera-media-manager__bar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 12px; }
+.cera-media-manager__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 16px; align-items: start; }
+.cera-media-manager__layout > .cera-media__library { border-top: 0; padding-top: 0; }
+.cera-media-manager__layout .cera-media__grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); max-height: none; overflow: visible; }
+.cera-media-manager__hint { margin: 0; padding: 16px; border: 1px dashed var(--cera-line); border-radius: var(--cera-radius); }
+.cera-media-details { margin-top: 0; display: grid; gap: 12px; position: sticky; top: 12px; }
+.cera-media-details__head { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+.cera-media-details__head h2 { margin: 0; font-size: 1.05em; overflow-wrap: anywhere; }
+.cera-media-details h3 { margin: 0; font-size: 0.95em; }
+.cera-media-details__preview img, .cera-media-details__preview video { display: block; width: 100%; max-height: 260px; object-fit: contain; border-radius: 4px; background: var(--cera-bg); border: 1px solid var(--cera-line); }
+.cera-media-details__facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 0.9em; }
+.cera-media-details__facts dt { color: var(--cera-muted); }
+.cera-media-details__facts dd { margin: 0; overflow-wrap: anywhere; }
+.cera-media-details__alt { display: grid; gap: 6px; }
+.cera-media-details__alt label { display: grid; gap: 4px; font-weight: 600; }
+.cera-media-details__alt textarea { font: inherit; font-weight: 400; padding: 6px 8px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-surface); color: var(--cera-fg); resize: vertical; }
+.cera-media-details__alt .cera-note, .cera-media-details__delete .cera-note { margin: 0; font-size: 0.85em; }
+.cera-media-details__alt button { justify-self: start; }
+.cera-media-details__uses { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.cera-media-details__delete { display: grid; gap: 6px; justify-items: start; padding-top: 12px; border-top: 1px solid var(--cera-line); }
+@media (max-width: 800px) {
+  .cera-media-manager__layout { grid-template-columns: 1fr; }
+  .cera-media-details { position: static; order: -1; }
+}

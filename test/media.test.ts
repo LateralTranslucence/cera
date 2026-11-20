@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mediaAccept, toMediaRef } from '../src/index.ts';
-import { finishMediaUpload, listMedia, mediaPathFor, prepareMediaUpload } from '../src/supabase/index.ts';
+import { deleteMedia, finishMediaUpload, listMedia, mediaPathFor, mediaUsage, prepareMediaUpload, updateMedia } from '../src/supabase/index.ts';
 import { addUser, createTestDb, fakeSupabase, queryAs, type FakeObject } from './support/db.ts';
 
 let db: PGlite;
@@ -142,4 +142,98 @@ test('the bucket enforces the same types, without SVG', async () => {
   assert.equal(Number(bucket?.file_size_limit), 50 * MB);
   assert.deepEqual([...(bucket?.allowed_mime_types ?? [])].sort(), mediaAccept(['image', 'video']).split(',').sort());
   assert.equal(mediaAccept(['image']).includes('video/'), false);
+});
+
+/** Saves a page straight through cera_save_page, with `panels` as given. */
+async function savePanels(id: string, slug: string, panels: unknown[], opts: { publish: boolean; version: number }) {
+  const { error } = await server.rpc('cera_save_page', {
+    p_page: { id, contentType: 'landing_page', slug, title: `Page ${slug}`, boxes: {}, panels },
+    p_expected_version: opts.version,
+    p_publish: opts.publish,
+    p_user: editor,
+  });
+  assert.equal(error, null, JSON.stringify(error));
+}
+
+async function uploaded(name: string) {
+  const { result } = await upload(name, 'image/png', 1000);
+  if (!result.ok) throw new Error(result.message);
+  return result.item;
+}
+
+test('update changes only the library alt text, and checks the role', async () => {
+  const item = await uploaded('crater.png');
+  const changed = await updateMedia(server, { id: item.id, alt: '  Gale crater  ' }, { userId: editor });
+  assert.equal(changed.ok, true, JSON.stringify(changed));
+  if (changed.ok) assert.deepEqual(changed.item, { ...item, alt: 'Gale crater' });
+  assert.deepEqual((await listMedia(anon, { search: 'gale crater' })).map((m) => m.id), [item.id]);
+
+  const cleared = await updateMedia(server, { id: item.id, alt: '   ' }, { userId: editor });
+  assert.equal(cleared.ok && cleared.item.alt, undefined);
+
+  const denied = await updateMedia(server, { id: item.id, alt: 'x' }, { userId: viewer });
+  assert.equal(denied.ok, false);
+  if (!denied.ok) assert.match(denied.message, /can’t change/);
+  const gone = await updateMedia(server, { id: crypto.randomUUID(), alt: 'x' }, { userId: editor });
+  assert.equal(gone.ok, false);
+  if (!gone.ok) assert.match(gone.message, /isn’t in the library/);
+  assert.equal((await updateMedia(server, { id: 'not-a-uuid', alt: 'x' }, { userId: editor })).ok, false);
+});
+
+test('usage finds a file in working copies and live versions, fields and rich text alike', async () => {
+  const item = await uploaded('dunes.png');
+  const other = await uploaded('dunes-2.png');
+  const staff = fakeSupabase(db, 'authenticated', { sub: viewer, app_metadata: { cera_role: 'viewer' } });
+  const pageA = crypto.randomUUID();
+  const pageB = crypto.randomUUID();
+  assert.deepEqual(await mediaUsage(staff, item.path), []);
+
+  // A draft that uses it in a field.
+  await savePanels(pageA, 'usage-a', [{ id: 'p1', type: 'cera/featured-media', v: 1, data: { media: { id: item.id, path: item.path, kind: 'image' } } }], { publish: false, version: 0 });
+  assert.deepEqual(await mediaUsage(staff, item.path), [{ id: pageA, title: 'Page usage-a', slug: 'usage-a', contentType: 'landing_page', draft: true, live: false }]);
+  assert.deepEqual(await mediaUsage(staff, other.path), []); // a similarly named file doesn't count
+
+  // Published: live too. Then a draft without it: live only.
+  await savePanels(pageA, 'usage-a', [{ id: 'p1', type: 'cera/featured-media', v: 1, data: { media: { id: item.id, path: item.path, kind: 'image' } } }], { publish: true, version: 1 });
+  assert.deepEqual((await mediaUsage(staff, item.path)).map((u) => [u.draft, u.live]), [[true, true]]);
+  await savePanels(pageA, 'usage-a', [], { publish: false, version: 2 });
+  assert.deepEqual((await mediaUsage(staff, item.path)).map((u) => [u.draft, u.live]), [[false, true]]);
+
+  // An image in rich text counts.
+  await savePanels(pageB, 'usage-b', [{ id: 'p1', type: 'cera/text', v: 1, data: { copy: `<p><img src="https://x.supabase.co/storage/v1/object/public/cera-media/${item.path}"></p>` } }], { publish: false, version: 0 });
+  assert.deepEqual((await mediaUsage(staff, item.path)).map((u) => u.slug), ['usage-a', 'usage-b']);
+  assert.deepEqual(await mediaUsage(staff, ''), []);
+});
+
+test('delete refuses a file a page uses, and removes an unused one from the library and Storage', async () => {
+  const used = await uploaded('used.png');
+  const page = crypto.randomUUID();
+  await savePanels(page, 'delete-test', [{ id: 'p1', type: 'cera/gallery', v: 1, data: { gallery: [{ id: used.id, path: used.path, kind: 'image' }] } }], { publish: true, version: 0 });
+
+  const refused = await deleteMedia(server, used.id, { userId: editor });
+  assert.equal(refused.ok, false);
+  if (!refused.ok) {
+    assert.match(refused.message, /A page uses this file/);
+    assert.deepEqual(refused.usedBy?.map((u) => [u.slug, u.draft, u.live]), [['delete-test', true, true]]);
+  }
+  assert.equal(objects.has(used.path), true);
+
+  const unused = await uploaded('unused.png');
+  assert.equal((await deleteMedia(server, unused.id, { userId: viewer })).ok, false);
+  assert.equal(objects.has(unused.path), true);
+  assert.deepEqual(await deleteMedia(server, unused.id, { userId: editor }), { ok: true });
+  assert.equal(objects.has(unused.path), false);
+  assert.deepEqual((await listMedia(anon, { search: 'unused' })).map((m) => m.id), []);
+  const again = await deleteMedia(server, unused.id, { userId: editor });
+  assert.equal(again.ok, false);
+  if (!again.ok) assert.match(again.message, /isn’t in the library/);
+});
+
+test('browsers can’t edit or delete media, and only signed-in users can check usage', async () => {
+  const item = await uploaded('locked.png');
+  const claims = { sub: editor, app_metadata: { cera_role: 'editor' } };
+  await assert.rejects(queryAs(db, 'authenticated', `select public.cera_update_media($1, '{"alt":"x"}'::jsonb, $2)`, [item.id, editor], claims), /permission denied/);
+  await assert.rejects(queryAs(db, 'authenticated', 'select public.cera_delete_media($1, $2)', [item.id, editor], claims), /permission denied/);
+  await assert.rejects(queryAs(db, 'authenticated', `update public.cera_media set alt = 'x' where id = $1`, [item.id], claims), /permission denied/);
+  await assert.rejects(queryAs(db, 'anon', 'select public.cera_media_usage($1)', [item.path]), /permission denied/);
 });

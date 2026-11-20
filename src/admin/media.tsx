@@ -314,16 +314,19 @@ function MediaPreview({ media }: { media: MediaRef }) {
   );
 }
 
-function MediaLibrary({
+/** A searchable grid of library items. Changing `version` reloads it (after an upload, edit or delete). */
+export function MediaLibrary({
   find,
   kinds,
   isSelected,
   onPick,
+  version = 0,
 }: {
   find: MediaContext['find'];
   kinds: MediaKind[];
   isSelected: (id: string) => boolean;
   onPick: (item: MediaItem) => void;
+  version?: number;
 }) {
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<MediaItem[] | null>(null);
@@ -344,7 +347,7 @@ function MediaLibrary({
       current = false;
       clearTimeout(timer);
     };
-  }, [find, search, kindsKey]);
+  }, [find, search, kindsKey, version]);
 
   return (
     <div className="cera-media__library">

@@ -20,9 +20,11 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  formatBytes,
   isMediaMimeType,
   MEDIA_MAX_BYTES,
   MEDIA_TYPES,
+  type MediaDeleteResult,
   type MediaItem,
   type MediaKind,
   type MediaQuery,
@@ -30,6 +32,8 @@ import {
   type MediaUploadPrepared,
   type MediaUploadRequest,
   type MediaUploadResult,
+  type MediaUpdate,
+  type MediaUse,
 } from '../media.ts';
 import { fail } from './errors.ts';
 
@@ -42,12 +46,6 @@ const MAX_ALT = 500;
 function tooLarge(kind: MediaKind, size: number): string | null {
   const max = kind === 'video' ? MEDIA_MAX_BYTES.video : MEDIA_MAX_BYTES.image;
   return size > max ? `That file is ${formatBytes(size)}; ${kind === 'video' ? 'videos' : 'images'} can be up to ${formatBytes(max)}.` : null;
-}
-
-export function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
 }
 
 const TYPE_LIST = 'JPEG, PNG, WebP, GIF, AVIF, MP4 or WebM';
@@ -147,6 +145,72 @@ export async function listMedia(client: SupabaseClient, query: MediaQuery = {}):
   const { data, error } = await q.order('created_at', { ascending: false }).limit(limit);
   if (error) fail(error);
   return (data ?? []).map((row) => toItem(row as Record<string, unknown>));
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Changes a file's library alt text: the default for new uses. Pages that
+ * already use the file keep their own alt text. `service` must use the
+ * secret key; `userId` must come from a verified session.
+ */
+export async function updateMedia(service: SupabaseClient, update: MediaUpdate, opts: { userId: string }): Promise<MediaUploadResult> {
+  const id = String(update?.id ?? '');
+  if (!UUID.test(id)) return { ok: false, message: 'That file isn’t in the library.' };
+  const alt = typeof update.alt === 'string' ? update.alt.trim().slice(0, MAX_ALT) : '';
+  const { data, error } = await service.rpc('cera_update_media', { p_id: id, p_media: { alt }, p_user: opts.userId });
+  if (error) {
+    if (error.code === '42501') return { ok: false, message: 'Your account can’t change media.' };
+    if (error.code === 'CE404') return { ok: false, message: 'That file isn’t in the library any more.' };
+    fail(error);
+  }
+  return { ok: true, item: toItem(data as Record<string, unknown>) };
+}
+
+/**
+ * The pages that use a file, by title. Pass the signed-in user's client:
+ * row-level security decides which pages they can see.
+ */
+export async function mediaUsage(client: SupabaseClient, path: string): Promise<MediaUse[]> {
+  if (!PATH.test(path)) return [];
+  const { data, error } = await client.rpc('cera_media_usage', { p_path: path });
+  if (error) fail(error);
+  return ((data as Array<Record<string, unknown>> | null) ?? []).map((u) => ({
+    id: String(u.id),
+    title: String(u.title ?? ''),
+    slug: String(u.slug ?? ''),
+    contentType: String(u.contentType ?? ''),
+    draft: u.draft === true,
+    live: u.live === true,
+  }));
+}
+
+/**
+ * Deletes a file from the library and from Storage, unless a page uses it
+ * (its working copy or live version; see the migration for why older
+ * revisions aren't checked). `service` must use the secret key; `userId`
+ * must come from a verified session.
+ *
+ * The library row goes first, in a transaction that re-checks the role and
+ * the usage. If removing the object from Storage then fails, the file stays
+ * reachable at its old URL but is no longer in the library.
+ */
+export async function deleteMedia(service: SupabaseClient, id: string, opts: { userId: string }): Promise<MediaDeleteResult> {
+  if (!UUID.test(String(id ?? ''))) return { ok: false, message: 'That file isn’t in the library.' };
+  const { data, error } = await service.rpc('cera_delete_media', { p_id: id, p_user: opts.userId });
+  if (error) {
+    if (error.code === '42501') return { ok: false, message: 'Your account can’t delete media.' };
+    if (error.code === 'CE404') return { ok: false, message: 'That file isn’t in the library any more.' };
+    if (error.code === 'CE409') {
+      const { data: row } = await service.from('cera_media').select('path').eq('id', id).maybeSingle();
+      const usedBy = row ? await mediaUsage(service, String((row as { path: string }).path)) : [];
+      return { ok: false, message: 'A page uses this file. Remove it from those pages first.', usedBy };
+    }
+    fail(error);
+  }
+  const path = String((data as { path?: string } | null)?.path ?? '');
+  if (path) await service.storage.from(MEDIA_BUCKET).remove([path]);
+  return { ok: true };
 }
 
 function toItem(row: Record<string, unknown>): MediaItem {

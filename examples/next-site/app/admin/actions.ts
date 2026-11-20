@@ -1,16 +1,19 @@
 'use server';
 import { redirect } from 'next/navigation';
-import type { CeraRole, MediaItem, MediaQuery, MediaUploadDone, MediaUploadPrepared, MediaUploadRequest, MediaUploadResult } from '@lateraltranslucence/cera';
+import type { CeraRole, MediaDeleteResult, MediaItem, MediaQuery, MediaUpdate, MediaUse, MediaUploadDone, MediaUploadPrepared, MediaUploadRequest, MediaUploadResult } from '@lateraltranslucence/cera';
 import type { PageOption, PageQuery, SaveInput } from '@lateraltranslucence/cera/admin';
 import {
   createCeraUser,
+  deleteMedia,
   finishMediaUpload,
   listMedia,
   listPages,
+  mediaUsage,
   prepareMediaUpload,
   savePage,
   setCeraRole,
   unpublishPage,
+  updateMedia,
   type CreateUserResult,
   type SaveResult,
   type UserResult,
@@ -83,6 +86,24 @@ export async function finishMediaUploadAction(done: MediaUploadDone): Promise<Me
 export async function findMediaAction(query: MediaQuery): Promise<MediaItem[]> {
   const staff = await requireStaff();
   return listMedia(staff.client, query);
+}
+
+/** Changes a file's library alt text (the Media page). */
+export async function updateMediaAction(update: MediaUpdate): Promise<MediaUploadResult> {
+  const { user } = await requireStaff('editor');
+  return updateMedia(serviceClient(), update, { userId: user.id });
+}
+
+/** Deletes a file no page uses. Nothing live changes, so the page cache stays. */
+export async function deleteMediaAction(id: string): Promise<MediaDeleteResult> {
+  const { user } = await requireStaff('editor');
+  return deleteMedia(serviceClient(), id, { userId: user.id });
+}
+
+/** The pages that use a file, read as the signed-in user. */
+export async function mediaUsageAction(path: string): Promise<MediaUse[]> {
+  const staff = await requireStaff();
+  return mediaUsage(staff.client, path);
 }
 
 /**
