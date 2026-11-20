@@ -131,6 +131,102 @@ const pages: StoredPage[] = [
       },
     ],
   },
+  {
+    // One of each panel ported in batch 1, so they can be seen together.
+    id: '00000000-0000-4000-8000-00000000c003',
+    contentType: 'landing_page',
+    slug: 'panels',
+    title: 'Panels',
+    boxes: {
+      hero: { title: 'The core panels', copy: '<p>Every panel on this page ships with Cera, under the <code>cera/</code> namespace.</p>' },
+      seo: { description: 'A page with one of each Cera core panel.' },
+      admin: {},
+    },
+    panels: [
+      {
+        id: 'panels-text',
+        type: 'cera/text',
+        v: 1,
+        data: {
+          title: 'Text',
+          copy: '<p>A title, copy and buttons. With <strong>Overlay</strong> on, the text sits in a box over the background.</p>',
+          background: { color: '#1d2a3a', overlay: false },
+          overlay: true,
+          ctas: [{ text: 'Back home', url: '/' }],
+        },
+      },
+      {
+        id: 'panels-tabs',
+        type: 'cera/tabs',
+        v: 1,
+        data: {
+          title: 'Tabs',
+          copy: '<p>Use the arrow keys to move between tabs. A link to <a href="#europa">#europa</a> opens that tab.</p>',
+          tabs: [
+            { _id: 't1', navLabel: 'Mars', title: 'The red planet', copy: '<p>Iron oxide dust gives Mars its color.</p>' },
+            { _id: 't2', navLabel: 'Moon', title: 'Our satellite', copy: '<p>The Moon keeps one face toward Earth.</p>' },
+            { _id: 't3', navLabel: 'Europa', title: 'An ocean under ice', copy: '<p>Europa likely hides a salty ocean beneath its crust.</p>', cta: { text: 'About Cera', url: 'about' } },
+          ],
+        },
+      },
+      {
+        id: 'panels-tree',
+        type: 'cera/decision-tree',
+        v: 1,
+        data: {
+          title: 'Decision Tree',
+          cards: [
+            {
+              _id: 'd1',
+              title: 'Orbit',
+              overview: '<p>Study the planet from above.</p>',
+              copy: '<p>Orbiters map the whole surface and relay data for landers.</p>',
+              cta: { text: 'Plan an orbiter', url: '/about' },
+              list: [{ _id: 'd1a', title: 'Mapping', url: '/about' }, { _id: 'd1b', title: 'Relays', url: '/about' }],
+            },
+            {
+              _id: 'd2',
+              title: 'Land',
+              overview: '<p>Touch the ground.</p>',
+              copy: '<p>Landers and rovers sample rock and soil up close.</p>',
+              list: [{ _id: 'd2a', title: 'Rovers', url: '/about' }],
+            },
+          ],
+        },
+      },
+      {
+        id: 'panels-quotes',
+        type: 'cera/quotes',
+        v: 1,
+        data: {
+          title: 'Quotes',
+          quotes: [
+            { _id: 'q1', quote: '<p>Per aspera ad astra.</p>', attribution: 'Latin proverb' },
+            { _id: 'q2', quote: '<p>Non est ad astra mollis e terris via.</p>', attribution: 'Seneca' },
+            { _id: 'q3', quote: '<p>Two or more quotes scroll sideways.</p>', attribution: 'Cera' },
+          ],
+        },
+      },
+      {
+        id: 'panels-cta',
+        type: 'cera/cta',
+        v: 1,
+        data: {
+          title: 'CTA',
+          copy: '<p>A short pitch and a button or two, on a colored background.</p>',
+          background: { color: '#5b3412', overlay: false },
+          ctas: [{ text: 'See the home page', url: '/' }, { text: 'About', url: 'about' }],
+        },
+      },
+      {
+        id: 'panels-media',
+        type: 'cera/featured-media',
+        v: 1,
+        // Media is left empty in the seed (files aren't seeded); pick an image in the admin.
+        data: { title: 'Featured Media', copy: '<p>One large image or video. Add one in the admin.</p>' },
+      },
+    ],
+  },
 ];
 
 await seedAdmin();

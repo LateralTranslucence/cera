@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 68 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 76 tests).
 
 ## Goal
 
@@ -50,8 +50,9 @@ src/
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish; sanitizes rich text)
   media.ts          uploadable types (MEDIA_TYPES), size limits, MediaItem and the upload request/result types, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
-  panels/           the `/panels` entry: core panels cera/blocks, cera/featured-post, cera/text-media (v2),
-                    plus Html and CtaLink(s) for site components
+  panels/           the `/panels` entry: the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
+                    quotes, tabs, text, text-media v2; `corePanels` lists them), PanelFrame (the shared section,
+                    background, title and copy), Html and CtaLink(s); Tabs and Decision Tree have small client parts
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
                     createPageResolver (linked pages for panels' load: published-only live, working copies in preview),
@@ -77,6 +78,7 @@ test/
   supabase.test.ts  end to end: savePage → SQL → getPublishedPage / getPageForEditing
   render.test.ts    <Panels> output, hidden panels, a panel that fails to load
   metadata.test.ts  pageMetadata and JSON-LD escaping
+  panels.test.ts    every core panel through <Panels>: the frame (background, overlay, video), each panel's markup
   media.test.ts     upload paths, type/size checks, finishing against what Storage reports, the library, grants
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
@@ -176,6 +178,8 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
 1. **Finish the field set.** Port the ❌ types above and resolve every `TODO(verify)`. Add a type assertion and a runtime test for each new builder.
 2. **Port all panels.** The 15 types in `class-landing-page.php` → `set_panel_fields()`, plus the full Hero, SEO and Admin boxes. They go in `src/panels/` as `cera/<theme key>` with `defineCorePanel` (decision 20); three are there already. Use the `.fields.ts` pattern. Port components from `app/components/panels/`.
    *Done when:* every theme panel has a definition, `PanelData` types match what the existing React components consume, and `npm run check` passes.
+   **Batch 1 done** (2026-11-20): `PanelFrame` (the theme's Panel + PanelWrapper: anchor id, background color/image/video with overlay, title, copy) and six panels: text, cta, quotes, featured-media, tabs, decision-tree. Blocks, Text + Media and Featured Post moved onto the frame, so they now draw their backgrounds. The example site's `/panels` page shows one of each. Differences from the theme: Quotes scrolls with CSS scroll snap instead of a slider script; CTA renders all its CTAs (the theme read one from a `ctas` field); Decision Tree's “CTA Text” + “CTA URL” are one `cta` field; Featured Media's `image_link` modal option isn't ported (no modals yet); a panel's anchor id isn't generated from its title.
+   **Next batches:** accordion and stats (new field types, see the table above), gallery (a picker for `f.gallery`); then posts (a `load` like Featured Post's), form (needs the Form content type) and search (interactive, client-side).
 3. **Content-type parity.** Port `class-simple-page.php`, `class-form.php`, `class-form-submission.php` and `class-icon.php` (custom icons; decision 21). Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). Still to do: pruning old draft revisions, and a "restore revision" action.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.

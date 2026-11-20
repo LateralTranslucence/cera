@@ -2,15 +2,14 @@
 import type { PanelPropsOf } from '../panel.ts';
 import { CtaLink, CtaLinks } from './CtaLinks.tsx';
 import { Html } from './Html.tsx';
+import { PanelFrame } from './PanelFrame.tsx';
 import { mediaUrl } from '../media-url.ts';
 import type { blocksFields } from './blocks.fields.ts';
 
 export default function Blocks({ data, panel }: PanelPropsOf<typeof blocksFields>) {
   const visible = data.blocks.filter((b) => !b.hidden);
   return (
-    <section id={data.anchorId} className={`panel panel--blocks panel--${data.style}`} data-index={panel.index}>
-      {data.title && <h2>{data.title}</h2>}
-      {data.copy && <Html html={data.copy} />}
+    <PanelFrame name="blocks" data={data} panel={panel} className={`panel--${data.style}`}>
       <ul className="blocks" style={{ ['--per-row' as string]: data.perRow }}>
         {visible.map((b) => (
           <li key={b._id} className="block">
@@ -22,6 +21,6 @@ export default function Blocks({ data, panel }: PanelPropsOf<typeof blocksFields
         ))}
       </ul>
       <CtaLinks ctas={data.ctas} />
-    </section>
+    </PanelFrame>
   );
 }
