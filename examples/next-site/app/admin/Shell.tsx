@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Staff } from '@/lib/auth.ts';
+import { canManagePeople, type Staff } from '@/lib/auth.ts';
 import { signOutAction } from './actions.ts';
 
 /** Top bar for signed-in admin pages. */
@@ -8,10 +8,12 @@ export function Shell({ staff, children }: { staff: Staff; children: ReactNode }
     <>
       <header className="cera-shell__bar">
         <a href="/admin" className="cera-shell__brand">Cera admin</a>
+        <a href="/admin">Pages</a>
+        {canManagePeople(staff.role) && <a href="/admin/users">People</a>}
         <a href="/" target="_blank" rel="noreferrer">View site</a>
-        <span className="cera-shell__user">
+        <a href="/admin/account" className="cera-shell__user" title="Account">
           {staff.user.email} · {staff.role}
-        </span>
+        </a>
         <form action={signOutAction}>
           <button type="submit" className="cera-button cera-button--small">Sign out</button>
         </form>

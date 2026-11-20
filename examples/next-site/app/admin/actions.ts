@@ -1,15 +1,19 @@
 'use server';
 import { redirect } from 'next/navigation';
-import type { MediaItem, MediaQuery, MediaUploadDone, MediaUploadPrepared, MediaUploadRequest, MediaUploadResult } from '@lateraltranslucence/cera';
+import type { CeraRole, MediaItem, MediaQuery, MediaUploadDone, MediaUploadPrepared, MediaUploadRequest, MediaUploadResult } from '@lateraltranslucence/cera';
 import type { PageOption, PageQuery, SaveInput } from '@lateraltranslucence/cera/admin';
 import {
+  createCeraUser,
   finishMediaUpload,
   listMedia,
   listPages,
   prepareMediaUpload,
   savePage,
+  setCeraRole,
   unpublishPage,
+  type CreateUserResult,
   type SaveResult,
+  type UserResult,
 } from '@lateraltranslucence/cera/supabase';
 import { contentTypes } from '@/cera';
 import { requireStaff, userClient } from '@/lib/auth.ts';
@@ -74,6 +78,34 @@ export async function finishMediaUploadAction(done: MediaUploadDone): Promise<Me
 export async function findMediaAction(query: MediaQuery): Promise<MediaItem[]> {
   const staff = await requireStaff();
   return listMedia(staff.client, query);
+}
+
+/**
+ * People (admins only). The acting user comes from the verified session, so
+ * the "not your own role" and "last admin" guards can't be talked around.
+ */
+export async function createUserAction(input: { email: string; role: CeraRole }): Promise<CreateUserResult> {
+  await requireStaff('admin');
+  return createCeraUser(serviceClient(), input);
+}
+
+export async function setUserRoleAction(input: { userId: string; role: CeraRole | null }): Promise<UserResult> {
+  const { user } = await requireStaff('admin');
+  return setCeraRole(serviceClient(), input, { actingUserId: user.id });
+}
+
+export type PasswordState = { ok?: boolean; error?: string };
+
+/** Changes the signed-in user's own password (Account page). */
+export async function changePasswordAction(_prev: PasswordState, form: FormData): Promise<PasswordState> {
+  const staff = await requireStaff();
+  const password = String(form.get('password') ?? '');
+  const confirm = String(form.get('confirm') ?? '');
+  if (password.length < 12) return { error: 'Use at least 12 characters.' };
+  if (password !== confirm) return { error: 'The two passwords don’t match.' };
+  const { error } = await staff.client.auth.updateUser({ password });
+  if (error) return { error: error.code === 'same_password' ? 'That’s your current password. Pick a new one.' : error.message };
+  return { ok: true };
 }
 
 export type SignInState = { error?: string };

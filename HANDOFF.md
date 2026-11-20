@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 68 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 73 tests).
 
 ## Goal
 
@@ -48,6 +48,7 @@ src/
   content-type.ts   defineContentType, PageDocument, PageOf, runtime pageSchema
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish; sanitizes rich text)
+  roles.ts          CERA_ROLES, their labels, CeraUser
   media.ts          uploadable types (MEDIA_TYPES), size limits, MediaItem and the upload request/result types, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   panels/           the `/panels` entry: core panels cera/blocks, cera/featured-post, cera/text-media (v2),
@@ -55,7 +56,8 @@ src/
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
                     createPageResolver (linked pages for panels' load: published-only live, working copies in preview),
-                    prepareMediaUpload / finishMediaUpload / listMedia (media.ts), mediaUrl
+                    prepareMediaUpload / finishMediaUpload / listMedia (media.ts), mediaUrl,
+                    listCeraUsers / createCeraUser / setCeraRole (users.ts)
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers,
                     MediaInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
                     `/admin.css` is its stylesheet, scoped under .cera-admin
@@ -77,6 +79,7 @@ test/
   supabase.test.ts  end to end: savePage → SQL → getPublishedPage / getPageForEditing
   render.test.ts    <Panels> output, hidden panels, a panel that fails to load
   metadata.test.ts  pageMetadata and JSON-LD escaping
+  users.test.ts     people: listing, adding with a temporary password, roles, the own-role and last-admin guards
   media.test.ts     upload paths, type/size checks, finishing against what Storage reports, the library, grants
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
@@ -108,6 +111,7 @@ test/
 21. **Icons: both a content type and a bundled set** (decided 2026-11-19). The theme's icon content type stays, for a site's custom icons; a bundled icon set covers standard ones. `f.icon()` picks from either.
 22. **WordPress import: Developers Only's astronomy content only** (decided 2026-11-19). A one-off import script, not a general migration tool. It maps theme panel keys to `cera/` types and needs a database export or the site's REST API (the local checkout has neither).
 23. **Media uploads go straight to Storage** (decided 2026-11-19). The server checks the type and size the browser claims, picks the path (`2026/11/1a2b3c4d-name.jpg`, extension from the type) and returns a one-time signed upload URL; the browser PUTs the file; the server then reads the object's real type and size from Storage, deletes it if they aren't allowed, and records it with `cera_add_media` (role re-checked, like saves). Files never pass through the app server, so hosts' request-size limits (4.5 MB on Vercel) don't apply. The bucket itself allows only JPEG, PNG, WebP, GIF, AVIF, MP4 and WebM up to 50 MiB; the app limits images to 10 MB. SVG is refused because it can carry scripts (the icon content type will need its own answer). A field stores a `MediaRef` copy (id, path, kind, alt, width, height): alt text is per use, and dimensions are measured in the browser as layout hints. Typed paths and URLs still work, for embeds and seeded content.
+24. **Admins manage people in the admin** (decided 2026-11-20). The People page (`UsersManager` with `createCeraUser` / `setCeraRole` from `./supabase`) lists every account with its role, adds a person with a role and a 20-character temporary password shown once, and changes or removes roles. Only admins see it, which is what now separates `admin` from `editor`. You can't change your own role, and the last admin can't be demoted, so the site can't lose its admins. Removing access clears the role and keeps the account; nothing deletes accounts. People change their password on the Account page. Email invites aren't built: Supabase's built-in mailer is rate-limited, so they wait for a mail provider. A role change applies to saves at once (the database reads the role fresh); a signed-in person's own view updates when they sign in again or within the hour.
 
 ## Pattern: keep fields in their own file
 

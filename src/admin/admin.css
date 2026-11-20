@@ -228,3 +228,16 @@
 .cera-picker__results > li.cera-note { padding: 8px; }
 .cera-picker__results button { display: grid; gap: 2px; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: none; color: var(--cera-fg); font: inherit; text-align: left; cursor: pointer; }
 .cera-picker__results button:hover, .cera-picker__results button:focus-visible { background: var(--cera-panel-head-bg); }
+
+/* People (UsersManager) */
+.cera-users__add { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto; gap: 12px; align-items: end; }
+@media (max-width: 640px) { .cera-users__add { grid-template-columns: 1fr; } }
+.cera-users__created { display: grid; gap: 6px; }
+.cera-users__created p { margin: 0; }
+.cera-users__password { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cera-users__password code { padding: 4px 8px; border-radius: 4px; background: var(--cera-surface); color: var(--cera-fg); font-size: 1.05em; letter-spacing: 0.04em; user-select: all; }
+.cera-users details > summary { cursor: pointer; }
+.cera-users details > summary > h2 { display: inline; }
+.cera-users .cera-badge { margin-left: 8px; }
+.cera-users select { max-width: 100%; }
+.cera-password-form { display: grid; gap: 12px; max-width: 28rem; }
