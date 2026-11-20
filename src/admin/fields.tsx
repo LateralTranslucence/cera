@@ -520,8 +520,10 @@ function PagePicker({
   const ids = asArray(value).map(asString).filter(Boolean);
   const idsKey = ids.join(',');
 
-  // Allowed content types: fixed, or read from a sibling field (theme: post_types_field). None means any.
-  const types = Array.isArray(cfg.to) ? cfg.to : asArray(siblings[cfg.to.field]).map(asString).filter(Boolean);
+  // Allowed content types: fixed, or read from a sibling field (theme: post_types_field). None ticked
+  // means any type with pages of its own (not forms, which only show inside other pages).
+  const picked0 = Array.isArray(cfg.to) ? cfg.to : asArray(siblings[cfg.to.field]).map(asString).filter(Boolean);
+  const types = picked0.length > 0 ? picked0 : ctx.options.contentTypes.filter((t) => t.public).map((t) => t.name);
   const typesKey = types.join(',');
   const labelOf = (name: string) => ctx.options.contentTypes.find((t) => t.name === name)?.label ?? name;
 

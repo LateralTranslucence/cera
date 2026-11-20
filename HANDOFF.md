@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 112 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 121 tests).
 
 ## Goal
 
@@ -53,20 +53,26 @@ src/
                     has-light-background for a light color with no image, video or overlay
   media.ts          uploadable types (MEDIA_TYPES), size limits, formatBytes, MediaItem, the upload/update/delete types, MediaUse, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
+  forms/            the `/forms` entry: formType (the cera_form content type), its 13 field types as panels (cera/field-*),
+                    publicForm (what visitors see), checkSubmission (server-side checks), submissionsCsv; server.ts holds
+                    the anti-spam token and sender key (node:crypto, server only)
   panels/           the `/panels` entry: the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
-                    quotes, tabs, text, text-media v2, accordion, stats, gallery, posts; `corePanels` lists them), PanelFrame (the shared section,
+                    quotes, tabs, text, text-media v2, accordion, stats, gallery, posts, form; `corePanels` lists them), PanelFrame (the shared section,
                     background, title and copy), Html and CtaLink(s); Tabs and Decision Tree have small client parts
   next/cache.ts     the `/next/cache` entry: cacheLive (Next data cache, tag cera:pages) and pagesChanged (call after publishing)
-  next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
+  next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString, createFormHandler
+                    (the forms endpoint: token, honeypot, checks, rate limit); React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
                     createPageResolver (linked pages for panels' load: published-only live, working copies in preview),
                     prepareMediaUpload / finishMediaUpload / listMedia / updateMedia / mediaUsage / deleteMedia (media.ts), mediaUrl,
-                    listCeraUsers / createCeraUser / setCeraRole (users.ts)
+                    listCeraUsers / createCeraUser / setCeraRole (users.ts), getLiveForm / createFormResolver / addSubmission /
+                    listSubmissions / submissionCounts / deleteSubmissions (forms.ts)
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers,
                     MediaInput, GalleryInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
                     PageEditor (top bar, card stack, dnd-kit reordering, schedule/unpublish/add-panel dialogs), PageList
                     (the Pages table: search, status filter, sort, paging), AdminSidebar, icons.tsx (Icon, CeraSeal, CeraLockup),
                     Dialog, MediaManager (the Media page: browse, upload, alt text, usage, delete), UsersManager (People),
+                    SubmissionList (the Submissions page),
                     RichTextInput (f.html: Tiptap editor, HTML view) with rich-text/extensions.ts (schema per toolbar)
                     and rich-text/html.ts (tidyEditorHtml, sameContent);
                     `/admin.css` is its stylesheet, scoped under .cera-admin
@@ -79,6 +85,8 @@ supabase/
   migrations/…_cera_scheduling.sql    scheduled publishing (cera_schedule_page, cera_cancel_schedule, cera_publish_due + pg_cron job),
                                       cera_page_summaries / cera_user_email for the Pages list
   migrations/…_cera_page_history.sql  cera_delete_page (refuses live pages), cera_page_links, cera_page_history, cera_restore_revision
+  migrations/…_cera_forms.sql         cera_form_submissions (admins and editors read), cera_add_submission (with the rate limit),
+                                      cera_list_submissions, cera_submission_counts, cera_delete_submissions
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
     cera/           the landing_page content type, built from the core panels; it imports the package like a
@@ -96,6 +104,7 @@ test/
   users.test.ts     people: listing, adding with a temporary password, roles, the own-role and last-admin guards
   schedule.test.ts  scheduling: due → live, replacing, cancelling, failures; the page list's statuses, emails and access
   page-history.test.ts  deleting pages (live, conflicts, schedules), linking pages, history and paging, restoring
+  forms.test.ts     forms: publicForm, checkSubmission, tokens, CSV, and the endpoint end to end (honeypot, rate limit, access)
   rich-text.test.ts the editor schema under happy-dom: exact round trips, respellings, WordPress classes and images, what it would lose
   media.test.ts     upload paths, type/size checks, finishing against what Storage reports, the library, alt edits, usage, delete, grants
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
@@ -135,6 +144,7 @@ test/
 28. **The admin follows the Cera design brief** (decided 2026-11-20, brief `cera-admin-handoff`). Tokens (surface, line, ink, honey and so on, plus `surface-sunken` and `line-strong`, which the brief proposed) are defined on `.cera-admin`, not `:root`, so they can't touch a site's CSS; the older `--cera-*` names are aliases. Sites load Fraunces (SOFT, opsz), Inter and JetBrains Mono as `--cera-font-display/sans/mono` (the example uses `next/font`, which self-hosts them). Dark mode follows the system with the brief's dark tokens (`data-theme` pins either). The shell is a sidebar (lockup; Pages, expandable with "+ New" and every page; Media; People for admins; the user chip opens Account, View site and Sign out) and a main column. Where the brief and Cera differ, Cera wins: only features that exist are in the sidebar (no Regions, Subjects, Menus or Settings yet); Hero is a fixed lead box shown as the first card, not a movable panel (decision 11); every form is still generated from field definitions (decision 4) and restyled to labels-left; page settings (title, address, SEO, admin) sit in a folded "Page settings" card at the top of the stack; the Pages list shows "Last edited by" (no author is stored) and has no checkbox column (no bulk actions yet); the top bar shows when the page was last saved (there's no autosave). Panels reorder only by drag (dnd-kit pointer) or arrow keys on the focused handle, with a live-region announcement. Deleting a panel offers Undo; Unpublish confirms in a dialog.
 29. **Scheduled publishing runs in the database** (decided 2026-11-20). Scheduling validates like a publish, saves the working copy, and marks that revision `kind = 'schedule'` with `scheduled_for`; a pg_cron job (`cera-publish-due`, every minute) publishes due revisions. One schedule per page: scheduling again replaces it; publishing now, unpublishing or "Cancel schedule" cancels it, so an older snapshot can't go live over newer content. Edits made after scheduling stay unpublished. A schedule whose address went live on another page meanwhile is marked failed with the reason, and the Pages list flags it. Because the job runs outside Next, the cached live page catches up within its revalidate time (300 seconds; decision 25). Where pg_cron isn't available, call `publishDuePages()` from a cron route.
 30. **Deleting is permanent and deliberate; restoring makes a new draft** (decided 2026-11-20). Both live in the Page settings card (the brief puts revisions under page settings and didn't design them): History and Delete page. `deletePage` removes the page and all its revisions (no trash), and only a page that isn't live, at the version the editor loaded (`cera_delete_page`: CE422 live, CE409 conflict); the dialog says to unpublish first. Before deleting, the dialog lists the other pages that link to it (`cera_page_links`: the page's id in another page's working copy or live revision, run as the caller), since their panels stop showing it. History (`pageHistory`) lists every saved version newest first, 30 at a time, with who saved it, how (draft, published, scheduled and what became of it, restored), and the title or address when they differ from now. `restoreRevision` runs the old content through `preparePageForSave` as a draft (so old panels are upgraded and rich text sanitized) and saves it as a new version that records `restored_from`; the live page doesn't change until someone publishes, and a restore is undone by restoring the version before it. A restore fails as `slug-taken` if another page now has that address. There's no preview of an old version before restoring; restore, preview the draft, and restore back if needed. Editors and admins can delete and restore; viewers can see the history.
+31. **Forms are a content type; their fields are panels; submissions are stored, not emailed (yet)** (decided 2026-11-20, from DO_Form and DO_Form_Submission). `formType` (`cera_form`) has no route: a Form panel (`cera/form`, a relation to one form) shows it on a page, the live version on the live site and the working copy in preview (where it can't be sent). Each field type is a panel (`cera/field-text` … `cera/field-section`), so fields reorder, duplicate, hide (the theme's Hide Field) and get drafts, publishing, history and restore like pages; a Section starts a fieldset until the next one (theme: the Fieldsets box of comma-separated IDs, which crashed on stray spaces). Field names come from Field ID or the label, made unique. The endpoint (`createFormHandler`, mounted at `/api/cera/forms`) checks a honeypot (fake success), a token that must be 3 seconds to 24 hours old and is fetched when the form appears (the theme had no timer), then checks every answer against the live version (`checkSubmission`: required, email and phone formats, choices among the options, range bounds and steps, length limits; the theme checked only choices and required), then stores it with a per-sender limit of 5 accepted in 10 minutes (refused answers don't count, unlike the theme), keyed by an HMAC of the IP address so addresses aren't stored. Answers are stored as `[{ name, label, value }]` with the form version. Only admins and editors can read, export (CSV, formula-safe) or delete submissions; they're kept until deleted, and a form with submissions can't be deleted. Dropped from the theme: Field Label Location and Auto-update (both non-functional there), and the Privacy Policy link (replaced by a Privacy note you write). No email yet (the owner's choice): `afterSubmit` on the handler is where notifications and the theme's routing logic and confirmation email will go; keep recipients out of published revisions, which anyone can read. JavaScript is required to send a form (the token), as in the theme.
 
 ## Pattern: keep fields in their own file
 
@@ -210,8 +220,8 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
    **Batch 1 done** (2026-11-20): `PanelFrame` (the theme's Panel + PanelWrapper: anchor id, background color/image/video with overlay, title, copy) and six panels: text, cta, quotes, featured-media, tabs, decision-tree. Blocks, Text + Media and Featured Post moved onto the frame, so they now draw their backgrounds. The example site's `/panels` page shows one of each. Differences from the theme: Quotes scrolls with CSS scroll snap instead of a slider script; CTA renders all its CTAs (the theme read one from a `ctas` field); Decision Tree's “CTA Text” + “CTA URL” are one `cta` field; Featured Media's `image_link` modal option isn't ported (no modals yet); a panel's anchor id isn't generated from its title.
    **Batch 2 done** (2026-11-20): accordion (WAI-ARIA accordion, one item open at a time), stats (numbers in the HTML, counted up on the client only when off screen at load and not for reduced motion) and gallery (a grid that opens images in a modal `<dialog>`, arrow keys between them), plus the admin's gallery picker (`GalleryInput`: upload several or drop them, pick several from the library, reorder, alt text per image). The theme's `accordion` and `stats` field types became repeaters. Differences: a gallery image's alt text doubles as its title (the theme had a separate title).
    **Posts done** (2026-11-20): cards for picked pages via `load` (like Featured Post: published, visible pages only on the live site, in the picked order), a per-row grid, and with Slider on and more pages than fit in a row, a scroll-snap row with Previous/Next buttons (`PostsSlider`). Not ported: “Modal”. The theme turned on its slider for more than three posts whatever the Slider field said; here the field decides.
-   **Left:** form (needs the Form content type, a submissions table, spam protection and probably mail) and search (filters, A–Z, text search, sorting and paging across content types). Which comes first depends on the Developers Only astronomy content (decision 22).
-3. **Content-type parity.** Port `class-simple-page.php`, `class-form.php`, `class-form-submission.php` and `class-icon.php` (custom icons; decision 21). Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
+   **Form done** (decision 31). **Left:** search (filters, A–Z, text search, sorting and paging across content types). Which comes first depends on the Developers Only astronomy content (decision 22).
+3. **Content-type parity.** Forms and submissions are done (decision 31). Port `class-simple-page.php` and `class-icon.php` (custom icons; decision 21). Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). "Restore revision" is done (decision 30). Still to do: pruning old draft revisions.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.
 6. **Next.js integration.** Started in A and B above. Still to do after them: per-panel error boundaries (a client component) and admin route handlers packaged in `./next`.

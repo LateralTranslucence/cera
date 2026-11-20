@@ -47,6 +47,7 @@ export type _tests = [
       | 'cera/decision-tree'
       | 'cera/featured-media'
       | 'cera/featured-post'
+      | 'cera/form'
       | 'cera/gallery'
       | 'cera/posts'
       | 'cera/quotes'

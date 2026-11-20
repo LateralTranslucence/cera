@@ -26,8 +26,12 @@ export interface PageDocument<N extends string, B extends BoxMap, P extends read
 export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends readonly AnyPanel[]> {
   name: N;
   label: string;
-  /** Next.js-style route pattern. Theme: rewrite rules / post_type_slug. */
-  route: string;
+  /**
+   * Next.js-style route pattern. Theme: rewrite rules / post_type_slug.
+   * Omit for content types without public pages of their own (e.g. forms,
+   * which panels show on other pages).
+   */
+  route?: string;
   /** A page's public URL. Defaults to `route` with `[slug]` filled in. */
   url?: (page: PageDocument<N, B, P>) => string;
   boxes: B;
@@ -51,6 +55,18 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
     pageBoxes?: ReadonlyArray<keyof B & string>;
     /** Shown just above the panels, styled like one (e.g. a hero that renders like a panel). */
     leadBoxes?: ReadonlyArray<keyof B & string>;
+    /** What the admin calls one of these, lowercase. Default "page". */
+    noun?: string;
+    /** Plural of `noun`. Default: `noun` + "s". */
+    nounPlural?: string;
+    /** What the admin calls one panel, lowercase. Default "panel" (forms: "field"). */
+    itemNoun?: string;
+    /** Label for the title field. Default "Title". */
+    titleLabel?: string;
+    /** Label for the slug field. Default "Address". */
+    slugLabel?: string;
+    /** Note under the slug field. */
+    slugNote?: string;
   };
   hooks?: {
     /** Theme: onsave_callback (could modify $_POST). */
@@ -130,5 +146,6 @@ export function defineContentType<
 
 /** A page's public URL: the content type's `url`, or its `route` with `[slug]` filled in. */
 export function pageUrl<CT extends AnyContentType>(ct: CT, page: PageOf<CT>): string {
-  return ct.url ? ct.url(page) : ct.route.replace('[slug]', encodeURIComponent(page.slug));
+  if (ct.url) return ct.url(page);
+  return ct.route ? ct.route.replace('[slug]', encodeURIComponent(page.slug)) : '';
 }

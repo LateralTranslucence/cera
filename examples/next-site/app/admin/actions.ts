@@ -7,6 +7,7 @@ import {
   createCeraUser,
   deleteMedia,
   deletePage,
+  deleteSubmissions,
   finishMediaUpload,
   listMedia,
   listPages,
@@ -112,6 +113,12 @@ export async function restoreRevisionAction(input: { pageId: string; contentType
   const ct = contentTypes.find((c) => c.name === input.contentType);
   if (!ct) return { ok: false, reason: 'not-found', message: 'Unknown content type.', issues: [] };
   return restoreRevision(serviceClient(), ct, input.pageId, input.version, { expectedVersion: input.expectedVersion, userId: user.id });
+}
+
+/** Deletes submissions: the given ids, or all of a form's. Admins and editors; the database checks again. */
+export async function deleteSubmissionsAction(input: { ids?: string[]; formId?: string }): Promise<number> {
+  const { user } = await requireStaff('editor');
+  return deleteSubmissions(serviceClient(), { ids: input.ids, formId: input.formId, userId: user.id });
 }
 
 /**

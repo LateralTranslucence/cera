@@ -91,6 +91,18 @@ const PATHS = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  form: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h8M8 12h8M8 16h4" />
+    </>
+  ),
+  inbox: (
+    <>
+      <path d="M3 13l2.5-8h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+      <path d="M3 13h5l1.5 3h5L16 13h5" />
+    </>
+  ),
   history: (
     <>
       <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5" />

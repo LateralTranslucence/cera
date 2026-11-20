@@ -53,8 +53,10 @@ export interface PageEditorProps {
   onSaved?: (result: Extract<SaveResult, { ok: true }>, mode: SaveInput['mode']) => void;
   /** Link that opens the page in draft-mode preview. */
   previewHref?: (slug: string) => string;
-  /** The "Pages" link in the top bar. */
+  /** The back link in the top bar. */
   backHref?: string;
+  /** Its text. Default "Pages". */
+  backLabel?: string;
   /** Content types offered to `selectFrom` option sources. */
   contentTypes?: OptionsContext['contentTypes'];
   /** Finds pages for `relation` fields' page picker (a server action). Without it, relations take pasted ids. */
@@ -130,6 +132,7 @@ export function PageEditor({
   onSaved,
   previewHref,
   backHref,
+  backLabel = 'Pages',
   contentTypes,
   findPages,
   media,
@@ -140,6 +143,16 @@ export function PageEditor({
   findLinks,
   onDeleted,
 }: PageEditorProps) {
+  // What this content type calls itself and its panels ("page"/"panel", "form"/"field").
+  const noun = ct.editor?.noun ?? 'page';
+  const nouns = ct.editor?.nounPlural ?? `${noun}s`;
+  const item = ct.editor?.itemNoun ?? 'panel';
+  const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
+  const Item = item.charAt(0).toUpperCase() + item.slice(1);
+  const slugLabel = ct.editor?.slugLabel ?? 'Address';
+  const slugWord = slugLabel.charAt(0).toLowerCase() + slugLabel.slice(1);
+  const showSlug = (slug: string) => (ct.route ? (slug === 'home' ? '/' : `/${slug || '…'}`) : slug || '…');
+
   const [page, setPage] = useState(() => upgradeForEditing(ct, initialPage));
   const [version, setVersion] = useState(initialVersion);
   const [published, setPublished] = useState(initialPublished);
@@ -236,7 +249,7 @@ export function PageEditor({
               : mode === 'schedule' && publishAt
                 ? `Scheduled to publish ${formatScheduled(publishAt)}. Changes you make now wait for the next publish.`
                 : published
-                  ? 'Draft saved. The live page is unchanged.'
+                  ? `Draft saved. The live ${noun} is unchanged.`
                   : 'Draft saved.';
           setStatus({ tone: 'success', text: done + warnings });
           onSaved?.(result, mode);
@@ -249,17 +262,17 @@ export function PageEditor({
             setOpen((s) => new Set(s).add(SETTINGS));
             break;
           case 'conflict':
-            setStatus({ tone: 'error', text: 'Someone else saved this page after you opened it. Reload to get their version (your unsaved changes will be lost).', reload: true });
+            setStatus({ tone: 'error', text: `Someone else saved this ${noun} after you opened it. Reload to get their version (your unsaved changes will be lost).`, reload: true });
             break;
           case 'forbidden':
-            setStatus({ tone: 'error', text: 'Your account is not allowed to edit pages.' });
+            setStatus({ tone: 'error', text: `Your account is not allowed to edit ${nouns}.` });
             break;
           case 'slug-taken':
-            setStatus({ tone: 'error', text: `Another page already uses the address “/${page.slug}”.` });
+            setStatus({ tone: 'error', text: `Another ${noun} already uses the ${slugWord} “${showSlug(page.slug)}”.` });
             setOpen((s) => new Set(s).add(SETTINGS));
             break;
           case 'not-found':
-            setStatus({ tone: 'error', text: 'This page no longer exists.' });
+            setStatus({ tone: 'error', text: `This ${noun} no longer exists.` });
             break;
           case 'bad-time':
             setStatus({ tone: 'error', text: 'Not scheduled. Pick a time in the future.' });
@@ -281,7 +294,7 @@ export function PageEditor({
         setPublished(false);
         setUnpublished(false);
         setSchedule(undefined);
-        setStatus({ tone: 'success', text: 'Unpublished. The page is no longer on the live site.' });
+        setStatus({ tone: 'success', text: `Unpublished. The ${noun} is no longer on the live site.` });
       } catch (e) {
         setStatus({ tone: 'error', text: `Unpublish failed: ${e instanceof Error ? e.message : String(e)}` });
       }
@@ -333,20 +346,20 @@ export function PageEditor({
           setUnpublished(published);
           setStatus({
             tone: 'success',
-            text: `Restored version ${from} as a new draft (version ${result.version}).${published ? ' The live page is unchanged until you publish.' : ''}`,
+            text: `Restored version ${from} as a new draft (version ${result.version}).${published ? ` The live ${noun} is unchanged until you publish.` : ''}`,
           });
           onSaved?.(result, 'draft');
           return;
         }
         switch (result.reason) {
           case 'conflict':
-            setStatus({ tone: 'error', text: 'Not restored. Someone else saved this page after you opened it. Reload to see their version.', reload: true });
+            setStatus({ tone: 'error', text: `Not restored. Someone else saved this ${noun} after you opened it. Reload to see their version.`, reload: true });
             break;
           case 'slug-taken':
-            setStatus({ tone: 'error', text: `Not restored. Another page now uses that version’s address. Change that page’s address first, or copy what you need from the old version.` });
+            setStatus({ tone: 'error', text: `Not restored. Another ${noun} now uses that version’s ${slugWord}. Change that ${noun}’s ${slugWord} first, or copy what you need from the old version.` });
             break;
           case 'forbidden':
-            setStatus({ tone: 'error', text: 'Your account is not allowed to edit pages.' });
+            setStatus({ tone: 'error', text: `Your account is not allowed to edit ${nouns}.` });
             break;
           case 'not-found':
             setStatus({ tone: 'error', text: `Not restored. Version ${from} no longer exists.` });
@@ -383,15 +396,16 @@ export function PageEditor({
         if (result.ok) {
           // Nothing left to save: don't warn about unsaved changes on the way out.
           setDirty(false);
-          setStatus({ tone: 'success', text: 'Page deleted.' });
+          setStatus({ tone: 'success', text: `${Noun} deleted.` });
           onDeleted?.();
           return;
         }
         const text = {
-          live: 'Not deleted. The page is live: unpublish it first.',
-          conflict: 'Not deleted. Someone else saved this page after you opened it. Reload to see their version.',
-          forbidden: 'Your account is not allowed to delete pages.',
-          'not-found': 'This page was already deleted.',
+          live: `Not deleted. The ${noun} is live: unpublish it first.`,
+          conflict: `Not deleted. Someone else saved this ${noun} after you opened it. Reload to see their version.`,
+          forbidden: `Your account is not allowed to delete ${nouns}.`,
+          'not-found': `This ${noun} was already deleted.`,
+          'in-use': `Not deleted. Other records still depend on this ${noun}${noun === 'form' ? ': delete its submissions first' : ''}.`,
         }[result.reason];
         setStatus({ tone: 'error', text, reload: result.reason === 'conflict' });
       } catch (e) {
@@ -450,14 +464,14 @@ export function PageEditor({
     <div className="cera-editor">
       <header className="cera-topbar">
         {backHref && (
-          <a className="cera-back" href={backHref} aria-label="Back to Pages">
+          <a className="cera-back" href={backHref} aria-label={`Back to ${backLabel}`}>
             <Icon name="chevronLeft" size={16} strokeWidth={2} />
-            Pages
+            {backLabel}
           </a>
         )}
         <div className="cera-topbar__title">
-          <h1>{page.title || 'Untitled page'}</h1>
-          <StateLine version={version} published={published} changes={changes} schedule={schedule} onCancelSchedule={!readOnly && onCancelSchedule ? cancelSchedule : undefined} />
+          <h1>{page.title || `Untitled ${noun}`}</h1>
+          <StateLine noun={noun} version={version} published={published} changes={changes} schedule={schedule} onCancelSchedule={!readOnly && onCancelSchedule ? cancelSchedule : undefined} />
         </div>
         <div className="cera-topbar__actions">
           {!readOnly && (
@@ -507,7 +521,7 @@ export function PageEditor({
       </header>
 
       <div className="cera-stack">
-        {readOnly && <p className="cera-status cera-status--info">You can view this page but not change it.</p>}
+        {readOnly && <p className="cera-status cera-status--info">You can view this {noun} but not change it.</p>}
         {status && (
           <p className={`cera-status cera-status--${status.tone}`} role={status.tone === 'error' ? 'alert' : 'status'}>
             {status.text}
@@ -524,8 +538,8 @@ export function PageEditor({
         <Card
           id={SETTINGS}
           badge="Settings"
-          name="Page settings"
-          summary={<span className="cera-mono">{page.slug === 'home' ? '/' : `/${page.slug || '…'}`}</span>}
+          name={`${Noun} settings`}
+          summary={<span className="cera-mono">{showSlug(page.slug)}</span>}
           open={open.has(SETTINGS) || settingsIssues.length > 0}
           onToggle={() => toggle(SETTINGS)}
           hasError={settingsIssues.some((i) => i.severity === 'error')}
@@ -534,7 +548,7 @@ export function PageEditor({
             <div className="cera-fields">
               <div className="cera-field cera-field--text" data-field="title">
                 <label htmlFor="cera-title" className="cera-field__label">
-                  Title
+                  {ct.editor?.titleLabel ?? 'Title'}
                 </label>
                 <input
                   id="cera-title"
@@ -550,7 +564,7 @@ export function PageEditor({
               </div>
               <div className="cera-field cera-field--text" data-field="slug">
                 <label htmlFor="cera-slug" className="cera-field__label">
-                  Address
+                  {slugLabel}
                 </label>
                 <input
                   id="cera-slug"
@@ -563,7 +577,7 @@ export function PageEditor({
                     update({ ...page, slug: e.target.value });
                   }}
                 />
-                <p className="cera-note">Lowercase words joined by hyphens. “home” is the front page.</p>
+                <p className="cera-note">{ct.editor?.slugNote ?? 'Lowercase words joined by hyphens. “home” is the front page.'}</p>
                 <IssueList issues={issuesAt(issues, ['slug'])} />
               </div>
             </div>
@@ -585,7 +599,7 @@ export function PageEditor({
               {!readOnly && onDelete && (
                 <button type="button" className="cera-button cera-button--danger" disabled={saving} onClick={openDelete}>
                   <Icon name="trash" />
-                  Delete page
+                  Delete {noun}
                 </button>
               )}
             </div>
@@ -640,16 +654,16 @@ export function PageEditor({
                         <button
                           type="button"
                           className="cera-icon-button"
-                          aria-label={p.hidden ? 'Show panel on the page' : 'Hide panel from the page'}
-                          title={p.hidden ? 'Show panel on the page' : 'Hide panel from the page'}
+                          aria-label={p.hidden ? `Show ${item} on the ${noun}` : `Hide ${item} from the ${noun}`}
+                          title={p.hidden ? `Show ${item} on the ${noun}` : `Hide ${item} from the ${noun}`}
                           onClick={() => setPanels(setIn(page.panels, [i, 'hidden'], !p.hidden))}
                         >
                           <Icon name={p.hidden ? 'eyeOff' : 'eye'} />
                         </button>
-                        <button type="button" className="cera-icon-button" aria-label="Duplicate panel" title="Duplicate panel" onClick={() => setPanels(duplicatePanel(page.panels, i))}>
+                        <button type="button" className="cera-icon-button" aria-label={`Duplicate ${item}`} title={`Duplicate ${item}`} onClick={() => setPanels(duplicatePanel(page.panels, i))}>
                           <Icon name="duplicate" />
                         </button>
-                        <button type="button" className="cera-icon-button cera-danger" aria-label="Delete panel" title="Delete panel" onClick={() => removePanel(i)}>
+                        <button type="button" className="cera-icon-button cera-danger" aria-label={`Delete ${item}`} title={`Delete ${item}`} onClick={() => removePanel(i)}>
                           <Icon name="trash" />
                         </button>
                         <span className="cera-divider" aria-hidden="true" />
@@ -661,7 +675,7 @@ export function PageEditor({
                   {def ? (
                     <FieldMapForm fields={def.fields} value={p.data} onChange={(data) => setPanels(setIn(page.panels, [i, 'data'], data))} path={[...path, 'data']} ctx={ctx} />
                   ) : (
-                    <p className="cera-note">This site has no definition for “{p.type}” panels, so it can’t be edited here. It is kept exactly as stored when you save.</p>
+                    <p className="cera-note">This site has no definition for “{p.type}” {item}s, so it can’t be edited here. It is kept exactly as stored when you save.</p>
                   )}
                 </SortableCard>
               );
@@ -674,7 +688,7 @@ export function PageEditor({
 
         {deleted && (
           <p className="cera-status cera-status--info" role="status">
-            Deleted the {deleted.name} panel. It’s gone from the page when you next save.
+            Deleted the {deleted.name} {item}. It’s gone from the {noun} when you next save.
             <button
               type="button"
               className="cera-button cera-button--small"
@@ -693,12 +707,12 @@ export function PageEditor({
         {!readOnly && ct.panels.length > 0 && (
           <button type="button" className="cera-add-panel" onClick={() => setDialog('add')}>
             <Icon name="plus" strokeWidth={2} />
-            Add panel
+            Add {item}
           </button>
         )}
       </div>
 
-      <Dialog open={dialog === 'unpublish'} onClose={() => setDialog(null)} title="Unpublish this page?">
+      <Dialog open={dialog === 'unpublish'} onClose={() => setDialog(null)} title={`Unpublish this ${noun}?`}>
         <p>
           It comes off the live site{schedule ? ', and its scheduled publish is canceled' : ''}. Its content and history are kept, and you can publish it again at any time.
         </p>
@@ -748,7 +762,7 @@ export function PageEditor({
 
       <Dialog open={dialog === 'history'} onClose={() => setDialog(null)} title="Page history" wide>
         <p className="cera-note">
-          Every save is kept. Restoring a version saves its content as a new draft{published ? ', and the live page stays as it is until you publish' : ''}. You can undo a
+          Every save is kept. Restoring a version saves its content as a new draft{published ? `, and the live ${noun} stays as it is until you publish` : ''}. You can undo a
           restore by restoring the version before it.
         </p>
         {dirty && !readOnly && <p className="cera-status cera-status--info">You have unsaved changes. Restoring a version replaces them.</p>}
@@ -796,10 +810,10 @@ export function PageEditor({
         </div>
       </Dialog>
 
-      <Dialog open={dialog === 'delete'} onClose={() => setDialog(null)} title={published ? 'Unpublish before deleting' : 'Delete this page?'}>
+      <Dialog open={dialog === 'delete'} onClose={() => setDialog(null)} title={published ? 'Unpublish before deleting' : `Delete this ${noun}?`}>
         {published ? (
           <>
-            <p>“{page.title || 'Untitled page'}” is on the live site. Unpublish it first, then delete it.</p>
+            <p>“{page.title || `Untitled ${noun}`}” is on the live site. Unpublish it first, then delete it.</p>
             <div className="cera-dialog__buttons">
               <button type="button" className="cera-button" onClick={() => setDialog(null)}>
                 Close
@@ -809,7 +823,7 @@ export function PageEditor({
         ) : (
           <>
             <p>
-              “{page.title || 'Untitled page'}” and all its saved versions are deleted for good{schedule ? ', and its scheduled publish is canceled' : ''}. This can’t be undone.
+              “{page.title || `Untitled ${noun}`}” and all its saved versions are deleted for good{schedule ? ', and its scheduled publish is canceled' : ''}. This can’t be undone.
               {dirty && ' Your unsaved changes are lost too.'}
             </p>
             {links === null ? (
@@ -830,18 +844,18 @@ export function PageEditor({
             )}
             <div className="cera-dialog__buttons">
               <button type="button" className="cera-button" onClick={() => setDialog(null)}>
-                Keep page
+                Keep {noun}
               </button>
               <button type="button" className="cera-button cera-button--danger" disabled={links === null} onClick={removePage}>
-                Delete page
+                Delete {noun}
               </button>
             </div>
           </>
         )}
       </Dialog>
 
-      <Dialog open={dialog === 'add'} onClose={() => setDialog(null)} title="Add a panel" wide>
-        <p className="cera-note">New panels go at the end of the page. Drag them by the handle to move them.</p>
+      <Dialog open={dialog === 'add'} onClose={() => setDialog(null)} title={`Add a ${item}`} wide>
+        <p className="cera-note">New {item}s go at the end of the {noun}. Drag them by the handle to move them.</p>
         <ul className="cera-picker-grid">
           {ct.panels.map((def: AnyPanel) => (
             <li key={def.type}>
@@ -874,12 +888,14 @@ function revisionKind(r: PageRevision): string {
 }
 
 function StateLine({
+  noun,
   version,
   published,
   changes,
   schedule,
   onCancelSchedule,
 }: {
+  noun: string;
   version: number;
   published: boolean;
   changes: boolean;
@@ -924,7 +940,7 @@ function StateLine({
   return (
     <span className="cera-state">
       <span className="cera-state__dot cera-state__dot--draft" aria-hidden="true" />
-      {version === 0 ? 'New page, not saved yet' : 'Draft'}
+      {version === 0 ? `New ${noun}, not saved yet` : 'Draft'}
     </span>
   );
 }

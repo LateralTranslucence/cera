@@ -186,3 +186,49 @@ a { color: var(--accent); }
 .posts-slider__nav { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .posts-slider__nav button { padding: 6px 14px; border: 1px solid var(--accent); border-radius: 6px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
 .posts-slider__nav button:disabled { opacity: 0.4; cursor: default; }
+
+/* Form (FormClient) */
+.cera-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.cera-form { display: grid; gap: 20px; max-width: 640px; margin-top: 24px; }
+.cera-form__hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.cera-form__section { display: grid; gap: 20px; margin: 0; padding: 20px; border: 1px solid var(--line); border-radius: 10px; }
+.cera-form__section > legend { padding: 0 6px; font-weight: 700; }
+.cera-form__field { display: grid; gap: 6px; }
+.cera-form__label, .cera-form__choices > legend { font-weight: 600; }
+.cera-form__choices { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.cera-form__choices > legend { margin-bottom: 4px; padding: 0; }
+.cera-form__required { color: var(--accent); }
+.cera-form :is(input[type='text'], input[type='email'], input[type='tel'], textarea, select) {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--muted); border-radius: 6px; background: var(--card); color: var(--fg); font: inherit;
+}
+.cera-form :is(input, textarea, select, button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cera-form__choice { display: flex; align-items: flex-start; gap: 10px; }
+.cera-form__choice input { width: 20px; height: 20px; margin: 3px 0 0; accent-color: var(--accent); flex: none; }
+.cera-form__choice label { display: grid; }
+.cera-form__choice-desc { color: var(--muted); font-size: 15px; }
+.panel--form .cera-form__field--button-select .cera-form__choice { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.cera-form__toggle { display: flex; align-items: center; gap: 10px; }
+.cera-form__toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+.cera-form__toggle-state { color: var(--muted); }
+.cera-form__range { display: flex; align-items: center; gap: 12px; }
+.cera-form__range input { flex: 1; accent-color: var(--accent); }
+.cera-form__range output { min-width: 3ch; font-variant-numeric: tabular-nums; font-weight: 600; }
+.cera-form__note { margin: 0; color: var(--muted); font-size: 15px; }
+.cera-form__error { margin: 0; color: #b3261e; font-weight: 600; }
+.cera-form__field.has-error :is(input, textarea, select) { border-color: #b3261e; }
+.cera-form__summary { padding: 16px 20px; border: 2px solid #b3261e; border-radius: 8px; }
+.cera-form__summary p { margin: 0; font-weight: 700; }
+.cera-form__summary ul { margin: 8px 0 0; padding-left: 20px; }
+.cera-form__notice { margin: 0; padding: 10px 14px; border: 1px dashed var(--muted); border-radius: 8px; color: var(--muted); }
+.cera-form__privacy { color: var(--muted); font-size: 15px; }
+.cera-form__privacy > :first-child { margin-top: 0; }
+.cera-form__privacy > :last-child { margin-bottom: 0; }
+.cera-form__submit { justify-self: start; padding: 10px 20px; border: 0; border-radius: 6px; background: var(--accent); color: var(--bg); font: inherit; font-weight: 700; cursor: pointer; }
+.cera-form__submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.cera-form.is-sending .cera-form__submit { opacity: 0.7; }
+.cera-form__thanks { margin-top: 24px; padding: 20px; border-left: 3px solid var(--accent); background: var(--card); }
+.cera-form__thanks:focus { outline: none; }
+@media (prefers-color-scheme: dark) {
+  .cera-form__error { color: #f2b8b5; }
+  .cera-form__field.has-error :is(input, textarea, select), .cera-form__summary { border-color: #f2b8b5; }
+}

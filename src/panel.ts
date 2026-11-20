@@ -5,6 +5,7 @@
 import type { ComponentType } from 'react';
 import type { z } from 'zod';
 import type { FieldMap, InferFields, MediaRef } from './fields.ts';
+import type { PublicForm } from './forms/model.ts';
 
 export interface PanelContext {
   pageId: string;
@@ -39,9 +40,19 @@ export interface PageResolver {
   byIds(ids: readonly string[]): Promise<LinkedPage[]>;
 }
 
+/** Looks up forms for Form panels (see `createFormResolver` in `cera/supabase`). */
+export interface FormResolver {
+  /** The live form, or its working copy in draft-mode preview; null if there's none to show. */
+  byId(id: string): Promise<PublicForm | null>;
+  /** Where forms post (the site's form route handler). */
+  endpoint: string;
+}
+
 /** What a panel's `load` gets besides its own data. */
 export interface LoadContext {
   pages: PageResolver;
+  /** Needed by Form panels. */
+  forms?: FormResolver;
   /** True in draft-mode preview: linked pages resolve to their working copies. */
   draft: boolean;
   page: { id: string; contentType: string; slug: string };
