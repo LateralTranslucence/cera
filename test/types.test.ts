@@ -48,6 +48,7 @@ export type _tests = [
       | 'cera/featured-media'
       | 'cera/featured-post'
       | 'cera/gallery'
+      | 'cera/posts'
       | 'cera/quotes'
       | 'cera/stats'
       | 'cera/tabs'
