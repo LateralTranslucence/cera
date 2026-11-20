@@ -1,4 +1,4 @@
-import type { CTA } from '@lateraltranslucence/cera';
+import type { CTA } from '../fields.ts';
 
 /** Theme note on CTA: "For internal links, only include the path." */
 function href(url: string): string {

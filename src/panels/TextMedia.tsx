@@ -1,7 +1,7 @@
-import type { PanelPropsOf } from '@lateraltranslucence/cera';
-import { CtaLinks } from '../../components/CtaLinks.tsx';
-import { Html } from '../../components/Html.tsx';
-import { mediaUrl } from '../../lib/media.ts';
+import type { PanelPropsOf } from '../panel.ts';
+import { CtaLinks } from './CtaLinks.tsx';
+import { Html } from './Html.tsx';
+import { mediaUrl } from '../media-url.ts';
 import type { textMediaFields } from './text-media.fields.ts';
 
 export default function TextMedia({ data, panel }: PanelPropsOf<typeof textMediaFields>) {

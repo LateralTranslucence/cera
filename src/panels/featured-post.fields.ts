@@ -1,7 +1,8 @@
 // Ported from set_panel_fields()['featured-post']:
 // drops Title/Background/Copy ($unset), dynamic options, post_browser → relation.
 // Not ported yet: 'Override Type' (post_type_labels).
-import { f, omit, panelDefaults } from '@lateraltranslucence/cera';
+import { f } from '../fields.ts';
+import { omit, panelDefaults } from '../defaults.ts';
 
 export const featuredPostFields = {
   ...omit(panelDefaults, 'title', 'background', 'copy'),

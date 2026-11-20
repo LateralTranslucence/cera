@@ -12,7 +12,7 @@
   "panels": [
     {
       "id": "p_8f2a",
-      "type": "blocks",
+      "type": "cera/blocks",
       "v": 1,
       "data": {
         "title": "What we do",
@@ -24,7 +24,7 @@
     },
     {
       "id": "p_19cc",
-      "type": "text-media",
+      "type": "cera/text-media",
       "v": 1,
       "data": { "title": "Our story", "mediaAlignment": "right" }
     }

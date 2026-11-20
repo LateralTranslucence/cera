@@ -1,7 +1,8 @@
 // Ported from class-landing-page.php → set_panel_fields()['blocks'].
 // Fields live in their own file so the component can import the type
 // without a circular `import()` reference (see HANDOFF.md, "Pattern").
-import { f, panelDefaults } from '@lateraltranslucence/cera';
+import { f } from '../fields.ts';
+import { panelDefaults } from '../defaults.ts';
 
 export const blocksFields = {
   ...panelDefaults,

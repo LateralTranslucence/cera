@@ -4,7 +4,7 @@
  */
 import type { ComponentType } from 'react';
 import type { z } from 'zod';
-import { type FieldMap, type InferFields, type MediaRef, objectSchema } from './fields.ts';
+import type { FieldMap, InferFields, MediaRef } from './fields.ts';
 
 export interface PanelContext {
   pageId: string;
@@ -85,45 +85,6 @@ export interface PanelDefinition<T extends string = string, M extends FieldMap =
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyPanel = PanelDefinition<string, any, any>;
-
-/**
- * Defines a panel. With `load`, keep it in its own file (like the fields) so
- * the component can import its result type without a circular reference:
- *
- *   // featured-post.load.ts
- *   export const loadFeaturedPost = async (data, ctx) => ({ page: … });
- *   export type FeaturedPostLoaded = Awaited<ReturnType<typeof loadFeaturedPost>>;
- */
-export function definePanel<const T extends string, const M extends FieldMap, L = undefined>(def: {
-  type: T;
-  label: string;
-  description?: string;
-  version?: number;
-  fields: M;
-  load?: PanelLoad<InferFields<M>, L>;
-  component: ComponentLoader<PanelPropsOf<M, Awaited<L>>>;
-  /** Keyed by the version being upgraded FROM. */
-  migrations?: Record<number, Migration>;
-}): PanelDefinition<T, M, Awaited<L>> {
-  if (!/^[a-z][a-z0-9-]*$/.test(def.type)) {
-    throw new Error(`Panel type "${def.type}" must be kebab-case (matches the theme's PanelLoader keys).`);
-  }
-  const version = def.version ?? 1;
-  for (let v = 1; v < version; v++) {
-    if (!def.migrations?.[v]) throw new Error(`Panel "${def.type}" is v${version} but has no migration from v${v}.`);
-  }
-  return {
-    type: def.type,
-    label: def.label,
-    description: def.description,
-    version,
-    fields: def.fields,
-    schema: objectSchema(def.fields),
-    load: def.load as PanelLoad<InferFields<M>, Awaited<L>> | undefined,
-    component: def.component,
-    migrations: def.migrations ?? {},
-  };
-}
 
 /** Stored data for a panel definition. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

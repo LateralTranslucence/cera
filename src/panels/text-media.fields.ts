@@ -1,5 +1,6 @@
 // Ported from set_panel_fields()['text-media'].
-import { f, panelDefaults } from '@lateraltranslucence/cera';
+import { f } from '../fields.ts';
+import { panelDefaults } from '../defaults.ts';
 
 export const textMediaFields = {
   ...panelDefaults,

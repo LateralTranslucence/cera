@@ -24,6 +24,8 @@ import {
 } from '../document.ts';
 import type { StoredPanel } from '../migrate.ts';
 
+export { mediaUrl } from '../media-url.ts';
+
 const PAGE_COLUMNS = 'content_type, slug, title, boxes, panels';
 
 interface PageRow {

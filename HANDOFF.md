@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 8 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 60 tests).
 
 ## Goal
 
@@ -22,7 +22,7 @@ Read these before changing the design:
 | `api/functions.helpers.php` → `devo_get_meta_field_type()` | How field type strings are resolved |
 | `app/loaders/PanelLoader.tsx`, `app/components/panels/*.tsx` | React panel components to port |
 | `app/utils/panels/index.ts`, `app/utils/types/Panels.ts` | Hand-written field→prop mapping, which this design makes unnecessary |
-| `extensions/README.md` | The extension model (auto-discovery; core wins on name collision) |
+| `extensions/README.md` | The theme's extension model (auto-discovery; core wins on name collision). Cera avoids collisions instead: decision 20 |
 | `CLAUDE.md` | Theme architecture walkthrough |
 
 ## Run it
@@ -41,12 +41,16 @@ Versions used: TypeScript 7.0, Zod 4.6, React 19, Node 22+.
 ```
 src/
   fields.ts         f.* builders, Field type, InferFields, MediaRef/CTA/Background schemas
-  panel.ts          definePanel, PanelData, PanelInstance (discriminated union), PanelPropsOf
+  panel.ts          PanelDefinition, PanelData, PanelInstance (discriminated union), PanelPropsOf, LoadContext
+  define-panel.ts   definePanel (sites) and defineCorePanel (core panels, the reserved cera/ namespace)
+  media-url.ts      mediaUrl(): public URL of a cera-media object (exported from `/supabase`)
   defaults.ts       panelDefaults (Title, Background, Copy, ID) + omit()
   content-type.ts   defineContentType, PageDocument, PageOf, runtime pageSchema
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish; sanitizes rich text)
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
+  panels/           the `/panels` entry: core panels cera/blocks, cera/featured-post, cera/text-media (v2),
+                    plus Html and CtaLink(s) for site components
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
                     createPageResolver (linked pages for panels' load: published-only live, working copies in preview)
@@ -58,8 +62,8 @@ supabase/
   migrations/…_cera_media_bucket.sql  public `cera-media` Storage bucket
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
-    cera/           the example panels (blocks, featured-post, text-media v2) and the landing_page content type;
-                    they import '@lateraltranslucence/cera' like a real site, and the library tests use them too
+    cera/           the landing_page content type, built from the core panels; it imports the package like a
+                    real site, and the library tests use it too
   sample-page.json  a stored page row
 test/
   types.test.ts     compile-time assertions on inferred types (Equal/Expect)
@@ -85,7 +89,7 @@ test/
 7. **Repeater items get `_id`.** This gives a stable React key and drag-and-drop identity.
 8. **`relation` is always `string[]`.** Use `limit: 1` for a single pick.
 9. **Panel versioning.** `version` plus `migrations[n]` (n → n+1). `definePanel` throws if a migration step is missing. Stored panels are upgraded *before* validation.
-10. **Panel `type` keys are kebab-case.** They match the theme's existing keys (`text-media`, `featured-post`), which makes content import straightforward.
+10. **Panel `type` keys are kebab-case,** optionally behind one namespace (`pricing-table`, `acme/pricing-table`). Core panels keep the theme's names in the `cera/` namespace (`cera/text-media`), so importing theme content is a fixed rename (see 20).
 11. **The page model keeps `boxes` (fixed groups) separate from `panels`.** This mirrors the theme's `default_meta_boxes: ['Hero','SEO','Admin']` versus the dynamic Panel box.
 12. **Page concerns are typed functions,** not string syntax: `seo.title: p => p.boxes.seo.title || p.title` replaces `'SEO Title||post_title'`. Likewise `jsonLd` for schema.org, `hidden` for `hide_field`, and `hooks.beforeSave` / `hooks.afterSave` for `onsave_callback` / `aftersave_callback`.
 13. **The name is Cera** (Latin for wax, as in Roman wax writing tablets). It ships as one package, `@lateraltranslucence/cera`, with subpath exports: `.` is the core (no React or Next imports) and `./next` is the renderer, admin and routes. React is an optional peer dependency. The installer is the unscoped `create-cera` (`npx create-cera`), which was free on npm on 2026-11-16. Shorter scopes (`@cera`, `@syndr`) were not available.
@@ -95,6 +99,9 @@ test/
 17. **Browsers never write.** No insert/update/delete grants for `anon`/`authenticated`. The app server validates with `preparePageForSave` and calls `cera_save_page` with the service role, passing the user id from a verified session; the function re-checks that the user is an admin or editor. Roles live in `app_metadata.cera_role` (`admin | editor | viewer`), which users can't set themselves. Saves use optimistic locking (`expectedVersion`).
 18. **Rich text is stored as sanitized HTML** (decided 2026-11-19), not structured JSON. Existing WordPress content is HTML, and the toolbars are small enough for an allowlist. `preparePageForSave` sanitizes every `f.html()` value (repeaters included) with `sanitize-html`: the `full` toolbar follows `wp_kses_post` minus inline styles (headings, lists, links, images over http(s), tables, `class`); `limited` follows WordPress's "teeny" toolbar (bold, italic, underline, strikethrough, blockquote, lists, links). Links allow http(s), mailto, tel and relative paths; `target="_blank"` gets `rel="noopener noreferrer"`. Anything removed becomes an `html-sanitized` warning, which never blocks a save. Panels of unknown types aren't sanitized (they aren't rendered). Rendering trusts stored HTML because of this and decision 17.
 19. **Panels load their own data on the server.** `definePanel({ load })` runs before render in `<Panels>` (in parallel with the component import); its awaited result is the component's `loaded` prop, typed from `load`'s return (`PanelPropsOf<typeof fields, Loaded>`). Panels without `load` have no `loaded` prop. Keep `load` in its own `*.load.ts` file, like the fields, so the component can import the result type. `load` gets `ctx.pages.byIds()` (a `PageResolver`) and `ctx.draft`; sites build the resolver with `createPageResolver`. On the live site it returns only published, visible pages, so a panel can't leak a draft or a hidden page; in preview it returns working copies. A failing `load` skips that panel, not the page. Linked pages carry title, URL (content type `url`, default `route`), type label, and the content type's SEO description and image.
+20. **Core panels live in the `cera/` namespace** (decided 2026-11-19). The panels ported from the theme ship in the package (`@lateraltranslucence/cera/panels`) as `cera/blocks`, `cera/text-media` and so on, defined with the internal `defineCorePanel`. `definePanel` rejects `cera/` types, so a site's panel can never collide with a core one, and a stored type always means the same panel. Sites name their panels freely (`pricing-table`, or their own namespace). This replaces the theme's "core wins on collision". Letting a site restyle or swap a core panel's component is a separate, later question. Core components get media URLs from `mediaUrl()`, which reads `NEXT_PUBLIC_SUPABASE_URL`, and are plain markup with `panel--*` classes for sites to style.
+21. **Icons: both a content type and a bundled set** (decided 2026-11-19). The theme's icon content type stays, for a site's custom icons; a bundled icon set covers standard ones. `f.icon()` picks from either.
+22. **WordPress import: Developers Only's astronomy content only** (decided 2026-11-19). A one-off import script, not a general migration tool. It maps theme panel keys to `cera/` types and needs a database export or the site's REST API (the local checkout has neither).
 
 ## Pattern: keep fields in their own file
 
@@ -105,8 +112,8 @@ A component that imports its own panel's type through `component: () => import('
 export const blocksFields = { ...panelDefaults, blocks: f.repeater({...}), ... };
 // Blocks.tsx
 export default function Blocks({ data }: PanelPropsOf<typeof blocksFields>) { ... }
-// blocks.ts
-export const blocks = definePanel({ type: 'blocks', label: 'Blocks', fields: blocksFields, component: () => import('./Blocks.tsx') });
+// blocks.ts (a core panel; a site's own panel uses definePanel and its own name)
+export const blocks = defineCorePanel({ type: 'cera/blocks', label: 'Blocks', fields: blocksFields, component: () => import('./Blocks.tsx') });
 ```
 
 ## Implementation note: why `Field<…, S>` has no Zod constraint on `S`
@@ -159,19 +166,17 @@ D. ✅ **Sanitize `f.html()` on save** (decision 18). Checked in the admin: a sc
 **Then the original list:**
 
 1. **Finish the field set.** Port the ❌ types above and resolve every `TODO(verify)`. Add a type assertion and a runtime test for each new builder.
-2. **Port all panels.** The 15 types in `class-landing-page.php` → `set_panel_fields()`, plus the full Hero, SEO and Admin boxes. Use the `.fields.ts` pattern. Port components from `app/components/panels/`.
+2. **Port all panels.** The 15 types in `class-landing-page.php` → `set_panel_fields()`, plus the full Hero, SEO and Admin boxes. They go in `src/panels/` as `cera/<theme key>` with `defineCorePanel` (decision 20); three are there already. Use the `.fields.ts` pattern. Port components from `app/components/panels/`.
    *Done when:* every theme panel has a definition, `PanelData` types match what the existing React components consume, and `npm run check` passes.
-3. **Content-type parity.** Port `class-simple-page.php`, `class-form.php`, `class-form-submission.php` and `class-icon.php`. Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
+3. **Content-type parity.** Port `class-simple-page.php`, `class-form.php`, `class-form-submission.php` and `class-icon.php` (custom icons; decision 21). Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Still to do: media uploads (server route writing to `cera-media` and `cera_media`), pruning old draft revisions, and a "restore revision" action.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.
 6. **Next.js integration.** Started in A and B above. Still to do after them: per-panel error boundaries (a client component) and admin route handlers packaged in `./next`.
-7. **Packaging.** The package is `@lateraltranslucence/cera` with `.`, `./next`, `./supabase`, `./admin` and `./admin.css` entry points (already set up in `package.json`, currently pointing at source). Add a build step that emits JS and `.d.ts`, point `exports` at the output, and keep `.` free of React and Next imports. Then add the `create-cera` installer.
+7. **Packaging.** The package is `@lateraltranslucence/cera` with `.`, `./next`, `./panels`, `./supabase`, `./admin` and `./admin.css` entry points (already set up in `package.json`, currently pointing at source). Add a build step that emits JS and `.d.ts`, point `exports` at the output, and keep `.` free of React and Next imports. Then add the `create-cera` installer.
 
 ## Open questions for the project owner
 
-- Should the extension model stay "core wins on collision", or should sites be able to override core panels?
-- Icons: keep an icon content type as in the theme, or use a bundled icon set?
-- Migrating content from existing WordPress client sites: wanted, and if so for which sites first?
+None right now. Collisions, icons and the WordPress import were answered on 2026-11-19 (decisions 20–22).
 
 ## Unrelated issue in the current theme
 

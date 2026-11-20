@@ -75,7 +75,7 @@ const pages: StoredPage[] = [
     panels: [
       {
         id: 'home-blocks',
-        type: 'blocks',
+        type: 'cera/blocks',
         v: 1,
         data: {
           title: 'What a panel gets for free',
@@ -89,7 +89,7 @@ const pages: StoredPage[] = [
       },
       {
         id: 'home-text',
-        type: 'text-media',
+        type: 'cera/text-media',
         v: 1, // stored at v1 on purpose: the v1 → v2 migration runs on save
         data: {
           title: 'Drafts and live are separate',
@@ -99,7 +99,7 @@ const pages: StoredPage[] = [
       },
       {
         id: 'home-featured',
-        type: 'featured-post',
+        type: 'cera/featured-post',
         v: 1,
         // Title, description and link come from the About page at render time (its load()).
         data: { postTypes: ['landing_page'], post: ['00000000-0000-4000-8000-00000000c002'] },
@@ -119,7 +119,7 @@ const pages: StoredPage[] = [
     panels: [
       {
         id: 'about-text',
-        type: 'text-media',
+        type: 'cera/text-media',
         v: 2,
         data: {
           title: 'Successor to Developers Only',

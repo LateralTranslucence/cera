@@ -90,7 +90,7 @@ test('beforeSave sees known panels only; unknown panels are put back in place', 
   const r = await preparePageForSave(landingPage, raw, { mode: 'publish' });
   assert.equal(r.ok, true, JSON.stringify(r.issues));
   assert.equal(r.page!.title, 'Home');
-  assert.deepEqual(r.page!.panels.map((p) => p.type), ['blocks', 'carousel', 'text-media']);
+  assert.deepEqual(r.page!.panels.map((p) => p.type), ['cera/blocks', 'carousel', 'cera/text-media']);
 });
 
 /* ---------------------------- reads are forgiving ---------------------------- */
@@ -100,7 +100,7 @@ test('read: an invalid field falls back to its default and the panel still rende
   raw.panels[0]!.data.style = 'grid';
   const { page, issues } = readPage(landingPage, raw);
   const blocks = page.panels[0];
-  if (blocks?.type !== 'blocks') throw new Error('expected blocks');
+  if (blocks?.type !== 'cera/blocks') throw new Error('expected blocks');
   assert.equal(blocks.data.style, 'card');
   assert.deepEqual(issues.map((i) => [i.code, i.path.join('.')]), [['invalid-field', 'panels.0.data.style']]);
 });
@@ -117,7 +117,7 @@ test('read: unknown, too-new and unrepairable panels are skipped; the rest rende
   const raw = clone();
   raw.panels.push(
     { id: 'u', type: 'carousel', v: 1, data: {} },
-    { id: 'n', type: 'text-media', v: 3, data: {} }, // newer than the definition (v2)
+    { id: 'n', type: 'cera/text-media', v: 3, data: {} }, // newer than the definition (v2)
     { id: 'q', type: 'quote', v: 1, data: { text: 42 } }, // required field, wrong type, no default
   );
   const { page, issues } = readPage(ct, raw);

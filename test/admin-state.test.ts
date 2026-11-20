@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultsFor, getIn, humanize, issuesAt, moveItem, newPanel, newRepeaterItem, removeItem, setIn, slugify } from '../src/admin/state.ts';
 import type { PageIssue } from '../src/index.ts';
-import { blocks } from '../examples/next-site/cera/panels/blocks.ts';
-import { blocksFields } from '../examples/next-site/cera/panels/blocks.fields.ts';
+import { blocks } from '../src/panels/blocks.ts';
+import { blocksFields } from '../src/panels/blocks.fields.ts';
 
 test('setIn is immutable, creates containers and removes cleared keys', () => {
   const before = { a: { b: 1, c: 2 }, list: [{ x: 1 }] };
@@ -28,7 +28,7 @@ test('new panels and repeater items start with their defaults', () => {
   const p = newPanel(blocks, 'p1');
   assert.deepEqual(p, {
     id: 'p1',
-    type: 'blocks',
+    type: 'cera/blocks',
     v: 1,
     hidden: false,
     data: { background: { overlay: false }, blocks: [], perRow: 3, style: 'card', ctas: [] },

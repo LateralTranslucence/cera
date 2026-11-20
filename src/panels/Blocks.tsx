@@ -1,8 +1,8 @@
 // Ports app/components/panels/Blocks.tsx from the theme (markup simplified).
-import type { PanelPropsOf } from '@lateraltranslucence/cera';
-import { CtaLink, CtaLinks } from '../../components/CtaLinks.tsx';
-import { Html } from '../../components/Html.tsx';
-import { mediaUrl } from '../../lib/media.ts';
+import type { PanelPropsOf } from '../panel.ts';
+import { CtaLink, CtaLinks } from './CtaLinks.tsx';
+import { Html } from './Html.tsx';
+import { mediaUrl } from '../media-url.ts';
 import type { blocksFields } from './blocks.fields.ts';
 
 export default function Blocks({ data, panel }: PanelPropsOf<typeof blocksFields>) {

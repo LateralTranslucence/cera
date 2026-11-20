@@ -31,7 +31,7 @@ function resolver(pages: LinkedPage[], calls: string[][] = []): PageResolver {
 
 function pageWithFeatured(data: Record<string, unknown>) {
   const raw = structuredClone(sample) as unknown as StoredPage;
-  raw.panels = [{ id: 'fp', type: 'featured-post', v: 1, data }];
+  raw.panels = [{ id: 'fp', type: 'cera/featured-post', v: 1, data }];
   return readPage(landingPage, raw).page;
 }
 
@@ -79,7 +79,7 @@ test('a load that fails, or no loadContext, skips just that panel', async () => 
   const errors: string[] = [];
   const failing: PageResolver = { byIds: async () => { throw new Error('db down'); } };
   const raw = structuredClone(sample) as unknown as StoredPage;
-  raw.panels.unshift({ id: 'fp', type: 'featured-post', v: 1, data: { post: [ABOUT] } });
+  raw.panels.unshift({ id: 'fp', type: 'cera/featured-post', v: 1, data: { post: [ABOUT] } });
   const page = readPage(landingPage, raw).page;
 
   const html = await render(page, failing, errors);

@@ -1,11 +1,11 @@
-import { definePanel } from '@lateraltranslucence/cera';
+import { defineCorePanel } from '../define-panel.ts';
 import { featuredPostFields } from './featured-post.fields.ts';
 import { loadFeaturedPost } from './featured-post.load.ts';
 
 export { featuredPostFields };
 
-export const featuredPost = definePanel({
-  type: 'featured-post',
+export const featuredPost = defineCorePanel({
+  type: 'cera/featured-post',
   label: 'Featured Post',
   fields: featuredPostFields,
   load: loadFeaturedPost,

@@ -43,7 +43,7 @@ test('publish, then read the live page as an anonymous visitor', async () => {
   assert.equal(live.page.status, 'published');
   assert.deepEqual(live.issues, []);
   const [blocks, textMedia] = live.page.panels;
-  if (blocks?.type !== 'blocks' || textMedia?.type !== 'text-media') throw new Error('unexpected panels');
+  if (blocks?.type !== 'cera/blocks' || textMedia?.type !== 'cera/text-media') throw new Error('unexpected panels');
   assert.equal(blocks.data.perRow, 3); // default filled on save
   assert.equal(textMedia.v, 2); // migrated on save
   assert.equal(textMedia.data.alignment, 'right');

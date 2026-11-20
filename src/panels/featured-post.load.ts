@@ -1,6 +1,7 @@
 // Server-side: looks up the linked page before the panel renders. On the live
 // site only published, visible pages resolve; in preview, working copies do.
-import type { InferFields, LoadContext } from '@lateraltranslucence/cera';
+import type { InferFields } from '../fields.ts';
+import type { LoadContext } from '../panel.ts';
 import type { featuredPostFields } from './featured-post.fields.ts';
 
 export async function loadFeaturedPost(data: InferFields<typeof featuredPostFields>, ctx: LoadContext) {

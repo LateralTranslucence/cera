@@ -1,10 +1,10 @@
 // Ports app/components/panels/FeaturedPost.tsx from the theme. Difference: the
 // theme rendered nothing without an image; here the image is optional, since
 // Cera pages don't always have one.
-import type { PanelPropsOf } from '@lateraltranslucence/cera';
-import { CtaLink } from '../../components/CtaLinks.tsx';
-import { Html } from '../../components/Html.tsx';
-import { mediaUrl } from '../../lib/media.ts';
+import type { PanelPropsOf } from '../panel.ts';
+import { CtaLink } from './CtaLinks.tsx';
+import { Html } from './Html.tsx';
+import { mediaUrl } from '../media-url.ts';
 import type { featuredPostFields } from './featured-post.fields.ts';
 import type { FeaturedPostLoaded } from './featured-post.load.ts';
 

@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./next": "./src/next/index.ts",
+    "./panels": "./src/panels/index.ts",
     "./supabase": "./src/supabase/index.ts",
     "./admin": "./src/admin/index.ts",
     "./admin.css": "./src/admin/admin.css"

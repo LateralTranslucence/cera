@@ -1,6 +1,6 @@
 # Cera example site
 
-A Next.js site that renders Cera pages from a local Supabase stack, with a minimal admin for editing them. It is also where the example panels and the `landing_page` content type live (`cera/`), and the library's tests use those same definitions.
+A Next.js site that renders Cera pages from a local Supabase stack, with a minimal admin for editing them. Its `landing_page` content type (`cera/`) is built from Cera's core panels (`@lateraltranslucence/cera/panels`), and the library's tests use it too.
 
 ## Run it
 
@@ -23,7 +23,7 @@ If saves or page loads stall for many seconds, check Docker's memory: each local
 
 | Path | Purpose |
 |---|---|
-| `cera/` | Panel definitions and components, and the `landing_page` content type |
+| `cera/` | The `landing_page` content type. Its panels come from the package (`cera/blocks`, …); a site's own panels would sit here too, under names without the reserved `cera/` prefix |
 | `app/(site)/` | Live pages: `getPublishedPage` → `<Panels>`, with `generateMetadata` from `pageMetadata` |
 | `app/admin/` | Sign-in, page list and the editor (`PageEditor` from `@lateraltranslucence/cera/admin`) |
 | `app/admin/actions.ts` | Server actions: save/publish via `savePage` with the user from the verified session; sign in/out |

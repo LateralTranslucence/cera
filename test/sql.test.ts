@@ -22,7 +22,7 @@ const page = (id: string, slug: string, title: string) => ({
   slug,
   title,
   boxes: { hero: { title } },
-  panels: [{ id: 'p1', type: 'blocks', v: 1, hidden: false, data: { title: 'x' } }],
+  panels: [{ id: 'p1', type: 'cera/blocks', v: 1, hidden: false, data: { title: 'x' } }],
 });
 
 async function save(p: object, expected: number, publish: boolean, user = editor) {

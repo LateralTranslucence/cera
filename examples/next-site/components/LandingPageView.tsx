@@ -1,9 +1,8 @@
 import type { LoadContext, PageOf } from '@lateraltranslucence/cera';
 import { jsonLdString, Panels } from '@lateraltranslucence/cera/next';
+import { CtaLinks, Html } from '@lateraltranslucence/cera/panels';
+import { mediaUrl } from '@lateraltranslucence/cera/supabase';
 import { landingPage } from '../cera/index.ts';
-import { mediaUrl } from '../lib/media.ts';
-import { CtaLinks } from './CtaLinks.tsx';
-import { Html } from './Html.tsx';
 
 type LandingPage = PageOf<typeof landingPage>;
 
