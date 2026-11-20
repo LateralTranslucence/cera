@@ -85,6 +85,16 @@
   color-scheme: dark;
 }
 
+/* The page around the admin: no browser margin, and the admin's surface
+   behind it (short pages, overscroll), so no white frame shows. The colors
+   repeat --surface, which lives on .cera-admin and can't reach <html>. */
+body:has(.cera-admin) { margin: 0; }
+html:has(.cera-admin) { background: #F7F5F0; }
+@media (prefers-color-scheme: dark) {
+  html:has(.cera-admin:not([data-theme='light'])) { background: #1C1A16; color-scheme: dark; }
+}
+html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: dark; }
+
 .cera-admin *, .cera-admin *::before, .cera-admin *::after { box-sizing: border-box; }
 .cera-admin [hidden] { display: none !important; }
 .cera-admin a { color: var(--honey-ink); text-underline-offset: 2px; }
