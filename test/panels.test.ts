@@ -152,3 +152,21 @@ test('gallery: images only, each a button that opens it; the dialog is closed un
   assert.doesNotMatch(html, /clip\.mp4/);
   assert.match(html, /<dialog class="gallery__dialog" aria-label="Image">/);
 });
+
+test('light backgrounds: dark text when black beats white for contrast', async () => {
+  const { isLightColor } = await import('../src/color.ts');
+  assert.equal(isLightColor('#FFB400'), true); // the theme's yellow
+  assert.equal(isLightColor('#fff'), true);
+  assert.equal(isLightColor('#1d2a3a'), false);
+  assert.equal(isLightColor('#5b3412'), false);
+  assert.equal(isLightColor('#777777'), true); // mid gray: black text has the edge
+  assert.equal(isLightColor('yellow'), undefined); // named colors: unknown, keep the default
+  assert.equal(isLightColor(undefined), undefined);
+
+  assert.match(await render('cera/cta', { background: { color: '#FFB400', overlay: false } }), /class="panel panel--cta has-background has-light-background"/);
+  // An overlay, an image or a dark color keeps light text.
+  assert.doesNotMatch(await render('cera/cta', { background: { color: '#FFB400', overlay: true } }), /has-light-background/);
+  assert.doesNotMatch(await render('cera/cta', { background: { color: '#FFB400', media: image, overlay: false } }), /has-light-background/);
+  assert.doesNotMatch(await render('cera/cta', { background: { color: '#1d2a3a', overlay: false } }), /has-light-background/);
+  assert.doesNotMatch(await render('cera/cta', { background: { color: 'yellow', overlay: false } }), /has-light-background/);
+});
