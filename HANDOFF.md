@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 81 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 84 tests).
 
 ## Goal
 
@@ -52,7 +52,7 @@ src/
   media.ts          uploadable types (MEDIA_TYPES), size limits, MediaItem and the upload request/result types, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   panels/           the `/panels` entry: the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
-                    quotes, tabs, text, text-media v2; `corePanels` lists them), PanelFrame (the shared section,
+                    quotes, tabs, text, text-media v2, accordion, stats, gallery; `corePanels` lists them), PanelFrame (the shared section,
                     background, title and copy), Html and CtaLink(s); Tabs and Decision Tree have small client parts
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
@@ -60,7 +60,7 @@ src/
                     prepareMediaUpload / finishMediaUpload / listMedia (media.ts), mediaUrl,
                     listCeraUsers / createCeraUser / setCeraRole (users.ts)
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers,
-                    MediaInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
+                    MediaInput, GalleryInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
                     `/admin.css` is its stylesheet, scoped under .cera-admin
 supabase/
   config.toml              local stack (`supabase start`), ports 563xx
@@ -183,7 +183,8 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
 2. **Port all panels.** The 15 types in `class-landing-page.php` → `set_panel_fields()`, plus the full Hero, SEO and Admin boxes. They go in `src/panels/` as `cera/<theme key>` with `defineCorePanel` (decision 20); three are there already. Use the `.fields.ts` pattern. Port components from `app/components/panels/`.
    *Done when:* every theme panel has a definition, `PanelData` types match what the existing React components consume, and `npm run check` passes.
    **Batch 1 done** (2026-11-20): `PanelFrame` (the theme's Panel + PanelWrapper: anchor id, background color/image/video with overlay, title, copy) and six panels: text, cta, quotes, featured-media, tabs, decision-tree. Blocks, Text + Media and Featured Post moved onto the frame, so they now draw their backgrounds. The example site's `/panels` page shows one of each. Differences from the theme: Quotes scrolls with CSS scroll snap instead of a slider script; CTA renders all its CTAs (the theme read one from a `ctas` field); Decision Tree's “CTA Text” + “CTA URL” are one `cta` field; Featured Media's `image_link` modal option isn't ported (no modals yet); a panel's anchor id isn't generated from its title.
-   **Next batches:** accordion and stats (new field types, see the table above), gallery (a picker for `f.gallery`); then posts (a `load` like Featured Post's), form (needs the Form content type) and search (interactive, client-side).
+   **Batch 2 done** (2026-11-20): accordion (WAI-ARIA accordion, one item open at a time), stats (numbers in the HTML, counted up on the client only when off screen at load and not for reduced motion) and gallery (a grid that opens images in a modal `<dialog>`, arrow keys between them), plus the admin's gallery picker (`GalleryInput`: upload several or drop them, pick several from the library, reorder, alt text per image). The theme's `accordion` and `stats` field types became repeaters. Differences: a gallery image's alt text doubles as its title (the theme had a separate title).
+   **Next batch:** posts (a `load` like Featured Post's), form (needs the Form content type) and search (interactive, client-side).
 3. **Content-type parity.** Port `class-simple-page.php`, `class-form.php`, `class-form-submission.php` and `class-icon.php` (custom icons; decision 21). Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). Still to do: pruning old draft revisions, and a "restore revision" action.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.

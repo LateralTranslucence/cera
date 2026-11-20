@@ -41,12 +41,15 @@ export type _tests = [
   Expect<
     Equal<
       Page['panels'][number]['type'],
+      | 'cera/accordion'
       | 'cera/blocks'
       | 'cera/cta'
       | 'cera/decision-tree'
       | 'cera/featured-media'
       | 'cera/featured-post'
+      | 'cera/gallery'
       | 'cera/quotes'
+      | 'cera/stats'
       | 'cera/tabs'
       | 'cera/text'
       | 'cera/text-media'

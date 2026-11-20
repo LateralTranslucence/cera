@@ -109,3 +109,46 @@ test('decision tree: at most two cards, details hidden until opened, links need 
   const { issues } = readPage(landingPage, pageWith([{ id: 'p', type: 'cera/decision-tree', v: 1, data: { cards: [card('a', '1'), card('b', '2'), card('c', '3')] } }]));
   assert.ok(issues.some((i) => i.path.includes('cards')), JSON.stringify(issues));
 });
+
+test('accordion: items without a title are skipped; all closed, text in the HTML, headers are buttons', async () => {
+  const html = await render('cera/accordion', {
+    fullWidth: true,
+    items: [
+      { _id: 'a', title: 'What is Cera?', text: '<p>A panel CMS.</p>' },
+      { _id: 'b', text: '<p>No title</p>' },
+      { _id: 'c', title: 'Title only' },
+    ],
+  });
+  assert.match(html, /class="panel panel--accordion is-full-width"/);
+  assert.equal(html.match(/class="accordion__item"/g)?.length, 2);
+  assert.match(html, /<h3 class="accordion__header"><button type="button" id="[^"]+" class="accordion__trigger" aria-expanded="false" aria-controls="[^"]+"><span>What is Cera\?<\/span>/);
+  assert.match(html, /role="region" aria-labelledby="[^"]+" class="accordion__panel" hidden=""><div class="rich-text"><p>A panel CMS\.<\/p>/);
+  assert.doesNotMatch(html, /No title/);
+});
+
+test('stats: the HTML has each final number, formatted, with screen readers reading the final value', async () => {
+  const html = await render('cera/stats', {
+    stats: [
+      { _id: 'a', before: '$', number: 1250000, after: '+', description: 'Raised' },
+      { _id: 'b', number: 4.46, decimal: true, description: 'Rating' },
+      { _id: 'c', number: 10, countDown: true, description: 'Days left' },
+      { _id: 'd', description: 'Nothing to show' },
+    ],
+  });
+  assert.match(html, /<span class="stats__before">\$<\/span><span class="stats__number" aria-label="1,250,000"><span aria-hidden="true">1,250,000<\/span><\/span><span class="stats__after">\+<\/span>/);
+  assert.match(html, /aria-label="4\.5"><span aria-hidden="true">4\.5</);
+  // Counting down ends at zero.
+  assert.match(html, /aria-label="0"><span aria-hidden="true">0</);
+  assert.doesNotMatch(html, /Nothing to show/);
+});
+
+test('gallery: images only, each a button that opens it; the dialog is closed until then', async () => {
+  const html = await render('cera/gallery', {
+    gallery: [image, { ...image, id: 'v', kind: 'video', path: 'clip.mp4' }, { ...image, id: 'm2', alt: undefined }],
+  });
+  assert.equal(html.match(/class="gallery__open"/g)?.length, 2);
+  assert.match(html, /<button type="button" class="gallery__open"><img src="[^"]*abc-mars\.png" alt="" width="800" height="500" loading="lazy"\/><span class="visually-hidden">Open: Mars<\/span><\/button>/);
+  assert.match(html, /<span class="visually-hidden">Open image 2<\/span>/);
+  assert.doesNotMatch(html, /clip\.mp4/);
+  assert.match(html, /<dialog class="gallery__dialog" aria-label="Image">/);
+});

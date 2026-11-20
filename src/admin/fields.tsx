@@ -10,7 +10,7 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { AnyField, FieldMap, Option, OptionsContext, OptionsSource } from '../fields.ts';
 import type { PageIssue } from '../document.ts';
-import { MediaInput, type MediaContext } from './media.tsx';
+import { GalleryInput, MediaInput, type MediaContext } from './media.tsx';
 import { fieldDefault, getIn, humanize, issuesAt, moveItem, newId, newRepeaterItem, removeItem, setIn, type Path } from './state.ts';
 
 /** What the page picker asks for: by ids (to show picked pages), or a search within content types. */
@@ -87,7 +87,7 @@ export function FieldMapForm({
 /* One field: label, control, note, counter, issues                    */
 /* ------------------------------------------------------------------ */
 
-const GROUP_KINDS = new Set(['media', 'background', 'cta', 'ctas', 'repeater', 'selectFrom', 'relation']);
+const GROUP_KINDS = new Set(['media', 'gallery', 'background', 'cta', 'ctas', 'repeater', 'selectFrom', 'relation']);
 
 interface FieldProps {
   name: string;
@@ -298,6 +298,9 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
         </div>
       );
     }
+
+    case 'gallery':
+      return <GalleryInput value={value} onChange={onChange} readOnly={ro} media={ctx.media} limit={(field.config as { limit?: number } | undefined)?.limit} />;
 
     case 'repeater':
       return <Repeater field={field} value={value} onChange={onChange} path={path} ctx={ctx} />;
