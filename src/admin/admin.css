@@ -272,3 +272,46 @@
   .cera-media-manager__layout { grid-template-columns: 1fr; }
   .cera-media-details { position: static; order: -1; }
 }
+
+/* Rich text (f.html) */
+.cera-rich { display: grid; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-surface); min-width: 0; }
+.cera-rich:focus-within { border-color: var(--cera-accent); }
+.has-error > .cera-rich { border-color: var(--cera-error); }
+.cera-rich__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px; border-bottom: 1px solid var(--cera-line); background: var(--cera-head-bg); border-radius: 5px 5px 0 0; }
+.cera-rich__button { min-width: 30px; height: 30px; padding: 0 7px; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--cera-fg); font: inherit; font-size: 0.88em; cursor: pointer; }
+.cera-rich__button:hover:not(:disabled) { border-color: var(--cera-line); background: var(--cera-surface); }
+.cera-rich__button[aria-pressed='true'] { border-color: var(--cera-accent); background: var(--cera-panel-head-bg); }
+.cera-rich__button:disabled { opacity: 0.4; cursor: default; }
+.cera-admin .cera-rich__block { height: 30px; padding: 0 6px; font-size: 0.88em; width: auto; }
+.cera-rich__divider { width: 1px; align-self: stretch; margin: 4px 3px; background: var(--cera-line); }
+.cera-rich__spacer { flex: 1; }
+.cera-rich__mode { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.8em; }
+.cera-rich__notice { margin: 0; padding: 8px 10px; font-size: 0.85em; background: var(--cera-warning-bg); color: var(--cera-warning); border-bottom: 1px solid var(--cera-line); }
+.cera-rich__panel { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; padding: 8px 10px; border-bottom: 1px solid var(--cera-line); background: var(--cera-bg); }
+.cera-rich__panel--image { display: grid; align-items: stretch; }
+.cera-rich__panel--image .cera-media__library { border-top: 0; padding-top: 0; }
+.cera-rich__grow { flex: 1 1 220px; }
+.cera-rich__check { display: flex; align-items: center; gap: 6px; font-size: 0.88em; padding-bottom: 6px; }
+.cera-admin textarea.cera-rich__source { border: 0; border-radius: 0 0 6px 6px; min-height: 10rem; }
+.cera-rich__editor { min-width: 0; }
+.cera-rich__content { min-height: 7rem; max-height: 32rem; overflow: auto; padding: 8px 12px; outline: none; line-height: 1.55; overflow-wrap: anywhere; }
+.cera-rich__content > :first-child { margin-top: 0; }
+.cera-rich__content > :last-child { margin-bottom: 0; }
+.cera-rich__content p, .cera-rich__content ul, .cera-rich__content ol, .cera-rich__content blockquote, .cera-rich__content pre { margin: 0 0 0.75em; }
+.cera-rich__content h2, .cera-rich__content h3, .cera-rich__content h4, .cera-rich__content h5, .cera-rich__content h6 { margin: 1em 0 0.4em; line-height: 1.25; }
+.cera-rich__content ul, .cera-rich__content ol { padding-left: 1.5em; }
+.cera-rich__content li > p { margin: 0; }
+.cera-rich__content blockquote { padding-left: 12px; border-left: 3px solid var(--cera-line); color: var(--cera-muted); }
+.cera-rich__content pre { padding: 8px 10px; border-radius: 4px; background: var(--cera-bg); overflow: auto; }
+.cera-rich__content code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.9em; }
+.cera-rich__content hr { border: 0; border-top: 1px solid var(--cera-line); margin: 1em 0; }
+.cera-rich__content img { max-width: 100%; height: auto; border-radius: 2px; }
+.cera-rich__content img.ProseMirror-selectednode { outline: 3px solid var(--cera-accent); }
+.cera-rich__content a { color: var(--cera-accent); }
+.cera-rich__content .alignleft { float: left; margin: 0 1em 0.5em 0; max-width: 50%; }
+.cera-rich__content .alignright { float: right; margin: 0 0 0.5em 1em; max-width: 50%; }
+.cera-rich__content::after { content: ''; display: block; clear: both; }
+.cera-rich__content .ProseMirror-gapcursor { position: relative; }
+.cera-rich__content .ProseMirror-gapcursor::after { content: ''; position: absolute; top: -2px; width: 20px; border-top: 1px solid var(--cera-fg); animation: cera-blink 1.1s steps(2, start) infinite; }
+@keyframes cera-blink { to { visibility: hidden; } }
+.cera-rich__content[contenteditable='false'] { color: var(--cera-muted); }

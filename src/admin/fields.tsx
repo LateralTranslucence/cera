@@ -11,6 +11,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { AnyField, FieldMap, Option, OptionsContext, OptionsSource } from '../fields.ts';
 import type { PageIssue } from '../document.ts';
 import { GalleryInput, MediaInput, type MediaContext } from './media.tsx';
+import { RichTextInput } from './RichTextInput.tsx';
 import { fieldDefault, getIn, humanize, issuesAt, moveItem, newId, newRepeaterItem, removeItem, setIn, type Path } from './state.ts';
 
 /** What the page picker asks for: by ids (to show picked pages), or a search within content types. */
@@ -87,7 +88,7 @@ export function FieldMapForm({
 /* One field: label, control, note, counter, issues                    */
 /* ------------------------------------------------------------------ */
 
-const GROUP_KINDS = new Set(['media', 'gallery', 'background', 'cta', 'ctas', 'repeater', 'selectFrom', 'relation']);
+const GROUP_KINDS = new Set(['html', 'media', 'gallery', 'background', 'cta', 'ctas', 'repeater', 'selectFrom', 'relation']);
 
 interface FieldProps {
   name: string;
@@ -197,15 +198,18 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
       );
 
     case 'textarea':
+      return <textarea id={id} rows={3} value={asString(value)} readOnly={ro} onChange={(e) => onChange(emptyToUndefined(e.target.value))} />;
+
     case 'html':
       return (
-        <textarea
+        <RichTextInput
           id={id}
-          rows={field.kind === 'html' ? 5 : 3}
-          value={asString(value)}
+          labelledBy={`${id}-label`}
+          value={value}
+          onChange={onChange}
           readOnly={ro}
-          className={field.kind === 'html' ? 'cera-code' : undefined}
-          onChange={(e) => onChange(emptyToUndefined(e.target.value))}
+          toolbar={(field.config as { toolbar?: 'full' | 'limited' } | undefined)?.toolbar}
+          media={ctx.media}
         />
       );
 
