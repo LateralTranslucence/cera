@@ -20,8 +20,11 @@ function logIssue(slug: string) {
 const publishedLandingPage = cacheLive('landing-page', (slug: string) =>
   getPublishedPage(publicClient(), landingPage, slug, { onIssue: logIssue(slug) }),
 );
-const livePages = createPageResolver(publicClient(), contentTypes, { draft: false });
-const liveLinkedPages = cacheLive('linked-pages', (ids: string[]) => livePages.byIds(ids));
+// Clients are made per read, not when this module loads: `next build` loads
+// it without Supabase settings (CI has none).
+const liveLinkedPages = cacheLive('linked-pages', (ids: string[]) =>
+  createPageResolver(publicClient(), contentTypes, { draft: false }).byIds(ids),
+);
 
 /**
  * Loads a landing page for rendering: the live revision normally (cached),
