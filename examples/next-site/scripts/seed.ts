@@ -1,9 +1,16 @@
 /**
- * Seeds the local stack with a published home and about page, saved through
- * the same `savePage` path the admin will use. Safe to run repeatedly: each
- * run saves and publishes a new version of the same pages.
+ * Seeds the local stack with published example pages (home, about, panels),
+ * saved through the same `savePage` path the admin uses. Safe to run
+ * repeatedly: each run saves and publishes a new version of the same pages,
+ * replacing any edits made to them in the admin.
  *
  *   npm run seed -w cera-next-site
+ *
+ * With `--only <slug>[,<slug>]` it publishes just those pages and leaves the
+ * admin account alone, e.g. to add a new example page to a site whose other
+ * pages have been edited:
+ *
+ *   node --env-file=.env.hosted --import tsx scripts/seed.ts --only panels
  */
 import { randomBytes } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
@@ -225,13 +232,55 @@ const pages: StoredPage[] = [
         // Media is left empty in the seed (files aren't seeded); pick an image in the admin.
         data: { title: 'Featured Media', copy: '<p>One large image or video. Add one in the admin.</p>' },
       },
+      {
+        id: 'panels-stats',
+        type: 'cera/stats',
+        v: 1,
+        data: {
+          title: 'Stats',
+          copy: '<p>Numbers count up when they scroll into view (unless you prefer reduced motion).</p>',
+          stats: [
+            { _id: 's1', number: 225, after: 'M km', description: 'Average distance from Earth to Mars' },
+            { _id: 's2', number: 24.6, decimal: true, after: ' h', description: 'Length of a Martian day' },
+            { _id: 's3', before: '−', number: 63, after: '°C', description: 'Average surface temperature' },
+            { _id: 's4', number: 10, countDown: true, description: 'Counts down to zero' },
+          ],
+        },
+      },
+      {
+        id: 'panels-accordion',
+        type: 'cera/accordion',
+        v: 1,
+        data: {
+          title: 'Accordion',
+          items: [
+            { _id: 'a1', title: 'Why is Mars red?', text: '<p>Iron oxide, rust, in its dust and rocks.</p>' },
+            { _id: 'a2', title: 'Does Mars have moons?', text: '<p>Two small ones: Phobos and Deimos.</p>' },
+            { _id: 'a3', title: 'Can you use the keyboard?', text: '<p>Yes: arrow keys move between questions, Enter opens one.</p>' },
+          ],
+        },
+      },
+      {
+        id: 'panels-gallery',
+        type: 'cera/gallery',
+        v: 1,
+        // Images are added in the admin (files aren't seeded).
+        data: { title: 'Gallery', copy: '<p>A grid of images that open full size. Add some in the admin.</p>' },
+      },
     ],
   },
 ];
 
-await seedAdmin();
+const onlyArg = process.argv.indexOf('--only');
+const only = onlyArg > -1 ? new Set((process.argv[onlyArg + 1] ?? '').split(',').filter(Boolean)) : null;
+if (only) {
+  const unknown = [...only].filter((slug) => !pages.some((p) => p.slug === slug));
+  if (only.size === 0 || unknown.length) throw new Error(`--only takes page slugs from this script: ${pages.map((p) => p.slug).join(', ')}.`);
+} else {
+  await seedAdmin();
+}
 const userId = await seedEditor();
-for (const page of pages) {
+for (const page of pages.filter((p) => !only || only.has(p.slug))) {
   const existing = await getPageForEditing(admin, landingPage, page.id);
   const result = await savePage(admin, landingPage, page, { mode: 'publish', expectedVersion: existing?.version ?? 0, userId });
   if (!result.ok) {

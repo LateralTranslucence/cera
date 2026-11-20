@@ -14,6 +14,7 @@
  * links are exported too, for site components (like a hero) that render the
  * same field types.
  */
+export { accordion, accordionFields } from './accordion.ts';
 export { blocks } from './blocks.ts';
 export { blocksFields } from './blocks.fields.ts';
 export { cta, ctaFields } from './cta.ts';
@@ -21,23 +22,28 @@ export { decisionTree, decisionTreeFields } from './decision-tree.ts';
 export { featuredMedia, featuredMediaFields } from './featured-media.ts';
 export { featuredPost, featuredPostFields } from './featured-post.ts';
 export type { FeaturedPostLoaded } from './featured-post.load.ts';
+export { gallery, galleryFields } from './gallery.ts';
 export { quotes, quotesFields } from './quotes.ts';
+export { stats, statsFields } from './stats.ts';
 export { tabs, tabsFields } from './tabs.ts';
 export { text, textFields } from './text.ts';
 export { textMedia, textMediaFields } from './text-media.ts';
 
+import { accordion } from './accordion.ts';
 import { blocks } from './blocks.ts';
 import { cta } from './cta.ts';
 import { decisionTree } from './decision-tree.ts';
 import { featuredMedia } from './featured-media.ts';
 import { featuredPost } from './featured-post.ts';
+import { gallery } from './gallery.ts';
 import { quotes } from './quotes.ts';
+import { stats } from './stats.ts';
 import { tabs } from './tabs.ts';
 import { text } from './text.ts';
 import { textMedia } from './text-media.ts';
 
 /** Every core panel, in the order the admin lists them (by label). */
-export const corePanels = [blocks, cta, decisionTree, featuredMedia, featuredPost, quotes, tabs, text, textMedia] as const;
+export const corePanels = [accordion, blocks, cta, decisionTree, featuredMedia, featuredPost, gallery, quotes, stats, tabs, text, textMedia] as const;
 
 export { PanelFrame, type PanelFrameData } from './PanelFrame.tsx';
 export { CtaLink, CtaLinks } from './CtaLinks.tsx';

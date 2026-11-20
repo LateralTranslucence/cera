@@ -272,7 +272,7 @@ export function MediaInput({
         <MediaLibrary
           find={media.find}
           kinds={uploadable}
-          selectedId={asString(m?.id)}
+          isSelected={(id) => id === asString(m?.id)}
           onPick={(item) => {
             const ref = toMediaRef(item);
             onChange(m && asString(m.alt) && !ref.alt ? { ...ref, alt: m.alt } : ref);
@@ -317,12 +317,12 @@ function MediaPreview({ media }: { media: MediaRef }) {
 function MediaLibrary({
   find,
   kinds,
-  selectedId,
+  isSelected,
   onPick,
 }: {
   find: MediaContext['find'];
   kinds: MediaKind[];
-  selectedId: string;
+  isSelected: (id: string) => boolean;
   onPick: (item: MediaItem) => void;
 }) {
   const [search, setSearch] = useState('');
@@ -359,13 +359,185 @@ function MediaLibrary({
         <ul className="cera-media__grid">
           {items.map((item) => (
             <li key={item.id}>
-              <button type="button" aria-pressed={item.id === selectedId} title={item.alt || item.path} onClick={() => onPick(item)}>
+              <button type="button" aria-pressed={isSelected(item.id)} title={item.alt || item.path} onClick={() => onPick(item)}>
                 {item.kind === 'video' ? <video src={mediaUrl(item)} muted preload="metadata" /> : <img src={mediaUrl(item)} alt="" loading="lazy" />}
                 <span>{item.alt || fileName(item.path)}</span>
               </button>
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The gallery field: an ordered list of images. Add by uploading (several at
+ * once, or dropped), or from the library, which stays open so several can be
+ * picked; reorder, remove, and set each image's alt text.
+ */
+export function GalleryInput({
+  value,
+  onChange,
+  readOnly,
+  media,
+  limit,
+}: {
+  value: unknown;
+  onChange: (value: unknown) => void;
+  readOnly: boolean;
+  media?: MediaContext;
+  limit?: number;
+}) {
+  const items = (Array.isArray(value) ? value : []).filter(isObject) as Array<Record<string, unknown>>;
+  const [library, setLibrary] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  // Uploads finish one at a time; build on the latest list, not the one this render saw.
+  const latest = useRef(items);
+  latest.current = items;
+  const full = limit !== undefined && items.length >= limit;
+
+  const set = (next: Array<Record<string, unknown>>) => {
+    latest.current = next;
+    onChange(next);
+  };
+  const move = (i: number, by: number) => {
+    const next = [...items];
+    const [item] = next.splice(i, 1);
+    next.splice(i + by, 0, item!);
+    set(next);
+  };
+
+  async function uploadAll(files: File[]) {
+    if (!media) return;
+    setError(null);
+    const room = limit === undefined ? files.length : Math.max(limit - latest.current.length, 0);
+    const queue = files.slice(0, room);
+    const failures: string[] = [];
+    for (const [n, file] of queue.entries()) {
+      setBusy(`Uploading ${n + 1} of ${queue.length}: ${file.name}…`);
+      try {
+        const result = await media.upload(file);
+        if (result.ok) set([...latest.current, toMediaRef(result.item) as unknown as Record<string, unknown>]);
+        else failures.push(`${file.name}: ${result.message}`);
+      } catch {
+        failures.push(`${file.name}: the upload failed.`);
+      }
+    }
+    if (files.length > queue.length) failures.push(`The gallery holds ${limit}; ${files.length - queue.length} file(s) weren’t added.`);
+    setBusy(null);
+    if (failures.length) setError(failures.join(' '));
+    if (fileInput.current) fileInput.current.value = '';
+  }
+
+  return (
+    <div
+      className={`cera-group cera-media cera-gallery${dragging ? ' cera-media--drop' : ''}`}
+      onDragOver={(e) => {
+        if (!media || readOnly || full) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
+        if (files.length && media && !readOnly && !busy && !full) void uploadAll(files);
+      }}
+    >
+      {items.length === 0 ? (
+        <p className="cera-note">No images yet.</p>
+      ) : (
+        <ol className="cera-gallery__items">
+          {items.map((item, i) => (
+            <li key={`${asString(item.id)}-${i}`} className="cera-gallery__item">
+              <img src={mediaUrl(item as unknown as MediaRef)} alt="" loading="lazy" />
+              <label className="cera-inline">
+                Alt text
+                <input
+                  type="text"
+                  value={asString(item.alt)}
+                  readOnly={readOnly}
+                  placeholder="Describe the image"
+                  onChange={(e) => {
+                    const next = [...items];
+                    next[i] = { ...item, alt: e.target.value };
+                    if (!e.target.value) delete next[i]!.alt;
+                    set(next);
+                  }}
+                />
+              </label>
+              {!readOnly && (
+                <span className="cera-item-buttons">
+                  <button type="button" className="cera-icon-button" aria-label="Move earlier" title="Move earlier" disabled={i === 0} onClick={() => move(i, -1)}>
+                    ↑
+                  </button>
+                  <button type="button" className="cera-icon-button" aria-label="Move later" title="Move later" disabled={i === items.length - 1} onClick={() => move(i, 1)}>
+                    ↓
+                  </button>
+                  <button type="button" className="cera-icon-button cera-danger" aria-label="Remove image" title="Remove" onClick={() => set(items.filter((_, j) => j !== i))}>
+                    ✕
+                  </button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {!readOnly && media && (
+        <div className="cera-media__actions">
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            className="cera-visually-hidden"
+            accept={mediaAccept(['image'])}
+            disabled={Boolean(busy) || full}
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])];
+              if (files.length) void uploadAll(files);
+            }}
+          />
+          <button type="button" className="cera-button cera-button--small" disabled={Boolean(busy) || full} onClick={() => fileInput.current?.click()}>
+            Upload images
+          </button>
+          <button type="button" className="cera-button cera-button--small" aria-expanded={library} disabled={Boolean(busy)} onClick={() => setLibrary(!library)}>
+            {library ? 'Close library' : 'Choose from library'}
+          </button>
+          {limit !== undefined && (
+            <span className="cera-note">
+              {items.length} of {limit}
+            </span>
+          )}
+        </div>
+      )}
+      {!media && !readOnly && <p className="cera-note">This admin has no media library, so images can’t be added here.</p>}
+      {busy && (
+        <p className="cera-note" role="status">
+          {busy}
+        </p>
+      )}
+      {error && (
+        <p className="cera-status cera-status--error" role="alert">
+          {error}
+        </p>
+      )}
+      {library && media && (
+        <MediaLibrary
+          find={media.find}
+          kinds={['image']}
+          isSelected={(id) => items.some((it) => it.id === id)}
+          onPick={(item) => {
+            if (full) return;
+            // Picking adds to the end; the library stays open for more.
+            set([...items, toMediaRef(item) as unknown as Record<string, unknown>]);
+          }}
+        />
       )}
     </div>
   );

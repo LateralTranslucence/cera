@@ -241,3 +241,8 @@
 .cera-users .cera-badge { margin-left: 8px; }
 .cera-users select { max-width: 100%; }
 .cera-password-form { display: grid; gap: 12px; max-width: 28rem; }
+
+/* Gallery fields */
+.cera-gallery__items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cera-gallery__item { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-surface); }
+.cera-gallery__item > img { width: 72px; height: 54px; object-fit: cover; border-radius: 4px; }
