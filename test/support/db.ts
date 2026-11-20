@@ -145,13 +145,18 @@ export function fakeSupabase(
     const keys = Object.keys(args);
     const call = `public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')})`;
     // Functions that return rows come back as a JSON array, as PostgREST sends them (times as ISO strings).
-    const procs = await db.query<{ proretset: boolean }>(
-      `select p.proretset from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = $1 limit 1`,
+    const procs = await db.query<{ proretset: boolean; names: string[] | null; types: string[] }>(
+      `select p.proretset, p.proargnames as names, p.proargtypes::regtype[]::text[] as types
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = $1 limit 1`,
       [fn],
     );
-    const sql = procs.rows[0]?.proretset ? `select coalesce(jsonb_agg(t), '[]'::jsonb) as result from ${call} t` : `select ${call} as result`;
+    const proc = procs.rows[0];
+    const sql = proc?.proretset ? `select coalesce(jsonb_agg(t), '[]'::jsonb) as result from ${call} t` : `select ${call} as result`;
+    // As PostgREST does: JSON for json/jsonb arguments, Postgres arrays for array arguments.
+    const typeOf = (k: string) => proc?.types[proc.names?.indexOf(k) ?? -1] ?? '';
     const params = keys.map((k) => {
       const v = args[k];
+      if (Array.isArray(v) && typeOf(k).endsWith('[]')) return v;
       return v !== null && typeof v === 'object' ? JSON.stringify(v) : v;
     });
     try {

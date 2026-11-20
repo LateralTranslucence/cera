@@ -9,6 +9,7 @@
     "./next": "./src/next/index.ts",
     "./next/cache": "./src/next/cache.ts",
     "./panels": "./src/panels/index.ts",
+    "./forms": "./src/forms/index.ts",
     "./supabase": "./src/supabase/index.ts",
     "./admin": "./src/admin/index.ts",
     "./admin.css": "./src/admin/admin.css"

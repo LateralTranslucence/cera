@@ -4,7 +4,7 @@
  * the summaries from `listPages` (./supabase). Everything here is in the
  * browser; the list itself is read on the server as the signed-in user.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { PageSummary } from '../supabase/index.ts';
 import { Icon } from './icons.tsx';
 
@@ -14,6 +14,15 @@ export interface PageListProps {
   editHref: (page: PageSummary) => string;
   /** How many rows a page of the table shows. */
   pageSize?: number;
+  /** What the list holds, lowercase. Default "page" / "pages". */
+  noun?: string;
+  nounPlural?: string;
+  /** Heading for the panel count. Default "Panels" (forms: "Fields"). */
+  countLabel?: string;
+  /** Show slugs as paths ("/about", the default) or as plain IDs ("contact"). */
+  slugs?: 'path' | 'id';
+  /** One more column after the count, e.g. a form's submissions. */
+  extra?: { label: string; render: (page: PageSummary) => ReactNode };
 }
 
 type Filter = 'all' | 'published' | 'drafts' | 'scheduled';
@@ -72,7 +81,16 @@ export function PageStatus({ page }: { page: PageSummary }) {
   );
 }
 
-export function PageList({ pages, editHref, pageSize = 20 }: PageListProps) {
+export function PageList({
+  pages,
+  editHref,
+  pageSize = 20,
+  noun = 'page',
+  nounPlural = `${noun}s`,
+  countLabel = 'Panels',
+  slugs = 'path',
+  extra,
+}: PageListProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<Sort>('updated');
@@ -99,10 +117,10 @@ export function PageList({ pages, editHref, pageSize = 20 }: PageListProps) {
       <div className="cera-list-toolbar">
         <div className="cera-search">
           <label htmlFor="cera-page-search" className="cera-visually-hidden">
-            Search pages
+            Search {nounPlural}
           </label>
           <Icon name="search" />
-          <input id="cera-page-search" type="search" placeholder="Search by title or address" value={search} onChange={(e) => (setSearch(e.target.value), reset())} />
+          <input id="cera-page-search" type="search" placeholder={slugs === 'path' ? 'Search by title or address' : 'Search by name or ID'} value={search} onChange={(e) => (setSearch(e.target.value), reset())} />
         </div>
         <div className="cera-segmented" role="group" aria-label="Status">
           {FILTERS.map((f) => (
@@ -127,7 +145,8 @@ export function PageList({ pages, editHref, pageSize = 20 }: PageListProps) {
             <tr>
               <th scope="col">Title</th>
               <th scope="col">Status</th>
-              <th scope="col">Panels</th>
+              <th scope="col">{countLabel}</th>
+              {extra && <th scope="col">{extra.label}</th>}
               <th scope="col">Last edited by</th>
               <th scope="col" className="is-end">
                 Updated
@@ -137,8 +156,8 @@ export function PageList({ pages, editHref, pageSize = 20 }: PageListProps) {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="cera-table__empty">
-                  {pages.length === 0 ? 'No pages yet.' : 'No pages match.'}
+                <td colSpan={extra ? 6 : 5} className="cera-table__empty">
+                  {pages.length === 0 ? `No ${nounPlural} yet.` : `No ${nounPlural} match.`}
                 </td>
               </tr>
             ) : (
@@ -148,12 +167,13 @@ export function PageList({ pages, editHref, pageSize = 20 }: PageListProps) {
                     <a className="cera-table__title" href={editHref(p)}>
                       {p.title || 'Untitled'}
                     </a>
-                    <span className="cera-table__slug">{p.slug === 'home' ? '/' : `/${p.slug}`}</span>
+                    <span className="cera-table__slug">{slugs === 'id' ? p.slug : p.slug === 'home' ? '/' : `/${p.slug}`}</span>
                   </td>
                   <td>
                     <PageStatus page={p} />
                   </td>
                   <td className="cera-table__muted">{p.panelCount}</td>
+                  {extra && <td className="cera-table__muted">{extra.render(p)}</td>}
                   <td className="cera-table__muted">{p.updatedBy ?? '—'}</td>
                   <td className="cera-table__muted is-end">
                     <time dateTime={p.updatedAt} title={dateTime.format(new Date(p.updatedAt))} suppressHydrationWarning>
@@ -169,7 +189,7 @@ export function PageList({ pages, editHref, pageSize = 20 }: PageListProps) {
 
       <div className="cera-list-footer">
         <span aria-live="polite">
-          Showing {rows.length} of {shown.length} {shown.length === 1 ? 'page' : 'pages'}
+          Showing {rows.length} of {shown.length} {shown.length === 1 ? noun : nounPlural}
         </span>
         {(
           <span className="cera-list-footer__buttons">

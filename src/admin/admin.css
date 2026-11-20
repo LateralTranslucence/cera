@@ -282,6 +282,7 @@
 /* ------------------------------------------------------------------ */
 
 .cera-list-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.cera-list-toolbar__spacer { flex: 1; }
 .cera-search { position: relative; flex: 1 1 240px; max-width: 360px; }
 .cera-search .cera-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-muted); pointer-events: none; }
 .cera-admin .cera-search input { padding-left: 40px; }
@@ -512,3 +513,17 @@
 .cera-rich__content .ProseMirror-gapcursor::after { content: ''; position: absolute; top: -2px; width: 20px; border-top: 1px solid var(--cera-fg); animation: cera-blink 1.1s steps(2, start) infinite; }
 @keyframes cera-blink { to { visibility: hidden; } }
 .cera-rich__content[contenteditable='false'] { color: var(--cera-muted); }
+
+/* Submissions */
+.cera-submissions { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.cera-submission { padding: 16px 20px; display: grid; gap: 12px; }
+.cera-submission__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cera-submission__title { margin: 0; font: 600 16px/22px var(--font-sans); overflow-wrap: anywhere; }
+.cera-submission__meta { margin: 2px 0 0; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+.cera-submission__answers { margin: 0; display: grid; gap: 8px; }
+.cera-submission__answers > div { display: grid; grid-template-columns: minmax(120px, 200px) 1fr; gap: 12px; }
+.cera-submission__answers dt { color: var(--ink-muted); font-size: 14px; }
+.cera-submission__answers dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .cera-submission__answers > div { grid-template-columns: 1fr; gap: 2px; }
+}

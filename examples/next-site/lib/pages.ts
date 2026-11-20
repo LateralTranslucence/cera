@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import { draftMode } from 'next/headers';
-import { createPageResolver, getDraftPage, getPublishedPage } from '@lateraltranslucence/cera/supabase';
+import { createFormResolver, createPageResolver, DEFAULT_FORM_ENDPOINT, getDraftPage, getLiveForm, getPublishedPage } from '@lateraltranslucence/cera/supabase';
 import { cacheLive } from '@lateraltranslucence/cera/next/cache';
 import type { LoadContext, PageIssue } from '@lateraltranslucence/cera';
 import { contentTypes, landingPage } from '../cera/index.ts';
@@ -25,6 +25,7 @@ const publishedLandingPage = cacheLive('landing-page', (slug: string) =>
 const liveLinkedPages = cacheLive('linked-pages', (ids: string[]) =>
   createPageResolver(publicClient(), contentTypes, { draft: false }).byIds(ids),
 );
+const liveForm = cacheLive('form', (id: string) => getLiveForm(publicClient(), id));
 
 /**
  * Loads a landing page for rendering: the live revision normally (cached),
@@ -44,11 +45,12 @@ export const loadLandingPage = cache(async (slug: string) => {
 });
 
 /**
- * How panels' `load` looks up linked pages: published pages for visitors
- * (cached, like the pages themselves), working copies in draft-mode preview (behind the draft-mode cookie, so the
- * secret key is safe to use there).
+ * How panels' `load` looks up linked pages and forms: published ones for
+ * visitors (cached, like the pages themselves), working copies in draft-mode
+ * preview (behind the draft-mode cookie, so the secret key is safe to use
+ * there). Forms post to app/api/cera/forms.
  */
-export function loadContextFor(draft: boolean): Pick<LoadContext, 'pages' | 'draft'> {
-  if (draft) return { pages: createPageResolver(serviceClient(), contentTypes, { draft }), draft };
-  return { pages: { byIds: (ids) => liveLinkedPages([...ids]) }, draft };
+export function loadContextFor(draft: boolean): Pick<LoadContext, 'pages' | 'forms' | 'draft'> {
+  if (draft) return { pages: createPageResolver(serviceClient(), contentTypes, { draft }), forms: createFormResolver(serviceClient(), { draft }), draft };
+  return { pages: { byIds: (ids) => liveLinkedPages([...ids]) }, forms: { byId: liveForm, endpoint: DEFAULT_FORM_ENDPOINT }, draft };
 }

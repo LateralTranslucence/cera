@@ -126,7 +126,12 @@ const plainText = (html: string) =>
 
 /** A folded panel's name: its title, or the panel type's label. */
 export function panelName(def: AnyPanel | undefined, data: Record<string, unknown>, type: string): string {
-  return typeof data.title === 'string' && data.title.trim() ? plainText(data.title) : (def?.label ?? type);
+  // Panels have titles; form fields have labels (or a section's legend).
+  for (const key of ['title', 'label', 'legend']) {
+    const v = data[key];
+    if (typeof v === 'string' && v.trim()) return plainText(v);
+  }
+  return def?.label ?? type;
 }
 
 /**

@@ -29,6 +29,18 @@ import { CeraDatabaseError, fail } from './errors.ts';
 
 export { mediaUrl } from '../media-url.ts';
 export { formatBytes } from '../media.ts';
+export {
+  addSubmission,
+  createFormResolver,
+  DEFAULT_FORM_ENDPOINT,
+  deleteSubmissions,
+  getDraftForm,
+  getLiveForm,
+  listSubmissions,
+  submissionCounts,
+  type AddSubmissionResult,
+  type Submission,
+} from './forms.ts';
 export { deleteMedia, finishMediaUpload, listMedia, MEDIA_BUCKET, mediaPathFor, mediaUsage, prepareMediaUpload, updateMedia } from './media.ts';
 export {
   CERA_ROLE_LABELS,
@@ -391,11 +403,16 @@ export async function publishDuePages(client: SupabaseClient): Promise<number> {
 
 export type DeletePageResult =
   | { ok: true; id: string; contentType: string; slug: string }
-  /** `live`: unpublish it first. `conflict`: someone saved it after the caller loaded it. */
-  | { ok: false; reason: 'live' | 'conflict' | 'forbidden' | 'not-found'; message: string };
+  /**
+   * `live`: unpublish it first. `conflict`: someone saved it after the caller
+   * loaded it. `in-use`: other records depend on it (a form's submissions).
+   */
+  | { ok: false; reason: 'live' | 'conflict' | 'forbidden' | 'not-found' | 'in-use'; message: string };
 
-const DELETE_REASONS: Record<string, 'live' | 'conflict' | 'forbidden' | 'not-found'> = {
+const DELETE_REASONS: Record<string, 'live' | 'conflict' | 'forbidden' | 'not-found' | 'in-use'> = {
   CE422: 'live',
+  '23503': 'in-use',
+  '23001': 'in-use',
   CE409: 'conflict',
   '42501': 'forbidden',
   CE404: 'not-found',
