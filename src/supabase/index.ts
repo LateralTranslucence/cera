@@ -28,6 +28,20 @@ import { CeraDatabaseError, fail } from './errors.ts';
 
 export { mediaUrl } from '../media-url.ts';
 export { finishMediaUpload, formatBytes, listMedia, MEDIA_BUCKET, mediaPathFor, prepareMediaUpload } from './media.ts';
+export {
+  CERA_ROLE_LABELS,
+  CERA_ROLES,
+  ceraRoleOf,
+  createCeraUser,
+  isCeraRole,
+  listCeraUsers,
+  setCeraRole,
+  temporaryPassword,
+  type CeraRole,
+  type CeraUser,
+  type CreateUserResult,
+  type UserResult,
+} from './users.ts';
 
 const PAGE_COLUMNS = 'content_type, slug, title, boxes, panels';
 

@@ -6,3 +6,4 @@ export * from './content-type.ts';
 export * from './migrate.ts';
 export * from './document.ts';
 export * from './media.ts';
+export * from './roles.ts';
