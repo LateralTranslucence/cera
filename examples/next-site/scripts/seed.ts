@@ -261,6 +261,19 @@ const pages: StoredPage[] = [
         },
       },
       {
+        id: 'panels-posts',
+        type: 'cera/posts',
+        v: 1,
+        // Titles, descriptions and links come from the picked pages at render time (load()).
+        data: {
+          title: 'Posts',
+          copy: '<p>Cards for pages you pick. With <strong>Slider</strong> on and more pages than fit in a row, they scroll sideways.</p>',
+          postTypes: ['landing_page'],
+          posts: ['00000000-0000-4000-8000-00000000c002', '00000000-0000-4000-8000-00000000c001'],
+          perRow: 3,
+        },
+      },
+      {
         id: 'panels-gallery',
         type: 'cera/gallery',
         v: 1,

@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 84 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 86 tests).
 
 ## Goal
 
@@ -52,7 +52,7 @@ src/
   media.ts          uploadable types (MEDIA_TYPES), size limits, MediaItem and the upload request/result types, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   panels/           the `/panels` entry: the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
-                    quotes, tabs, text, text-media v2, accordion, stats, gallery; `corePanels` lists them), PanelFrame (the shared section,
+                    quotes, tabs, text, text-media v2, accordion, stats, gallery, posts; `corePanels` lists them), PanelFrame (the shared section,
                     background, title and copy), Html and CtaLink(s); Tabs and Decision Tree have small client parts
   next/cache.ts     the `/next/cache` entry: cacheLive (Next data cache, tag cera:pages) and pagesChanged (call after publishing)
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
@@ -186,7 +186,8 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
    *Done when:* every theme panel has a definition, `PanelData` types match what the existing React components consume, and `npm run check` passes.
    **Batch 1 done** (2026-11-20): `PanelFrame` (the theme's Panel + PanelWrapper: anchor id, background color/image/video with overlay, title, copy) and six panels: text, cta, quotes, featured-media, tabs, decision-tree. Blocks, Text + Media and Featured Post moved onto the frame, so they now draw their backgrounds. The example site's `/panels` page shows one of each. Differences from the theme: Quotes scrolls with CSS scroll snap instead of a slider script; CTA renders all its CTAs (the theme read one from a `ctas` field); Decision Tree's “CTA Text” + “CTA URL” are one `cta` field; Featured Media's `image_link` modal option isn't ported (no modals yet); a panel's anchor id isn't generated from its title.
    **Batch 2 done** (2026-11-20): accordion (WAI-ARIA accordion, one item open at a time), stats (numbers in the HTML, counted up on the client only when off screen at load and not for reduced motion) and gallery (a grid that opens images in a modal `<dialog>`, arrow keys between them), plus the admin's gallery picker (`GalleryInput`: upload several or drop them, pick several from the library, reorder, alt text per image). The theme's `accordion` and `stats` field types became repeaters. Differences: a gallery image's alt text doubles as its title (the theme had a separate title).
-   **Next batch:** posts (a `load` like Featured Post's), form (needs the Form content type) and search (interactive, client-side).
+   **Posts done** (2026-11-20): cards for picked pages via `load` (like Featured Post: published, visible pages only on the live site, in the picked order), a per-row grid, and with Slider on and more pages than fit in a row, a scroll-snap row with Previous/Next buttons (`PostsSlider`). Not ported: “Modal”. The theme turned on its slider for more than three posts whatever the Slider field said; here the field decides.
+   **Left:** form (needs the Form content type, a submissions table, spam protection and probably mail) and search (filters, A–Z, text search, sorting and paging across content types). Which comes first depends on the Developers Only astronomy content (decision 22).
 3. **Content-type parity.** Port `class-simple-page.php`, `class-form.php`, `class-form-submission.php` and `class-icon.php` (custom icons; decision 21). Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). Still to do: pruning old draft revisions, and a "restore revision" action.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.
