@@ -6,7 +6,11 @@
   "description": "Cera: a panel-based CMS for Next.js and Supabase, successor to the Developers Only WordPress theme",
   "exports": {
     ".": "./src/index.ts",
-    "./next": "./src/next/index.ts"
+    "./next": "./src/next/index.ts",
+    "./panels": "./src/panels/index.ts",
+    "./supabase": "./src/supabase/index.ts",
+    "./admin": "./src/admin/index.ts",
+    "./admin.css": "./src/admin/admin.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -14,21 +18,38 @@
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
+    "sanitize-html": "^2.18.1",
     "zod": "^4.6.7"
   },
   "peerDependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "react": "^19.3.1"
   },
   "peerDependenciesMeta": {
+    "@supabase/supabase-js": {
+      "optional": true
+    },
     "react": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "@supabase/supabase-js": "^2.119.0",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/sanitize-html": "^2.16.2",
     "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
-  }
+  },
+  "files": [
+    "src",
+    "supabase/migrations"
+  ],
+  "workspaces": [
+    "examples/next-site"
+  ]
 }

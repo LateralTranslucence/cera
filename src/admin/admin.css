@@ -1,0 +1,209 @@
+/* Cera admin. Scoped under .cera-admin so it never touches the site's styles. */
+.cera-admin {
+  --cera-bg: #f6f5f2;
+  --cera-surface: #ffffff;
+  --cera-fg: #1f1d1a;
+  --cera-muted: #6a655d;
+  --cera-line: #dedad2;
+  --cera-accent: #8a4f0f;
+  --cera-accent-fg: #ffffff;
+  --cera-error: #b42318;
+  --cera-error-bg: #fdecea;
+  --cera-warning: #8a5a00;
+  --cera-warning-bg: #fff6dc;
+  --cera-success: #1d6b3a;
+  --cera-success-bg: #e6f4ea;
+  /* Section header bars: neutral for page settings, warm for panels, in between for fixed panels like Hero. */
+  --cera-head-bg: #eceae5;
+  --cera-panel-head-bg: #f5e3cc;
+  --cera-panel-head-fixed-bg: #efe6da;
+  --cera-radius: 8px;
+
+  background: var(--cera-bg);
+  color: var(--cera-fg);
+  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+}
+@media (prefers-color-scheme: dark) {
+  .cera-admin {
+    --cera-bg: #151412;
+    --cera-surface: #1e1c19;
+    --cera-fg: #ebe7e0;
+    --cera-muted: #a29c92;
+    --cera-line: #36322c;
+    --cera-accent: #e2a75c;
+    --cera-accent-fg: #1a1208;
+    --cera-error: #ff8a80;
+    --cera-error-bg: #3a1a17;
+    --cera-warning: #f3c56b;
+    --cera-warning-bg: #352a12;
+    --cera-success: #7fd39b;
+    --cera-success-bg: #15301f;
+    --cera-head-bg: #262420;
+    --cera-panel-head-bg: #3a2a18;
+    --cera-panel-head-fixed-bg: #2e2820;
+  }
+}
+.cera-admin *, .cera-admin *::before, .cera-admin *::after { box-sizing: border-box; }
+.cera-admin a { color: var(--cera-accent); }
+.cera-admin h1, .cera-admin h2 { margin: 0; line-height: 1.25; }
+.cera-admin h1 { font-size: 1.4rem; }
+.cera-admin h2 { font-size: 1.05rem; }
+
+/* Shell */
+.cera-shell__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; border-bottom: 1px solid var(--cera-line); background: var(--cera-surface); }
+.cera-shell__bar > * { white-space: nowrap; }
+.cera-shell__brand { font-weight: 700; color: var(--cera-fg) !important; text-decoration: none; margin-right: auto; }
+.cera-shell__user { color: var(--cera-muted); font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cera-shell__bar form { margin: 0; }
+.cera-shell__main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
+
+/* Buttons */
+.cera-button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-surface); color: var(--cera-fg); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+.cera-button:hover:not(:disabled) { border-color: var(--cera-accent); }
+.cera-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.cera-button--primary { background: var(--cera-accent); border-color: var(--cera-accent); color: var(--cera-accent-fg); }
+/* Links styled as buttons: beat the generic `.cera-admin a` color. */
+.cera-admin a.cera-button { color: var(--cera-fg); }
+.cera-admin a.cera-button--primary { color: var(--cera-accent-fg); }
+.cera-button--small { padding: 4px 10px; font-size: 0.9em; font-weight: 500; }
+.cera-icon-button { width: 28px; height: 28px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--cera-muted); cursor: pointer; font: inherit; }
+.cera-icon-button:hover:not(:disabled) { border-color: var(--cera-line); color: var(--cera-fg); }
+.cera-icon-button:disabled { opacity: 0.35; cursor: not-allowed; }
+.cera-danger:hover:not(:disabled) { color: var(--cera-error); }
+.cera-item-buttons { display: inline-flex; gap: 2px; margin-left: auto; }
+
+/* Editor */
+.cera-toolbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 0; margin-bottom: 8px; background: var(--cera-bg); border-bottom: 1px solid var(--cera-line); }
+.cera-toolbar__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cera-badges { display: flex; gap: 6px; margin: 4px 0 0; flex-wrap: wrap; }
+.cera-badge { font-size: 0.78em; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--cera-line); color: var(--cera-muted); }
+.cera-badge--live { border-color: var(--cera-success); color: var(--cera-success); }
+.cera-badge--dirty { border-color: var(--cera-warning); color: var(--cera-warning); }
+
+.cera-status { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--cera-radius); margin: 8px 0; }
+.cera-status--info { background: var(--cera-surface); border: 1px solid var(--cera-line); }
+.cera-status--success { background: var(--cera-success-bg); color: var(--cera-success); }
+.cera-status--error { background: var(--cera-error-bg); color: var(--cera-error); }
+
+.cera-section { background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: var(--cera-radius); padding: 16px; margin-top: 16px; }
+.cera-section > h2 { margin-bottom: 12px; }
+/* Collapsible section headers are tinted bars across the top of the section. */
+.cera-section > details > summary {
+  display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer;
+  margin: -16px -16px 0; padding: 12px 16px;
+  background: var(--cera-head-bg);
+  border-radius: calc(var(--cera-radius) - 1px);
+}
+.cera-section > details > summary::-webkit-details-marker { display: none; }
+.cera-section > details > summary::before { content: "▸"; flex: none; width: 1ch; font-size: 0.9em; }
+.cera-section > details[open] > summary::before { content: "▾"; }
+.cera-section > details > summary h2 { display: block; }
+.cera-section > details[open] > summary { margin-bottom: 16px; border-bottom: 1px solid var(--cera-line); border-radius: calc(var(--cera-radius) - 1px) calc(var(--cera-radius) - 1px) 0 0; }
+.cera-section > details:not([open]) > summary { margin-bottom: -16px; }
+.cera-section > details > summary:hover { filter: brightness(0.97); }
+@media (prefers-color-scheme: dark) { .cera-section > details > summary:hover { filter: brightness(1.15); } }
+
+/* Fields */
+/*
+ * Each field is a row: label in a fixed left column, the control plus its
+ * note, counter and issues in the right column. Field lists are size
+ * containers, so rows stack (label above) wherever they get narrow:
+ * small screens, and fields nested deep in repeaters.
+ */
+.cera-fields { display: grid; gap: 14px; container-type: inline-size; }
+.cera-field {
+  display: grid;
+  grid-template-columns: var(--cera-label-width, 11rem) minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 4px;
+  align-items: start;
+  min-width: 0;
+}
+.cera-field > * { grid-column: 2; }
+.cera-field > .cera-field__label { grid-column: 1; grid-row: 1; padding-top: 8px; font-weight: 600; font-size: 0.92em; overflow-wrap: anywhere; text-align: right; }
+.cera-field--toggle > .cera-field__label { padding-top: 0; }
+.cera-field > input[type="checkbox"] { justify-self: start; width: 18px; height: 18px; margin: 0; }
+@container (max-width: 34rem) {
+  .cera-field { grid-template-columns: minmax(0, 1fr); }
+  .cera-field > *, .cera-field > .cera-field__label { grid-column: 1; grid-row: auto; padding-top: 0; text-align: left; }
+  .cera-field--toggle { grid-template-columns: auto minmax(0, 1fr); }
+  .cera-field--toggle > .cera-field__label { grid-column: 2; grid-row: 1; }
+  .cera-field--toggle > input[type="checkbox"] { grid-column: 1; grid-row: 1; }
+  .cera-field--toggle > :not(input):not(label) { grid-column: 1 / -1; }
+}
+.cera-admin input[type='text'], .cera-admin input[type='number'], .cera-admin input[type='password'], .cera-admin input[type='email'], .cera-admin input[type='search'], .cera-admin input:not([type]), .cera-admin select, .cera-admin textarea {
+  width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-bg); color: var(--cera-fg); font: inherit;
+}
+.cera-admin input:focus-visible, .cera-admin select:focus-visible, .cera-admin textarea:focus-visible, .cera-admin button:focus-visible, .cera-admin summary:focus-visible { outline: 2px solid var(--cera-accent); outline-offset: 1px; }
+.cera-admin input[type='number'] { max-width: 10rem; }
+.cera-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.88em; }
+.cera-check { display: inline-flex; gap: 8px; align-items: center; font-weight: 500; }
+.cera-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.cera-note { margin: 0; color: var(--cera-muted); font-size: 0.85em; }
+.cera-counter { margin: 0; font-size: 0.8em; color: var(--cera-muted); text-align: right; }
+.cera-counter.is-over { color: var(--cera-warning); font-weight: 600; }
+.cera-readonly { margin: 0; padding: 8px; background: var(--cera-bg); border-radius: 6px; font-size: 0.85em; overflow: auto; max-height: 12rem; }
+
+.cera-group { display: grid; gap: 8px; }
+.cera-inline { display: grid; gap: 2px; font-size: 0.88em; color: var(--cera-muted); }
+/* Columns wrap to fit whatever width the CTA sits in (top level or deep in a panel). */
+.cera-cta { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); align-items: end; padding: 8px; border: 1px dashed var(--cera-line); border-radius: 6px; }
+.cera-cta > .cera-item-buttons { justify-self: end; }
+.cera-list { display: grid; gap: 8px; justify-items: start; }
+.cera-list > * { justify-self: stretch; }
+.cera-list > .cera-button { justify-self: start; }
+
+.cera-item { border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-surface); }
+.cera-item > summary { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; cursor: pointer; }
+.cera-item[open] > summary { border-bottom: 1px solid var(--cera-line); }
+.cera-item > .cera-fields { padding: 12px; }
+.cera-item-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cera-issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cera-issue { font-size: 0.85em; padding: 4px 8px; border-radius: 4px; }
+.cera-issue--error { background: var(--cera-error-bg); color: var(--cera-error); }
+.cera-issue--warning { background: var(--cera-warning-bg); color: var(--cera-warning); }
+.has-error > input, .has-error > select, .has-error > textarea { border-color: var(--cera-error); }
+
+/* Panels */
+/* Panels: top-level sections like the boxes, marked with an accent edge. */
+/* scroll-margin keeps a newly added panel's header clear of the sticky toolbar. */
+.cera-panel { min-width: 0; border-left: 3px solid var(--cera-accent); scroll-margin-top: 9rem; }
+.cera-panel.has-warning { border-color: var(--cera-warning); }
+.cera-panel--fixed { border-left-color: var(--cera-muted); }
+.cera-panel.is-hidden { border-left-style: dashed; }
+.cera-panel.is-hidden .cera-panel__type, .cera-panel.is-hidden .cera-panel__title { opacity: 0.55; }
+.cera-panel > details > summary { background: var(--cera-panel-head-bg); }
+.cera-panel--fixed > details > summary { background: var(--cera-panel-head-fixed-bg); }
+.cera-panel.is-hidden > details > summary { background: var(--cera-head-bg); }
+.cera-panel > details > summary h2.cera-panel__type { display: block; flex: none; }
+.cera-panel__title { flex: 1 1 auto; min-width: 0; color: var(--cera-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cera-panel > details > summary .cera-item-buttons, .cera-item > summary .cera-item-buttons { flex: none; }
+.cera-panel > details > .cera-issues { margin-bottom: 12px; }
+.cera-add-panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cera-add-panel select { width: auto; min-width: 12rem; }
+
+/* Page list */
+.cera-table { width: 100%; border-collapse: collapse; background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: var(--cera-radius); overflow: hidden; }
+.cera-table th, .cera-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--cera-line); }
+.cera-table th { font-size: 0.82em; color: var(--cera-muted); font-weight: 600; }
+.cera-table tr:last-child td { border-bottom: 0; }
+.cera-page-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+@media (max-width: 640px) { .cera-table .cera-hide-sm { display: none; } }
+
+/* Sign-in */
+.cera-login { max-width: 360px; margin: 10vh auto 0; padding: 24px; background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: var(--cera-radius); display: grid; gap: 14px; container-type: inline-size; }
+
+/* Page picker (relation fields) */
+.cera-picker { display: grid; gap: 8px; }
+.cera-picker__picked { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cera-picker__picked > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 8px 8px 12px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-bg); }
+.cera-picker__picked > li > .cera-icon-button { margin-left: auto; }
+.cera-picker__title { font-weight: 600; }
+.cera-picker__meta { color: var(--cera-muted); font-size: 0.85em; }
+.cera-picker__search { position: relative; }
+.cera-picker__results { position: absolute; z-index: 3; left: 0; right: 0; top: calc(100% + 4px); list-style: none; margin: 0; padding: 4px; max-height: 18rem; overflow: auto; background: var(--cera-surface); border: 1px solid var(--cera-line); border-radius: 6px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }
+.cera-picker__results > li.cera-note { padding: 8px; }
+.cera-picker__results button { display: grid; gap: 2px; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: none; color: var(--cera-fg); font: inherit; text-align: left; cursor: pointer; }
+.cera-picker__results button:hover, .cera-picker__results button:focus-visible { background: var(--cera-panel-head-bg); }

@@ -1,9 +1,10 @@
 // Compile-time assertions (checked by `npm run typecheck`) + a trivial runtime test so node --test picks it up.
 import { test } from 'node:test';
-import type { CTA, MediaRef, PageOf, PanelData } from '../src/index.ts';
-import type { blocks } from '../examples/panels/blocks.ts';
-import type { featuredPost } from '../examples/panels/featured-post.ts';
-import type { landingPage } from '../examples/content-types/landing-page.ts';
+import type { CTA, LinkedPage, MediaRef, PageOf, PanelData, PanelDefinition, PanelPropsOf } from '../src/index.ts';
+import type { blocksFields } from '../src/panels/blocks.fields.ts';
+import type { blocks } from '../src/panels/blocks.ts';
+import type { featuredPost } from '../src/panels/featured-post.ts';
+import type { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Expect<T extends true> = T;
@@ -11,6 +12,9 @@ type Expect<T extends true> = T;
 type Blocks = PanelData<typeof blocks>;
 type Featured = PanelData<typeof featuredPost>;
 type Page = PageOf<typeof landingPage>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LoadedOf<P> = P extends PanelDefinition<any, any, infer L> ? L : never;
 
 export type _tests = [
   // optional text
@@ -32,16 +36,20 @@ export type _tests = [
   Expect<Equal<Page['boxes']['seo']['image'], MediaRef | undefined>>,
   Expect<Equal<Page['boxes']['admin']['schemaType'], 'WebPage' | 'AboutPage' | 'ContactPage' | 'SearchResultsPage'>>,
   // panels are a discriminated union
-  Expect<Equal<Page['panels'][number]['type'], 'blocks' | 'featured-post' | 'text-media'>>,
+  Expect<Equal<Page['panels'][number]['type'], 'cera/blocks' | 'cera/featured-post' | 'cera/text-media'>>,
+  // load(): its awaited result is inferred and becomes the component's `loaded` prop
+  Expect<Equal<LoadedOf<typeof featuredPost>, { page: LinkedPage | null }>>,
+  // panels without load() have no `loaded` prop at all
+  Expect<Equal<'loaded' extends keyof PanelPropsOf<typeof blocksFields> ? true : false, false>>,
 ];
 
 // Narrowing on `type` gives the right data shape.
 export function narrow(p: Page['panels'][number]) {
-  if (p.type === 'blocks') {
+  if (p.type === 'cera/blocks') {
     const n: number = p.data.perRow;
     return n;
   }
-  if (p.type === 'text-media') {
+  if (p.type === 'cera/text-media') {
     const a: 'left' | 'right' | 'alternate' = p.data.alignment;
     return a;
   }

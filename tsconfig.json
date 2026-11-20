@@ -11,7 +11,16 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node", "react"]
+    "types": [
+      "node",
+      "react"
+    ]
   },
-  "include": ["src", "examples", "test"]
+  "include": [
+    "src",
+    "test",
+    "examples/next-site/cera",
+    "examples/next-site/components",
+    "examples/next-site/lib"
+  ]
 }

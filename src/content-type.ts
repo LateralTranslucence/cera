@@ -6,7 +6,7 @@
  * `panels` = the panel types editors can add (theme: the dynamic "Panel" box)
  */
 import { z } from 'zod';
-import { type FieldMap, type InferFields, type MediaRef, shapeOf } from './fields.ts';
+import { type FieldMap, type InferFields, type MediaRef, objectSchema } from './fields.ts';
 import type { AnyPanel, PanelUnion } from './panel.ts';
 
 export type BoxMap = Record<string, FieldMap>;
@@ -28,6 +28,8 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
   label: string;
   /** Next.js-style route pattern. Theme: rewrite rules / post_type_slug. */
   route: string;
+  /** A page's public URL. Defaults to `route` with `[slug]` filled in. */
+  url?: (page: PageDocument<N, B, P>) => string;
   boxes: B;
   panels?: P;
   seo?: {
@@ -40,6 +42,16 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
   jsonLd?: (page: PageDocument<N, B, P>) => Record<string, unknown>;
   /** Hide from public queries/routes. Theme: settings()['hide_field']. */
   hidden?: (page: PageDocument<N, B, P>) => boolean;
+  /**
+   * Where boxes appear in the admin editor. Boxes not listed here get their
+   * own section between the Page section and the panels, in declared order.
+   */
+  editor?: {
+    /** Shown inside the Page section, under title and slug (e.g. admin settings). */
+    pageBoxes?: ReadonlyArray<keyof B & string>;
+    /** Shown just above the panels, styled like one (e.g. a hero that renders like a panel). */
+    leadBoxes?: ReadonlyArray<keyof B & string>;
+  };
   hooks?: {
     /** Theme: onsave_callback (could modify $_POST). */
     beforeSave?: (page: PageDocument<N, B, P>) => PageDocument<N, B, P> | Promise<PageDocument<N, B, P>>;
@@ -51,12 +63,23 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
 export interface ContentType<N extends string, B extends BoxMap, P extends readonly AnyPanel[]>
   extends ContentTypeConfig<N, B, P> {
   panels: P;
-  /** Validates a stored page and fills in defaults. */
+  /**
+   * Strict, all-or-nothing schema for a fully valid page. Useful in tests and
+   * scripts. For real reads and writes use `readPage` (tolerant, per panel)
+   * and `preparePageForSave` (keeps unknown data, draft vs publish) from
+   * `document.ts`.
+   */
   pageSchema: z.ZodType<PageDocument<N, B, P>>;
 }
 
+/**
+ * Any content type. `any` (not `string`/`BoxMap`) because the hook and seo
+ * functions take the specific page type as a parameter, and parameters are
+ * contravariant: `ContentType<'landing_page', …>` is not a
+ * `ContentType<string, BoxMap, …>`.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyContentType = ContentType<string, BoxMap, readonly any[]>;
+export type AnyContentType = ContentType<any, any, any>;
 
 export type PageOf<CT> = CT extends ContentType<infer N, infer B, infer P> ? PageDocument<N, B, P> : never;
 
@@ -74,7 +97,7 @@ export function defineContentType<
   }
 
   const boxesSchema = z.object(
-    Object.fromEntries(Object.entries(config.boxes).map(([k, fields]) => [k, z.object(shapeOf(fields)).default({} as never)])),
+    Object.fromEntries(Object.entries(config.boxes).map(([k, fields]) => [k, objectSchema(fields).default({} as never)])),
   );
 
   const instanceSchemas = panels.map((p) =>
@@ -103,4 +126,9 @@ export function defineContentType<
   }) as unknown as z.ZodType<PageDocument<N, B, P>>;
 
   return { ...config, panels, pageSchema };
+}
+
+/** A page's public URL: the content type's `url`, or its `route` with `[slug]` filled in. */
+export function pageUrl<CT extends AnyContentType>(ct: CT, page: PageOf<CT>): string {
+  return ct.url ? ct.url(page) : ct.route.replace('[slug]', encodeURIComponent(page.slug));
 }

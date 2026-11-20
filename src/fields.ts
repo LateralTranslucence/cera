@@ -91,9 +91,16 @@ export function shapeOf(fields: FieldMap): Record<string, z.ZodType> {
   return Object.fromEntries(Object.entries(fields).map(([k, f]) => [k, f.schema as z.ZodType]));
 }
 
-/** Runtime: field map → Zod object schema, typed by the inferred stored value. */
+/**
+ * Runtime: field map → Zod object schema, typed by the inferred stored value.
+ *
+ * The object is *loose*: keys the definition doesn't know are kept, not
+ * stripped. Stored data can contain keys from a newer deploy or from a field
+ * that was removed without a migration; a load → save round trip must not
+ * delete them. The static type stays exact; extra keys are runtime-only.
+ */
 export function objectSchema<M extends FieldMap>(fields: M): z.ZodType<InferFields<M>> {
-  return z.object(shapeOf(fields)) as unknown as z.ZodType<InferFields<M>>;
+  return z.looseObject(shapeOf(fields)) as unknown as z.ZodType<InferFields<M>>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -114,7 +121,7 @@ export const mediaRef = z.object({
 });
 export type MediaRef = z.output<typeof mediaRef>;
 
-/** TODO(verify): match the theme's `background` field (image or .mp4 video, colour, overlay?). */
+/** TODO(verify): match the theme's `background` field (image or .mp4 video, color, overlay?). */
 export const background = z.object({
   media: mediaRef.optional(),
   color: z.string().optional(),
@@ -235,7 +242,8 @@ export const f = {
    * so the admin can reorder/key them without index-based keys.
    */
   repeater: <const M extends FieldMap>(opts: FieldMeta & { fields: M; limit?: number; min?: number; itemTitle?: keyof M & string }) => {
-    const item = z.object({ _id: z.string(), ...shapeOf(opts.fields) });
+    // Loose for the same reason as objectSchema: unknown keys survive a save.
+    const item = z.looseObject({ _id: z.string(), ...shapeOf(opts.fields) });
     let s = z.array(item);
     if (opts.limit) s = s.max(opts.limit);
     if (opts.min) s = s.min(opts.min);

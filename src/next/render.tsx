@@ -1,40 +1,72 @@
 /**
  * Renderer — the successor to LandingPage → Panel → PanelLoader.
- * Sketch only: Server Component compatibility, Suspense boundaries and
- * error boundaries per panel are for Claude Code to decide (see HANDOFF.md).
+ *
+ * An async Server Component. For every visible panel it imports the
+ * component and runs the panel's `load` (if any) in parallel, then renders
+ * the panels in order, passing the load result as `loaded`. Panel components
+ * can be Server Components, or Client Components marked 'use client' in
+ * their own file (then `loaded` must be serializable).
+ *
+ * A panel whose component or `load` fails is skipped (reported via
+ * `onError`) instead of failing the page. Errors thrown while *rendering* a
+ * panel still reach the nearest error.tsx; per-panel error boundaries need a
+ * client component and are a later step.
  */
-import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
+import type { ComponentType, ReactElement } from 'react';
 import type { AnyContentType, PageOf } from '../content-type.ts';
-import type { AnyPanel, PanelComponentProps } from '../panel.ts';
+import type { AnyPanel, LoadContext, PanelContext } from '../panel.ts';
 
-const cache = new WeakMap<AnyPanel, LazyExoticComponent<ComponentType<PanelComponentProps<unknown>>>>();
+type StoredInstance = { id: string; type: string; hidden: boolean; data: unknown };
 
-function componentFor(def: AnyPanel) {
-  let c = cache.get(def);
-  if (!c) {
-    c = lazy(def.component as () => Promise<{ default: ComponentType<PanelComponentProps<unknown>> }>);
-    cache.set(def, c);
-  }
-  return c;
+export interface PanelsProps<CT extends AnyContentType> {
+  contentType: CT;
+  page: PageOf<CT>;
+  /**
+   * Needed when any panel defines `load`: how to look up linked pages, and
+   * whether this is a draft preview. Panels with `load` are skipped without it.
+   */
+  loadContext?: Pick<LoadContext, 'pages' | 'draft'>;
+  /** Called when a panel's component or `load` fails. Defaults to console.error. */
+  onError?: (error: unknown, panel: { id: string; type: string }) => void;
 }
 
-export function Panels<CT extends AnyContentType>({ contentType, page }: { contentType: CT; page: PageOf<CT> }) {
+export async function Panels<CT extends AnyContentType>({
+  contentType,
+  page,
+  loadContext,
+  onError = (e, p) => console.error(`cera: panel ${p.type} (${p.id}) failed to load`, e),
+}: PanelsProps<CT>): Promise<ReactElement> {
   const byType = new Map<string, AnyPanel>(contentType.panels.map((p: AnyPanel) => [p.type, p]));
-  const visible = (page.panels as Array<{ id: string; type: string; hidden: boolean; data: unknown }>).filter((p) => !p.hidden);
+  const visible = (page.panels as StoredInstance[]).filter((p) => !p.hidden);
+
+  const prepared = await Promise.all(
+    visible.map(async (p, index) => {
+      const def = byType.get(p.type);
+      if (!def) return null;
+      const panel: PanelContext = { pageId: page.id, panelId: p.id, index, contentType: contentType.name };
+      try {
+        const [mod, loaded] = await Promise.all([
+          def.component(),
+          def.load
+            ? loadContext
+              ? def.load(p.data as Record<string, unknown>, { ...loadContext, page: { id: page.id, contentType: contentType.name, slug: page.slug }, panel })
+              : Promise.reject(new Error(`Panel "${p.type}" loads data, but <Panels> was given no loadContext.`))
+            : undefined,
+        ]);
+        return { p, panel, loaded, hasLoad: Boolean(def.load), Component: mod.default as ComponentType<Record<string, unknown>> };
+      } catch (e) {
+        onError(e, p);
+        return null;
+      }
+    }),
+  );
+
   return (
     <>
-      {visible.map((p, index) => {
-        const def = byType.get(p.type);
-        if (!def) return null;
-        const Component = componentFor(def);
-        return (
-          <Suspense key={p.id} fallback={null}>
-            <Component
-              data={p.data}
-              panel={{ pageId: page.id, panelId: p.id, index, contentType: contentType.name }}
-            />
-          </Suspense>
-        );
+      {prepared.map((entry) => {
+        if (!entry) return null;
+        const { p, panel, loaded, hasLoad, Component } = entry;
+        return <Component key={p.id} data={p.data} panel={panel} {...(hasLoad && { loaded })} />;
       })}
     </>
   );
