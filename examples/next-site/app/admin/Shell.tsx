@@ -1,25 +1,56 @@
 import type { ReactNode } from 'react';
-import { canManagePeople, type Staff } from '@/lib/auth.ts';
+import { AdminSidebar, type NavSection } from '@lateraltranslucence/cera/admin';
+import { listPages } from '@lateraltranslucence/cera/supabase';
+import { landingPage } from '@/cera';
+import { canEdit, canManagePeople, type Staff } from '@/lib/auth.ts';
 import { signOutAction } from './actions.ts';
 
-/** Top bar for signed-in admin pages. */
-export function Shell({ staff, children }: { staff: Staff; children: ReactNode }) {
+export type ShellSection = 'pages' | 'media' | 'people' | 'account';
+
+const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' } as const;
+
+/**
+ * The admin's frame: the sidebar (only what exists: Pages, Media, and People
+ * for admins) and the main column. The Pages list in the sidebar is read as
+ * the signed-in user, like the Pages screen.
+ */
+export async function Shell({ staff, active, currentPageId, children }: { staff: Staff; active?: ShellSection; currentPageId?: string; children: ReactNode }) {
+  const pages = await listPages(staff.client, { contentType: landingPage.name });
+  const sections: NavSection[] = [
+    {
+      label: 'Content',
+      items: [
+        {
+          label: 'Pages',
+          href: '/admin',
+          icon: 'pages',
+          active: active === 'pages',
+          count: pages.length,
+          expand: {
+            defaultOpen: true,
+            ...(canEdit(staff.role) && { newHref: '/admin/pages/new', newLabel: 'New page' }),
+            items: pages.map((p) => ({ label: p.title || 'Untitled', href: `/admin/pages/${p.id}`, current: p.id === currentPageId })),
+          },
+        },
+      ],
+    },
+    { label: 'Library', items: [{ label: 'Media', href: '/admin/media', icon: 'media', active: active === 'media' }] },
+    ...(canManagePeople(staff.role) ? [{ label: 'Site', items: [{ label: 'People', href: '/admin/users', icon: 'people' as const, active: active === 'people' }] }] : []),
+  ];
+
   return (
-    <>
-      <header className="cera-shell__bar">
-        <a href="/admin" className="cera-shell__brand">Cera admin</a>
-        <a href="/admin">Pages</a>
-        <a href="/admin/media">Media</a>
-        {canManagePeople(staff.role) && <a href="/admin/users">People</a>}
-        <a href="/" target="_blank" rel="noreferrer">View site</a>
-        <a href="/admin/account" className="cera-shell__user" title="Account">
-          {staff.user.email} · {staff.role}
-        </a>
-        <form action={signOutAction}>
-          <button type="submit" className="cera-button cera-button--small">Sign out</button>
-        </form>
-      </header>
-      <main className="cera-shell__main">{children}</main>
-    </>
+    <div className="cera-app">
+      <AdminSidebar
+        homeHref="/admin"
+        sections={sections}
+        user={{ name: staff.user.email ?? 'Signed in', role: ROLE_NAMES[staff.role] }}
+        userLinks={[
+          { label: 'Account', href: '/admin/account', icon: 'account' },
+          { label: 'View site', href: '/', icon: 'site' },
+        ]}
+        signOut={signOutAction}
+      />
+      <main className="cera-app__main">{children}</main>
+    </div>
   );
 }

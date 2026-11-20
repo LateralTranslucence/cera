@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 97 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 106 tests).
 
 ## Goal
 
@@ -64,7 +64,9 @@ src/
                     listCeraUsers / createCeraUser / setCeraRole (users.ts)
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers,
                     MediaInput, GalleryInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
-                    MediaManager (the Media page: browse, upload, alt text, usage, delete), UsersManager (People),
+                    PageEditor (top bar, card stack, dnd-kit reordering, schedule/unpublish/add-panel dialogs), PageList
+                    (the Pages table: search, status filter, sort, paging), AdminSidebar, icons.tsx (Icon, CeraSeal, CeraLockup),
+                    Dialog, MediaManager (the Media page: browse, upload, alt text, usage, delete), UsersManager (People),
                     RichTextInput (f.html: Tiptap editor, HTML view) with rich-text/extensions.ts (schema per toolbar)
                     and rich-text/html.ts (tidyEditorHtml, sameContent);
                     `/admin.css` is its stylesheet, scoped under .cera-admin
@@ -74,6 +76,8 @@ supabase/
   migrations/…_cera_media_bucket.sql  public `cera-media` Storage bucket
   migrations/…_cera_media_uploads.sql bucket type/size limits, cera_media search column, cera_add_media
   migrations/…_cera_media_editing.sql cera_update_media (alt text), cera_media_usage, cera_delete_media (refuses files in use)
+  migrations/…_cera_scheduling.sql    scheduled publishing (cera_schedule_page, cera_cancel_schedule, cera_publish_due + pg_cron job),
+                                      cera_page_summaries / cera_user_email for the Pages list
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
     cera/           the landing_page content type, built from the core panels; it imports the package like a
@@ -89,6 +93,7 @@ test/
   metadata.test.ts  pageMetadata and JSON-LD escaping
   panels.test.ts    every core panel through <Panels>: the frame (background, overlay, video), each panel's markup
   users.test.ts     people: listing, adding with a temporary password, roles, the own-role and last-admin guards
+  schedule.test.ts  scheduling: due → live, replacing, cancelling, failures; the page list's statuses, emails and access
   rich-text.test.ts the editor schema under happy-dom: exact round trips, respellings, WordPress classes and images, what it would lose
   media.test.ts     upload paths, type/size checks, finishing against what Storage reports, the library, alt edits, usage, delete, grants
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
@@ -125,6 +130,8 @@ test/
 25. **Live reads are cached; publishing clears them** (decided 2026-11-20). `@lateraltranslucence/cera/next/cache` wraps live (published-only) reads in Next's data cache (`unstable_cache`, tag `cera:pages`): the example site caches the page read and the linked-page lookups behind Featured Post and Posts. Pages still render per request, because draft-mode preview needs the request, but they stop waiting on the database. Publishing and unpublishing call `pagesChanged()` (Next's `updateTag`, read-your-own-writes) from the Server Action, so the next request is fresh. One tag covers every page, since a change to one page shows on others. Changes made outside the admin (the seed, SQL) appear within 300 seconds. Draft preview and anything read with a user's session are never cached. Moving to Next 16's Cache Components (`'use cache'`) and fully static pages is a later step.
 26. **The media library is edited on its own page; files in use can't be deleted** (decided 2026-11-20). The admin's Media page (`MediaManager`) lists the library with search and a type filter, uploads (several at once, or dropped), and shows a file's details, alt text and the pages that use it. Only the library alt text can change: it's the default for new uses, and pages that already use a file keep their own copy (decision 23), which editors change on the page. Paths can't be renamed, since pages store them. A file is in use when its path appears in a page's working copy or live revision, which catches fields, galleries and images in rich text (`cera_media_usage`, run as the caller so row-level security applies). `deleteMedia` refuses a file in use and names the pages; otherwise it deletes the library row (role and usage re-checked in one transaction) and then the Storage object. Older revisions aren't checked, so restoring one that used a deleted file would show it missing. Editors and admins can edit and delete; viewers can look.
 27. **Rich text is edited visually with Tiptap, and opening text never rewrites it** (decided 2026-11-20). `f.html()` fields use `RichTextInput`: Tiptap 3 (ProseMirror), pinned to an exact version, with a schema per toolbar that mirrors the sanitizer (decision 18), so it can only write what a save keeps. `full`: paragraphs, headings 2–6, bold, italic, underline, strikethrough, links (with "open in a new tab"), lists, quotes, code, horizontal lines, sub/superscript, images inline in paragraphs (uploaded or picked from the library, with alt text) and `class` attributes. `limited`: the theme's teeny toolbar. Tables and figures aren't in the schema. Before showing stored HTML, the editor checks whether it would keep it (`sameContent` compares what shows, not how it's spelled: `<b>` = `<strong>`, mark order, a paragraph inside a list item); if not, the field opens in its HTML view with a note, and switching to the visual view changes nothing until the person edits there. Every field also has an HTML view. The editor writes list items without an inner paragraph, as WordPress does, and never adds a trailing paragraph. Everything is still sanitized on save. All 29 rich-text fields on the migrated Developers Only page open visually and save back unchanged.
+28. **The admin follows the Cera design brief** (decided 2026-11-20, brief `cera-admin-handoff`). Tokens (surface, line, ink, honey and so on, plus `surface-sunken` and `line-strong`, which the brief proposed) are defined on `.cera-admin`, not `:root`, so they can't touch a site's CSS; the older `--cera-*` names are aliases. Sites load Fraunces (SOFT, opsz), Inter and JetBrains Mono as `--cera-font-display/sans/mono` (the example uses `next/font`, which self-hosts them). Dark mode follows the system with the brief's dark tokens (`data-theme` pins either). The shell is a sidebar (lockup; Pages, expandable with "+ New" and every page; Media; People for admins; the user chip opens Account, View site and Sign out) and a main column. Where the brief and Cera differ, Cera wins: only features that exist are in the sidebar (no Regions, Subjects, Menus or Settings yet); Hero is a fixed lead box shown as the first card, not a movable panel (decision 11); every form is still generated from field definitions (decision 4) and restyled to labels-left; page settings (title, address, SEO, admin) sit in a folded "Page settings" card at the top of the stack; the Pages list shows "Last edited by" (no author is stored) and has no checkbox column (no bulk actions yet); the top bar shows when the page was last saved (there's no autosave). Panels reorder only by drag (dnd-kit pointer) or arrow keys on the focused handle, with a live-region announcement. Deleting a panel offers Undo; Unpublish confirms in a dialog.
+29. **Scheduled publishing runs in the database** (decided 2026-11-20). Scheduling validates like a publish, saves the working copy, and marks that revision `kind = 'schedule'` with `scheduled_for`; a pg_cron job (`cera-publish-due`, every minute) publishes due revisions. One schedule per page: scheduling again replaces it; publishing now, unpublishing or "Cancel schedule" cancels it, so an older snapshot can't go live over newer content. Edits made after scheduling stay unpublished. A schedule whose address went live on another page meanwhile is marked failed with the reason, and the Pages list flags it. Because the job runs outside Next, the cached live page catches up within its revalidate time (300 seconds; decision 25). Where pg_cron isn't available, call `publishDuePages()` from a cron route.
 
 ## Pattern: keep fields in their own file
 
@@ -181,7 +188,8 @@ A. ✅ **Next.js example site** (`examples/next-site`).
 B. ✅ **Minimal admin** (`examples/next-site/app/admin`, editor in `src/admin`). Checked in a browser: sign-in, page list, editing a block inside the Blocks panel, save draft (live page unchanged), preview, publish, refusing to publish an empty title, the conflict message, and creating and publishing a new page. Not yet checked in a browser: unpublish (it asks for confirmation, which the test browser can't answer) and a viewer's read-only view.
    How it works: the editor edits the raw stored page (unknown panels and keys included) and upgrades known panels to their current version on load. Saves go through a server action that takes the user id from the verified session. Preview from the admin goes through `/admin/preview` (session-checked), so the preview secret stays on the server. A content type's `editor` option places boxes: `pageBoxes` go inside the Page section (landing page: `admin`), `leadBoxes` sit just above the panels, styled like one (landing page: `hero`), and the rest get their own sections in between (`seo`).
    Rich text: done (decision 27).
-   Still to do for the admin: drag-to-reorder (buttons for now), deleting pages, revision history, and client-side validation before save.
+   Redesign and drag-to-reorder: done (decision 28). Scheduling: done (decision 29).
+   Still to do for the admin: deleting pages, revision history, and client-side validation before save.
    Caching: done (decision 25).
 C. ✅ **Panel data loading** (decision 19), proven with Featured Post: fields, `featured-post.load.ts` and a component ported from the theme (image optional, unlike the theme). The admin's page picker replaces pasted ids for `relation` fields: it searches pages as the signed-in user, respects `to` (fixed or a sibling field like Post Type), shows "Not published" on picks the live site won't show, and replaces the pick when `limit` is 1. Checked in a browser: the home page features About; picking Our Services and saving a draft changed only the preview.
    Not yet: `load` results aren't cached across requests, and a linked page doesn't know which pages feature it (so unpublishing it silently empties those panels).

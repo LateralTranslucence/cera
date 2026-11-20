@@ -19,8 +19,16 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
   if (!editable) notFound();
 
   return (
-    <Shell staff={staff}>
-      <EditorClient page={editable.page} version={editable.version} published={editable.published} readOnly={!canEdit(staff.role)} />
+    <Shell staff={staff} active="pages" currentPageId={id}>
+      <EditorClient
+        page={editable.page}
+        version={editable.version}
+        published={editable.published}
+        unpublishedChanges={editable.unpublishedChanges}
+        updatedAt={editable.updatedAt}
+        schedule={editable.schedule}
+        readOnly={!canEdit(staff.role)}
+      />
     </Shell>
   );
 }

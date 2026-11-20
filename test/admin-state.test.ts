@@ -52,3 +52,50 @@ test('slugify and humanize', () => {
   assert.equal(humanize('anchorId'), 'Anchor id');
   assert.equal(humanize('per_row'), 'Per row');
 });
+
+test('folded panels: a name from the title, a summary from list counts or the start of the text', async () => {
+  const { galleryFields } = await import('../src/panels/gallery.fields.ts');
+  const { textFields } = await import('../src/panels/text.fields.ts');
+  const { panelName, panelSummary } = await import('../src/admin/state.ts');
+
+  assert.equal(panelName(blocks, { title: 'What we <em>do</em>' }, 'cera/blocks'), 'What we do');
+  assert.equal(panelName(blocks, { title: '  ' }, 'cera/blocks'), 'Blocks');
+  assert.equal(panelName(undefined, {}, 'acme/unknown'), 'acme/unknown');
+
+  assert.equal(panelSummary(blocksFields, { blocks: [{}, {}, {}] }), '3 blocks');
+  assert.equal(panelSummary(galleryFields, { gallery: [{}] }), '1 image');
+  assert.equal(panelSummary(textFields, { ctas: [{}, {}] }), '2 buttons');
+  assert.equal(panelSummary(textFields, { copy: '<p>From the dazzling brilliance &amp; quiet&nbsp;mystery</p>' }), 'From the dazzling brilliance & quiet mystery');
+  assert.equal(panelSummary(textFields, { copy: `<p>${'word '.repeat(40)}</p>` }, 40).length, 40);
+  assert.equal(panelSummary(textFields, {}), '');
+  assert.equal(panelSummary(undefined, { anything: [1] }), '');
+});
+
+test('duplicatePanel puts a deep copy with a new id right after the original', async () => {
+  const { duplicatePanel } = await import('../src/admin/state.ts');
+  const a = { id: 'a', type: 'cera/text', v: 1, hidden: false, data: { list: [{ _id: 'x' }] } };
+  const b = { id: 'b', type: 'cera/text', v: 1, hidden: true, data: {} };
+  const out = duplicatePanel([a, b], 0, 'a2');
+  assert.deepEqual(out.map((p) => p.id), ['a', 'a2', 'b']);
+  assert.deepEqual(out[1]!.data, a.data);
+  assert.notEqual(out[1]!.data, a.data); // a copy, not the same object
+  assert.deepEqual(duplicatePanel([a], 5).map((p) => p.id), ['a']);
+});
+
+test('initials and relative times for the admin chrome', async () => {
+  const { initials } = await import('../src/admin/AdminSidebar.tsx');
+  const { formatWhen } = await import('../src/admin/PageList.tsx');
+  assert.equal(initials('Ada Lovelace'), 'AL');
+  assert.equal(initials('ada.lovelace@example.com'), 'AL');
+  assert.equal(initials('admin@cera.test'), 'A');
+  assert.equal(initials(''), '?');
+
+  const now = Date.parse('2026-11-20T12:00:00Z');
+  const ago = (ms: number) => new Date(now - ms).toISOString();
+  assert.equal(formatWhen(ago(10_000), now), 'Just now');
+  assert.equal(formatWhen(ago(5 * 60_000), now), '5 min ago');
+  assert.equal(formatWhen(ago(3 * 3_600_000), now), '3 hr ago');
+  assert.equal(formatWhen(ago(30 * 3_600_000), now), 'Yesterday');
+  assert.match(formatWhen(ago(10 * 86_400_000), now), /^Nov 1\d$/);
+  assert.match(formatWhen('2025-03-02T12:00:00Z', now), /^Mar \d, 2025$/);
+});
