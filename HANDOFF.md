@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 87 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 91 tests).
 
 ## Goal
 
@@ -51,7 +51,7 @@ src/
   roles.ts          CERA_ROLES, their labels, CeraUser
   color.ts          isLightColor: dark text beats light on a background color (WCAG contrast); PanelFrame adds
                     has-light-background for a light color with no image, video or overlay
-  media.ts          uploadable types (MEDIA_TYPES), size limits, MediaItem and the upload request/result types, toMediaRef
+  media.ts          uploadable types (MEDIA_TYPES), size limits, formatBytes, MediaItem, the upload/update/delete types, MediaUse, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   panels/           the `/panels` entry: the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
                     quotes, tabs, text, text-media v2, accordion, stats, gallery, posts; `corePanels` lists them), PanelFrame (the shared section,
@@ -60,16 +60,18 @@ src/
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString; React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
                     createPageResolver (linked pages for panels' load: published-only live, working copies in preview),
-                    prepareMediaUpload / finishMediaUpload / listMedia (media.ts), mediaUrl,
+                    prepareMediaUpload / finishMediaUpload / listMedia / updateMedia / mediaUsage / deleteMedia (media.ts), mediaUrl,
                     listCeraUsers / createCeraUser / setCeraRole (users.ts)
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers,
                     MediaInput, GalleryInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
+                    MediaManager (the Media page: browse, upload, alt text, usage, delete), UsersManager (People);
                     `/admin.css` is its stylesheet, scoped under .cera-admin
 supabase/
   config.toml              local stack (`supabase start`), ports 563xx
   migrations/…_cera_init.sql          cera_pages, cera_page_revisions, cera_media, RLS, cera_save_page / cera_unpublish_page
   migrations/…_cera_media_bucket.sql  public `cera-media` Storage bucket
   migrations/…_cera_media_uploads.sql bucket type/size limits, cera_media search column, cera_add_media
+  migrations/…_cera_media_editing.sql cera_update_media (alt text), cera_media_usage, cera_delete_media (refuses files in use)
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
     cera/           the landing_page content type, built from the core panels; it imports the package like a
@@ -85,7 +87,7 @@ test/
   metadata.test.ts  pageMetadata and JSON-LD escaping
   panels.test.ts    every core panel through <Panels>: the frame (background, overlay, video), each panel's markup
   users.test.ts     people: listing, adding with a temporary password, roles, the own-role and last-admin guards
-  media.test.ts     upload paths, type/size checks, finishing against what Storage reports, the library, grants
+  media.test.ts     upload paths, type/size checks, finishing against what Storage reports, the library, alt edits, usage, delete, grants
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
   support/db.ts     PGlite (Postgres in-process, no Docker) with Supabase's roles stubbed, and a fake supabase-js client
@@ -118,6 +120,7 @@ test/
 23. **Media uploads go straight to Storage** (decided 2026-11-19). The server checks the type and size the browser claims, picks the path (`2026/11/1a2b3c4d-name.jpg`, extension from the type) and returns a one-time signed upload URL; the browser PUTs the file; the server then reads the object's real type and size from Storage, deletes it if they aren't allowed, and records it with `cera_add_media` (role re-checked, like saves). Files never pass through the app server, so hosts' request-size limits (4.5 MB on Vercel) don't apply. The bucket itself allows only JPEG, PNG, WebP, GIF, AVIF, MP4 and WebM up to 50 MiB; the app limits images to 10 MB. SVG is refused because it can carry scripts (the icon content type will need its own answer). A field stores a `MediaRef` copy (id, path, kind, alt, width, height): alt text is per use, and dimensions are measured in the browser as layout hints. Typed paths and URLs still work, for embeds and seeded content.
 24. **Admins manage people in the admin** (decided 2026-11-20). The People page (`UsersManager` with `createCeraUser` / `setCeraRole` from `./supabase`) lists every account with its role, adds a person with a role and a 20-character temporary password shown once, and changes or removes roles. Only admins see it, which is what now separates `admin` from `editor`. You can't change your own role, and the last admin can't be demoted, so the site can't lose its admins. Removing access clears the role and keeps the account; nothing deletes accounts. People change their password on the Account page. Email invites aren't built: Supabase's built-in mailer is rate-limited, so they wait for a mail provider. A role change applies to saves at once (the database reads the role fresh); a signed-in person's own view updates when they sign in again or within the hour.
 25. **Live reads are cached; publishing clears them** (decided 2026-11-20). `@lateraltranslucence/cera/next/cache` wraps live (published-only) reads in Next's data cache (`unstable_cache`, tag `cera:pages`): the example site caches the page read and the linked-page lookups behind Featured Post and Posts. Pages still render per request, because draft-mode preview needs the request, but they stop waiting on the database. Publishing and unpublishing call `pagesChanged()` (Next's `updateTag`, read-your-own-writes) from the Server Action, so the next request is fresh. One tag covers every page, since a change to one page shows on others. Changes made outside the admin (the seed, SQL) appear within 300 seconds. Draft preview and anything read with a user's session are never cached. Moving to Next 16's Cache Components (`'use cache'`) and fully static pages is a later step.
+26. **The media library is edited on its own page; files in use can't be deleted** (decided 2026-11-20). The admin's Media page (`MediaManager`) lists the library with search and a type filter, uploads (several at once, or dropped), and shows a file's details, alt text and the pages that use it. Only the library alt text can change: it's the default for new uses, and pages that already use a file keep their own copy (decision 23), which editors change on the page. Paths can't be renamed, since pages store them. A file is in use when its path appears in a page's working copy or live revision, which catches fields, galleries and images in rich text (`cera_media_usage`, run as the caller so row-level security applies). `deleteMedia` refuses a file in use and names the pages; otherwise it deletes the library row (role and usage re-checked in one transaction) and then the Storage object. Older revisions aren't checked, so restoring one that used a deleted file would show it missing. Editors and admins can edit and delete; viewers can look.
 
 ## Pattern: keep fields in their own file
 
@@ -179,7 +182,8 @@ C. ✅ **Panel data loading** (decision 19), proven with Featured Post: fields, 
    Not yet: `load` results aren't cached across requests, and a linked page doesn't know which pages feature it (so unpublishing it silently empties those panels).
 D. ✅ **Sanitize `f.html()` on save** (decision 18). Checked in the admin: a script, an `onclick` and a `javascript:` link were removed on save, the editor showed the cleaned HTML with a warning under the field, and the preview rendered only the clean version. `savePage` now returns the stored page, and the editor switches to it after a save.
 E. ✅ **Media uploads** (decision 23). Checked in the admin against the local stack: uploading a PNG (stored, recorded, measured 800 × 500), adding alt text, picking it from the library for the SEO image, saving a draft, and the preview rendering it with width, height and alt, plus `og:image`. A dropped SVG was refused with a message, and Storage itself refused a `text/html` upload made with a valid signed URL.
-   Not yet: deleting or editing library items, cleaning up files that were uploaded but never finished or never used, image resizing (Supabase image transformations need a paid plan), and a picker for `gallery` fields.
+   Library editing (decision 26) is done: the admin's Media page. Checked in a browser against the local stack: an image used on `/developers-only` listed that page as live and couldn't be deleted; saving its alt text updated the library; a new upload showed "No pages use this file", and deleting it removed the row and the Storage object. Both the two-column and narrow layouts work.
+   Not yet: cleaning up files that were uploaded but never finished or never used, image resizing (Supabase image transformations need a paid plan), paging past the newest 60 files in the library, and replacing a file in place.
 
 **Then the original list:**
 

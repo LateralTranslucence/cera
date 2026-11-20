@@ -9,6 +9,7 @@ export function Shell({ staff, children }: { staff: Staff; children: ReactNode }
       <header className="cera-shell__bar">
         <a href="/admin" className="cera-shell__brand">Cera admin</a>
         <a href="/admin">Pages</a>
+        <a href="/admin/media">Media</a>
         {canManagePeople(staff.role) && <a href="/admin/users">People</a>}
         <a href="/" target="_blank" rel="noreferrer">View site</a>
         <a href="/admin/account" className="cera-shell__user" title="Account">

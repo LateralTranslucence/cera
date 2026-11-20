@@ -30,6 +30,13 @@ export function isMediaMimeType(type: string): type is MediaMimeType {
   return Object.hasOwn(MEDIA_TYPES, type);
 }
 
+/** A file size for people: 512 B, 340 KB, 2.5 MB. */
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
+}
+
 /** The `accept` attribute for a file input limited to `kinds`. */
 export function mediaAccept(kinds: readonly MediaKind[]): string {
   return Object.entries(MEDIA_TYPES)
@@ -84,6 +91,25 @@ export interface MediaUploadDone {
 }
 
 export type MediaUploadResult = { ok: true; item: MediaItem } | { ok: false; message: string };
+
+/** Changes to a library item. Only the alt text can change: the path is the file's address, and pages store it. */
+export interface MediaUpdate {
+  id: string;
+  /** The default alt text for new uses. Pages that already use the file keep their own. */
+  alt?: string;
+}
+
+/** A page that uses a library file: in its working copy (`draft`), its live version (`live`), or both. */
+export interface MediaUse {
+  id: string;
+  title: string;
+  slug: string;
+  contentType: string;
+  draft: boolean;
+  live: boolean;
+}
+
+export type MediaDeleteResult = { ok: true } | { ok: false; message: string; usedBy?: MediaUse[] };
 
 /** The reference a field stores for a library item. */
 export function toMediaRef(item: MediaItem): MediaRef {
