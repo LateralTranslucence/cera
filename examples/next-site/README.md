@@ -19,6 +19,20 @@ npm run dev -w cera-next-site       # http://localhost:3100
 
 If saves or page loads stall for many seconds, check Docker's memory: each local Supabase stack needs a few hundred MB, and a 1.4 GB Docker VM running several stacks starts swapping.
 
+## Deployed
+
+- **Live:** the repository's Vercel project (deploys `main` on every push; pull requests get previews behind Vercel sign-in).
+- **Database:** a hosted Supabase project. Production and previews share it.
+
+Vercel builds from `examples/next-site` but installs from the repository root (`cd ../.. && npm ci`), because the site uses the library through the npm workspace. Its environment variables are `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `CERA_PREVIEW_SECRET`.
+
+The same values, plus the hosted admin account, are in `.env.hosted` (not committed). To apply new migrations and seed the hosted project:
+
+```bash
+supabase db push --linked
+cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.ts
+```
+
 ## What's here
 
 | Path | Purpose |
