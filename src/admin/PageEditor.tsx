@@ -63,6 +63,8 @@ export interface PageEditorProps {
   findPages?: FormContext['findPages'];
   /** Uploads and the media library (see `mediaUploader`). Without it, media fields take typed paths and URLs. */
   media?: FormContext['media'];
+  /** The site's icon sets (server actions), for the icon picker. */
+  icons?: FormContext['icons'];
   /** Viewers can look but not save. */
   readOnly?: boolean;
   /** Loads saved versions, newest first (older than `before` when given). Shows History in Page settings. */
@@ -136,6 +138,7 @@ export function PageEditor({
   contentTypes,
   findPages,
   media,
+  icons,
   readOnly = false,
   loadHistory,
   onRestore,
@@ -189,7 +192,7 @@ export function PageEditor({
 
   const defs = useMemo(() => new Map<string, AnyPanel>(ct.panels.map((p: AnyPanel) => [p.type, p])), [ct]);
   const options = useMemo<OptionsContext>(() => ({ contentTypes: contentTypes ?? [{ name: ct.name, label: ct.label, public: true }] }), [contentTypes, ct]);
-  const ctx: FormContext = { issues, options, readOnly, findPages, media };
+  const ctx: FormContext = { issues, options, readOnly, findPages, media, icons };
 
   // Warn before leaving with unsaved changes.
   useEffect(() => {

@@ -7,6 +7,7 @@ export { PageEditor, type PageEditorProps, type SaveInput } from './PageEditor.t
 export { FieldMapForm, IssueList, type FormContext, type PageOption, type PageQuery } from './fields.tsx';
 export * from './state.ts';
 export { GalleryInput, MediaInput, mediaUploader, type MediaContext } from './media.tsx';
+export { IconPicker, SvgInput, type IconsContext, type IconSearchResult } from './icon-inputs.tsx';
 export { MediaManager, type MediaManagerProps } from './MediaManager.tsx';
 export { UsersManager, type UsersManagerProps } from './UsersManager.tsx';
 export { AdminSidebar, initials, type AdminSidebarProps, type NavItem, type NavSection } from './AdminSidebar.tsx';

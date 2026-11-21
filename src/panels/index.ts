@@ -17,6 +17,8 @@
 export { accordion, accordionFields } from './accordion.ts';
 export { blocks } from './blocks.ts';
 export { blocksFields } from './blocks.fields.ts';
+export type { BlocksLoaded } from './blocks.load.ts';
+export { IconGlyph } from './IconGlyph.tsx';
 export { cta, ctaFields } from './cta.ts';
 export { decisionTree, decisionTreeFields } from './decision-tree.ts';
 export { featuredMedia, featuredMediaFields } from './featured-media.ts';

@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 121 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 131 tests).
 
 ## Goal
 
@@ -53,6 +53,10 @@ src/
                     has-light-background for a light color with no image, video or overlay
   media.ts          uploadable types (MEDIA_TYPES), size limits, formatBytes, MediaItem, the upload/update/delete types, MediaUse, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
+  svg.ts            cleanSvg / safeSvg: f.svg() values (custom icons) cleaned to drawing only, black → currentColor; loaded lazily
+  icons/            the `/icons` entry: IconSet, createIconLibrary (combines sets; values are `set:name`), lucideIcons (the
+                    bundled set, from lucide-static's JSON, server only), fontAwesomeIcons (adapter for any Font Awesome
+                    *-svg-icons pack, Free or a site's Pro), iconType (the cera_icon content type)
   forms/            the `/forms` entry: formType (the cera_form content type), its 13 field types as panels (cera/field-*),
                     publicForm (what visitors see), checkSubmission (server-side checks), submissionsCsv; server.ts holds
                     the anti-spam token and sender key (node:crypto, server only)
@@ -66,13 +70,14 @@ src/
                     createPageResolver (linked pages for panels' load: published-only live, working copies in preview),
                     prepareMediaUpload / finishMediaUpload / listMedia / updateMedia / mediaUsage / deleteMedia (media.ts), mediaUrl,
                     listCeraUsers / createCeraUser / setCeraRole (users.ts), getLiveForm / createFormResolver / addSubmission /
-                    listSubmissions / submissionCounts / deleteSubmissions (forms.ts)
+                    listSubmissions / submissionCounts / deleteSubmissions (forms.ts), findPublishedPage / findDraftPage
+                    (one slug across content types that share a route), supabaseIcons (a site's own icons as the `custom` set)
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers,
                     MediaInput, GalleryInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
                     PageEditor (top bar, card stack, dnd-kit reordering, schedule/unpublish/add-panel dialogs), PageList
                     (the Pages table: search, status filter, sort, paging), AdminSidebar, icons.tsx (Icon, CeraSeal, CeraLockup),
                     Dialog, MediaManager (the Media page: browse, upload, alt text, usage, delete), UsersManager (People),
-                    SubmissionList (the Submissions page),
+                    SubmissionList (the Submissions page), IconPicker and SvgInput (icon-inputs.tsx: f.icon() and f.svg()),
                     RichTextInput (f.html: Tiptap editor, HTML view) with rich-text/extensions.ts (schema per toolbar)
                     and rich-text/html.ts (tidyEditorHtml, sameContent);
                     `/admin.css` is its stylesheet, scoped under .cera-admin
@@ -87,10 +92,11 @@ supabase/
   migrations/…_cera_page_history.sql  cera_delete_page (refuses live pages), cera_page_links, cera_page_history, cera_restore_revision
   migrations/…_cera_forms.sql         cera_form_submissions (admins and editors read), cera_add_submission (with the rate limit),
                                       cera_list_submissions, cera_submission_counts, cera_delete_submissions
+  migrations/…_cera_slug_scopes.sql   slug_scope on pages and revisions: slugs unique per scope (types sharing a route share one)
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
-    cera/           the landing_page content type, built from the core panels; it imports the package like a
-                    real site, and the library tests use it too
+    cera/           the landing_page and simple_page content types (both at /[slug], one slug scope), plus the
+                    package's form and icon types; it imports the package like a real site, and the library tests use it too
   sample-page.json  a stored page row
 test/
   types.test.ts     compile-time assertions on inferred types (Equal/Expect)
@@ -109,6 +115,8 @@ test/
   media.test.ts     upload paths, type/size checks, finishing against what Storage reports, the library, alt edits, usage, delete, grants
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
+  icons.test.ts     SVG cleaning, cleaning on save, Lucide search, Font Awesome packs, the library, custom icons, Blocks' icons
+  simple-page.test.ts  slug scopes across types, findPublishedPage / findDraftPage, a simple page's metadata
   support/db.ts     PGlite (Postgres in-process, no Docker) with Supabase's roles stubbed, and a fake supabase-js client
 ```
 
@@ -145,6 +153,8 @@ test/
 29. **Scheduled publishing runs in the database** (decided 2026-11-20). Scheduling validates like a publish, saves the working copy, and marks that revision `kind = 'schedule'` with `scheduled_for`; a pg_cron job (`cera-publish-due`, every minute) publishes due revisions. One schedule per page: scheduling again replaces it; publishing now, unpublishing or "Cancel schedule" cancels it, so an older snapshot can't go live over newer content. Edits made after scheduling stay unpublished. A schedule whose address went live on another page meanwhile is marked failed with the reason, and the Pages list flags it. Because the job runs outside Next, the cached live page catches up within its revalidate time (300 seconds; decision 25). Where pg_cron isn't available, call `publishDuePages()` from a cron route.
 30. **Deleting is permanent and deliberate; restoring makes a new draft** (decided 2026-11-20). Both live in the Page settings card (the brief puts revisions under page settings and didn't design them): History and Delete page. `deletePage` removes the page and all its revisions (no trash), and only a page that isn't live, at the version the editor loaded (`cera_delete_page`: CE422 live, CE409 conflict); the dialog says to unpublish first. Before deleting, the dialog lists the other pages that link to it (`cera_page_links`: the page's id in another page's working copy or live revision, run as the caller), since their panels stop showing it. History (`pageHistory`) lists every saved version newest first, 30 at a time, with who saved it, how (draft, published, scheduled and what became of it, restored), and the title or address when they differ from now. `restoreRevision` runs the old content through `preparePageForSave` as a draft (so old panels are upgraded and rich text sanitized) and saves it as a new version that records `restored_from`; the live page doesn't change until someone publishes, and a restore is undone by restoring the version before it. A restore fails as `slug-taken` if another page now has that address. There's no preview of an old version before restoring; restore, preview the draft, and restore back if needed. Editors and admins can delete and restore; viewers can see the history.
 31. **Forms are a content type; their fields are panels; submissions are stored, not emailed (yet)** (decided 2026-11-20, from DO_Form and DO_Form_Submission). `formType` (`cera_form`) has no route: a Form panel (`cera/form`, a relation to one form) shows it on a page, the live version on the live site and the working copy in preview (where it can't be sent). Each field type is a panel (`cera/field-text` … `cera/field-section`), so fields reorder, duplicate, hide (the theme's Hide Field) and get drafts, publishing, history and restore like pages; a Section starts a fieldset until the next one (theme: the Fieldsets box of comma-separated IDs, which crashed on stray spaces). Field names come from Field ID or the label, made unique. The endpoint (`createFormHandler`, mounted at `/api/cera/forms`) checks a honeypot (fake success), a token that must be 3 seconds to 24 hours old and is fetched when the form appears (the theme had no timer), then checks every answer against the live version (`checkSubmission`: required, email and phone formats, choices among the options, range bounds and steps, length limits; the theme checked only choices and required), then stores it with a per-sender limit of 5 accepted in 10 minutes (refused answers don't count, unlike the theme), keyed by an HMAC of the IP address so addresses aren't stored. Answers are stored as `[{ name, label, value }]` with the form version. Only admins and editors can read, export (CSV, formula-safe) or delete submissions; they're kept until deleted, and a form with submissions can't be deleted. Dropped from the theme: Field Label Location and Auto-update (both non-functional there), and the Privacy Policy link (replaced by a Privacy note you write). No email yet (the owner's choice): `afterSubmit` on the handler is where notifications and the theme's routing logic and confirmation email will go; keep recipients out of published revisions, which anyone can read. JavaScript is required to send a form (the token), as in the theme.
+32. **Content types that share a route share addresses** (decided 2026-11-20). A content type's `slugScope` (default: its name) puts it in a set of types whose slugs must be unique together; the database enforces it (`cera_pages` and live revisions are unique on `slug_scope, slug`), so two saves can't race onto one address. The save functions take the scope from the page (`slugScope` in `p_page`), so a type that changes scope moves its pages on their next save. `findPublishedPage` / `findDraftPage` look a slug up across the types of one route and say which type it is (`type`). The example's simple pages (`simple_page`, ported from DO_Simple_Page) live at `/[slug]` with landing pages (the owner's choice; the theme used `/page/[slug]`) in the `landing_page` scope, so an address already used by one is refused for the other ("Another page already uses the address"). Simple pages have no panels: Image, Image Credit, Description (limited rich text), Content (full rich text), SEO Image (defaults to Image) and Hidden. The theme's character counters (title 60, description 160) aren't shown; the search description is the description's first 160 characters without formatting.
+33. **Icons: Lucide built in, sets plug in, custom icons are cleaned SVG** (decided 2026-11-20, the owner's choices; builds on decision 21). An `f.icon()` field stores `set:name` (`lucide:rocket`, `custom:<icon id>`, `fa-solid:house`), so values keep meaning the same icon as sets are added. `createIconLibrary([...sets])` combines sets in picker order; every set returns ready SVG, so pages inline only the icons they use (text color via `currentColor`, sized by CSS) and no icon library reaches the browser. Lucide (ISC, `lucide-static` pinned) is bundled; its 1.4 MB of icon and keyword JSON loads on the server on first use. Font Awesome isn't shipped: Pro is licensed per subscriber, so a site installs its own packs (with its token) and wraps each style with `fontAwesomeIcons({ name, label, icons })`; Free packs work the same way. A site's own icons are the `cera_icon` content type (from DO_Icon; no route): the file is an SVG stored with the icon (`f.svg()`), cleaned on every save to drawing only (no scripts, event handlers, foreignObject, style elements, images, `use`, links or outside `url()`), with black turned into `currentColor` as the theme's onsave did, and cleaned again when read; an unusable file blocks the save. `supabaseIcons` serves them as the `custom` set: published ones on the live site, working copies (marked "Not published") in preview and the admin; hidden icons aren't offered in the picker but still draw where they're used. Panels draw icons in `load` through `loadContext.icons` (Blocks does; the theme never drew a block's icon), so Blocks now needs a load context. The admin's picker searches every set (names, plus keywords at the start of a word) and shows the picked icon; the upload previews an SVG as an `<img>`, where scripts can't run, until it's cleaned on save.
 
 ## Pattern: keep fields in their own file
 
@@ -180,7 +190,8 @@ Builders choose `ZodOptional<S>` / `ZodDefault<S>` / `S` from the options throug
 | `gallery` | `f.gallery()` | ✅ |
 | `background` | `f.background()` | ⚠️ verify shape |
 | `cta` / `ctas` | `f.cta()` / `f.ctas()` | ✅ |
-| `icon` | `f.icon()` | ✅ (icon source still to decide) |
+| `icon` | `f.icon()` | ✅ with a picker over every icon set (decision 33) |
+| icon post type's File (`media`, SVG) | `f.svg()` | ✅ cleaned on save (decision 33) |
 | `multi_array` (+ `limit`) | `f.repeater({ fields, limit })` | ✅ |
 | `post_browser` (+ `post_types_field`) | `f.relation({ to: [...] \| { field } , limit })` | ✅ with a page picker in the admin (search, filtered by `to`) |
 | `stats` | `stats()` | ⚠️ verify sub-fields |
@@ -221,7 +232,7 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
    **Batch 2 done** (2026-11-20): accordion (WAI-ARIA accordion, one item open at a time), stats (numbers in the HTML, counted up on the client only when off screen at load and not for reduced motion) and gallery (a grid that opens images in a modal `<dialog>`, arrow keys between them), plus the admin's gallery picker (`GalleryInput`: upload several or drop them, pick several from the library, reorder, alt text per image). The theme's `accordion` and `stats` field types became repeaters. Differences: a gallery image's alt text doubles as its title (the theme had a separate title).
    **Posts done** (2026-11-20): cards for picked pages via `load` (like Featured Post: published, visible pages only on the live site, in the picked order), a per-row grid, and with Slider on and more pages than fit in a row, a scroll-snap row with Previous/Next buttons (`PostsSlider`). Not ported: “Modal”. The theme turned on its slider for more than three posts whatever the Slider field said; here the field decides.
    **Form done** (decision 31). **Left:** search (filters, A–Z, text search, sorting and paging across content types). Which comes first depends on the Developers Only astronomy content (decision 22).
-3. **Content-type parity.** Forms and submissions are done (decision 31). Port `class-simple-page.php` and `class-icon.php` (custom icons; decision 21). Decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped.
+3. **Content-type parity.** Forms and submissions (decision 31), simple pages (decision 32) and icons (decision 33) are done. Left: decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped. Not yet for icons: Font Awesome on Developers Only itself (needs the Pro packages and token), and showing the save's "SVG cleaned" warning on a brand-new icon (the editor reloads at its new address after the first save, which drops save notes, as it does for rich text).
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). "Restore revision" is done (decision 30). Still to do: pruning old draft revisions.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.
 6. **Next.js integration.** Started in A and B above. Still to do after them: per-panel error boundaries (a client component) and admin route handlers packaged in `./next`.

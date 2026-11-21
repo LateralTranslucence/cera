@@ -11,6 +11,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { AnyField, FieldMap, Option, OptionsContext, OptionsSource } from '../fields.ts';
 import type { PageIssue } from '../document.ts';
 import { GalleryInput, MediaInput, type MediaContext } from './media.tsx';
+import { IconPicker, SvgInput, type IconsContext } from './icon-inputs.tsx';
 import { RichTextInput } from './RichTextInput.tsx';
 import { fieldDefault, getIn, humanize, issuesAt, moveItem, newId, newRepeaterItem, removeItem, setIn, type Path } from './state.ts';
 
@@ -39,6 +40,8 @@ export interface FormContext {
   findPages?: (query: PageQuery) => Promise<PageOption[]>;
   /** Uploads and the media library. Without it, media fields take typed paths and URLs only. */
   media?: MediaContext;
+  /** The site's icon sets, for `f.icon()` fields. Without it, icon fields take typed values (`lucide:rocket`). */
+  icons?: IconsContext;
 }
 
 type Change = (value: unknown) => void;
@@ -182,9 +185,11 @@ export function IssueList({ issues }: { issues: readonly PageIssue[] }) {
 function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps & { id: string }): ReactNode {
   const ro = ctx.readOnly;
   switch (field.kind) {
+    case 'icon':
+      if (ctx.icons) return <IconPicker value={value} onChange={onChange} icons={ctx.icons} readOnly={ro} id={id} />;
+    // falls through: without the icon sets, a typed value
     case 'text':
     case 'url':
-    case 'icon':
       return (
         <input
           id={id}
@@ -196,6 +201,9 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
           onChange={(e) => onChange(emptyToUndefined(e.target.value))}
         />
       );
+
+    case 'svg':
+      return <SvgInput value={value} onChange={onChange} readOnly={ro} id={id} />;
 
     case 'textarea':
       return <textarea id={id} rows={3} value={asString(value)} readOnly={ro} onChange={(e) => onChange(emptyToUndefined(e.target.value))} />;

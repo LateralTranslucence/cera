@@ -474,6 +474,29 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 
 /* Page picker (relation fields) */
 .cera-picker { display: grid; gap: 8px; }
+
+/* Icons: the picker for f.icon() and the SVG upload for f.svg() (icon-inputs.tsx). */
+.cera-icon-glyph { display: inline-flex; flex: none; width: 1.5em; height: 1.5em; }
+.cera-icon-glyph > svg { width: 100%; height: 100%; }
+.cera-icon-picker { display: grid; gap: 8px; }
+.cera-icon-picker__current { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 44px; }
+.cera-icon-picker__preview { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-bg); font-size: 18px; }
+.cera-icon-picker__name { display: grid; min-width: 0; }
+.cera-icon-picker__name .cera-picker__meta { overflow-wrap: anywhere; }
+.cera-icon-picker__actions { display: flex; gap: 6px; margin-left: auto; }
+.cera-icon-picker__panel { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--cera-line); border-radius: 8px; background: var(--cera-bg); }
+.cera-icon-picker__group { display: grid; gap: 6px; }
+.cera-icon-picker__group h4 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cera-muted); }
+.cera-icon-picker__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; max-height: 280px; overflow-y: auto; }
+.cera-icon-picker__grid button { display: grid; justify-items: center; gap: 6px; width: 100%; height: 100%; padding: 10px 4px 8px; border: 1px solid transparent; border-radius: 6px; background: var(--cera-surface); color: var(--cera-fg); font: inherit; cursor: pointer; }
+.cera-icon-picker__grid button:hover { border-color: var(--cera-line); }
+.cera-icon-picker__grid button[aria-pressed='true'] { border-color: var(--honey-ink); background: var(--honey-soft); }
+.cera-icon-picker__grid .cera-icon-glyph { font-size: 16px; }
+.cera-icon-picker__label { width: 100%; font-size: 11px; line-height: 14px; text-align: center; color: var(--cera-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cera-svg-input { display: grid; gap: 8px; justify-items: start; }
+.cera-svg-input__preview { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; padding: 12px; border: 1px solid var(--cera-line); border-radius: 8px; background: #fff; }
+.cera-svg-input__preview img { width: 100%; height: 100%; object-fit: contain; }
+.cera-svg-input__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .cera-picker__picked { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .cera-picker__picked > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 8px 8px 12px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-bg); }
 .cera-picker__picked > li > .cera-icon-button { margin-left: auto; }

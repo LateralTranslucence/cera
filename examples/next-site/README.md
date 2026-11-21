@@ -39,9 +39,10 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 
 | Path | Purpose |
 |---|---|
-| `cera/` | The `landing_page` content type, with every core panel (`/panels` shows one of each), and the package's `formType` (forms, shown on pages by the Form panel). Its panels come from the package (`cera/blocks`, …); a site's own panels would sit here too, under names without the reserved `cera/` prefix |
-| `app/(site)/` | Live pages: `getPublishedPage` → `<Panels>`, with `generateMetadata` from `pageMetadata` |
+| `cera/` | The `landing_page` content type, with every core panel (`/panels` shows one of each); `simple_page` (no panels: image, description, content), which shares landing pages' addresses at `/[slug]`; and the package's `formType` (forms, shown on pages by the Form panel) and `iconType` (your own icons). Panels come from the package (`cera/blocks`, …); a site's own panels would sit here too, under names without the reserved `cera/` prefix |
+| `app/(site)/` | Live pages: `findPublishedPage` (a landing page or a simple page) → `RoutedPage`, with `generateMetadata` from `pageMetadata` |
 | `app/admin/` | Sign-in, page list and the editor (`PageEditor` from `@lateraltranslucence/cera/admin`) |
+| `app/admin/simple-pages`, `app/admin/icons` | Simple pages and icons, through the shared screens in `content-screens.tsx` (`content.ts` says where each type lives in the admin) |
 | `app/admin/forms`, `app/admin/submissions` | Forms (built in the same editor; fields are its panels) and what visitors sent (admins and editors; CSV download at `submissions/export`) |
 | `app/api/cera/forms` | Where forms post: `createFormHandler` (token, honeypot, checks, rate limit), storing submissions with the secret key |
 | `app/admin/users`, `app/admin/account` | People (admins: add people, set roles) and Account (change your password) |
@@ -50,11 +51,7 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 | `app/api/draft` | Preview for external tools: `/api/draft?secret=…&slug=about` |
 | `proxy.ts` | Refreshes the admin's Supabase session cookies |
 | `lib/auth.ts` | `requireStaff(role)`: verified user + Cera role from `app_metadata.cera_role` |
-| `lib/pages.ts` | Picks the live revision or, in draft mode, the working copy; logs read issues; `loadContextFor` gives panels' `load` a page resolver and a form resolver (published-only live) |
+| `lib/pages.ts` | Picks the live revision or, in draft mode, the working copy; logs read issues; `loadContextFor` gives panels' `load` a page resolver, a form resolver and icons (published-only live) |
+| `lib/icons.ts` | The site's icon sets (its own icons, then Lucide; add Font Awesome packs here) and the cached live icon lookup |
 | `lib/supabase.ts` | Anonymous client (published pages only) and secret-key client (server only) |
 | `scripts/seed.ts` | Admin account and pages, saved through `savePage` like the admin does |
-
-## Not done yet
-
-- **Media library management.** Uploading and picking work; deleting or editing library items doesn't yet.
-- **Admin extras.** Drag-to-reorder, a rich-text editor, deleting pages and revision history.

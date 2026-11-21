@@ -10,6 +10,7 @@
     "./next/cache": "./src/next/cache.ts",
     "./panels": "./src/panels/index.ts",
     "./forms": "./src/forms/index.ts",
+    "./icons": "./src/icons/index.ts",
     "./supabase": "./src/supabase/index.ts",
     "./admin": "./src/admin/index.ts",
     "./admin.css": "./src/admin/admin.css"
@@ -30,6 +31,7 @@
     "@tiptap/pm": "3.32.3",
     "@tiptap/react": "3.32.3",
     "@tiptap/starter-kit": "3.32.3",
+    "lucide-static": "1.70.0",
     "sanitize-html": "^2.18.1",
     "zod": "^4.6.7"
   },

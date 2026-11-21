@@ -32,6 +32,14 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
    * which panels show on other pages).
    */
   route?: string;
+  /**
+   * Content types with the same `slugScope` share one set of addresses: a
+   * slug one of them uses can't be used by another (the database enforces
+   * it). Give types that share a route the same scope, e.g. a simple page
+   * living at /[slug] next to landing pages: `slugScope: 'landing_page'`.
+   * Defaults to `name`.
+   */
+  slugScope?: string;
   /** A page's public URL. Defaults to `route` with `[slug]` filled in. */
   url?: (page: PageDocument<N, B, P>) => string;
   boxes: B;

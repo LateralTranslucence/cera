@@ -6,6 +6,7 @@ import type { ComponentType } from 'react';
 import type { z } from 'zod';
 import type { FieldMap, InferFields, MediaRef } from './fields.ts';
 import type { PublicForm } from './forms/model.ts';
+import type { IconResolver } from './icons/library.ts';
 
 export interface PanelContext {
   pageId: string;
@@ -53,6 +54,8 @@ export interface LoadContext {
   pages: PageResolver;
   /** Needed by Form panels. */
   forms?: FormResolver;
+  /** Needed by panels with icons (`f.icon()` fields), e.g. Blocks. Without it, icons aren't drawn. */
+  icons?: IconResolver;
   /** True in draft-mode preview: linked pages resolve to their working copies. */
   draft: boolean;
   page: { id: string; contentType: string; slug: string };

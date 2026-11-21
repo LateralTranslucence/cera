@@ -32,7 +32,9 @@ export type IssueCode =
   | 'unknown-panel' // no definition for the panel's type
   | 'migration-failed' // stored panel couldn't be upgraded to the current version
   | 'duplicate-panel-id'
-  | 'html-sanitized'; // disallowed HTML was removed from a rich-text field on save
+  | 'html-sanitized' // disallowed HTML was removed from a rich-text field on save
+  | 'svg-cleaned' // scripts, links or other non-drawing parts were removed from an SVG on save
+  | 'svg-invalid'; // an SVG field holds something that isn't a usable SVG
 
 export interface PageIssue {
   severity: 'error' | 'warning';
@@ -306,8 +308,9 @@ export interface PrepareOptions {
  * panels and keys are left alone: they aren't rendered.
  */
 async function sanitizePage(ct: AnyContentType, page: StoredPage): Promise<{ page: StoredPage; issues: PageIssue[] }> {
-  // Lazy: keeps the sanitizer out of client bundles that only import field definitions.
+  // Lazy: keeps the sanitizers out of client bundles that only import field definitions.
   const { sanitizeRichTextWithReport } = await import('./sanitize.ts');
+  const { cleanSvg } = await import('./svg.ts');
   const issues: PageIssue[] = [];
 
   const clean = (fields: FieldMap, value: unknown, path: IssuePath, panelId?: string): unknown => {
@@ -331,6 +334,23 @@ async function sanitizePage(ct: AnyContentType, page: StoredPage): Promise<{ pag
                 : 'HTML that isn’t allowed (scripts, inline styles, unsafe links) was removed.',
           });
         }
+      } else if (field.kind === 'svg' && typeof v === 'string' && v !== '') {
+        const r = cleanSvg(v);
+        if ('error' in r) {
+          out[key] = undefined;
+          issues.push({ severity: 'error', code: 'svg-invalid', path: [...path, key], panelId, message: `${r.error} Upload another file.` });
+        } else {
+          out[key] = r.svg;
+          if (r.removed) {
+            issues.push({
+              severity: 'warning',
+              code: 'svg-cleaned',
+              path: [...path, key],
+              panelId,
+              message: 'Parts of the SVG that aren’t drawing (scripts, links, embedded files or styles) were removed.',
+            });
+          }
+        }
       } else if (field.kind === 'repeater' && Array.isArray(v)) {
         const sub = (field.config as { fields: FieldMap }).fields;
         out[key] = v.map((item, i) => clean(sub, item, [...path, key, i], panelId));
@@ -353,13 +373,17 @@ async function sanitizePage(ct: AnyContentType, page: StoredPage): Promise<{ pag
   return { page: { ...page, boxes, panels }, issues };
 }
 
-/** validateForSave, then sanitize the rich text in what it returns. */
+/** Issues that don't stop `beforeSave` from running: notes about what saving cleaned up. */
+const CLEANING_NOTES = new Set<IssueCode>(['unknown-panel', 'html-sanitized', 'svg-cleaned']);
+
+/** validateForSave, then sanitize the rich text and SVGs in what it returns. */
 async function validateAndSanitize(ct: AnyContentType, raw: unknown, mode: SaveMode): Promise<PrepareResult> {
   const result = validateForSave(ct, raw, mode);
   if (!result.page) return result;
   const cleaned = await sanitizePage(ct, result.page);
   const issues = [...result.issues, ...cleaned.issues];
-  return result.ok ? { ok: true, page: cleaned.page, issues } : { ok: false, page: cleaned.page, issues };
+  const ok = result.ok && !cleaned.issues.some((i) => i.severity === 'error');
+  return ok ? { ok: true, page: cleaned.page, issues } : { ok: false, page: cleaned.page, issues };
 }
 
 /**
@@ -376,7 +400,7 @@ export async function preparePageForSave<CT extends AnyContentType>(ct: CT, raw:
   const first = await validateAndSanitize(ct, raw, opts.mode);
   const hook = ct.hooks?.beforeSave;
   if (!first.ok || !first.page || !hook) return first;
-  if (first.issues.some((i) => i.code !== 'unknown-panel' && i.code !== 'html-sanitized')) return first;
+  if (first.issues.some((i) => !CLEANING_NOTES.has(i.code))) return first;
 
   const known = new Set(ct.panels.map((p: AnyPanel) => p.type));
   const unknown = first.page.panels.map((p, index) => ({ p, index })).filter(({ p }) => !known.has(p.type));
@@ -396,7 +420,7 @@ export async function preparePageForSave<CT extends AnyContentType>(ct: CT, raw:
   // sanitize warnings for the editor.
   const second = await validateAndSanitize(ct, { ...rest, id: first.page.id, contentType: first.page.contentType, panels }, opts.mode);
   const seen = new Set(second.issues.map((i) => `${i.code}:${i.path.join('.')}`));
-  const carried = first.issues.filter((i) => i.code === 'html-sanitized' && !seen.has(`${i.code}:${i.path.join('.')}`));
+  const carried = first.issues.filter((i) => i.code !== 'unknown-panel' && CLEANING_NOTES.has(i.code) && !seen.has(`${i.code}:${i.path.join('.')}`));
   const issues = [...second.issues, ...carried];
   return second.ok ? { ok: true, page: second.page, issues } : { ok: false, page: second.page, issues };
 }

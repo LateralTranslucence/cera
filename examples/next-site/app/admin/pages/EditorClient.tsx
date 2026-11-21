@@ -8,18 +8,21 @@ import { useRouter } from 'next/navigation';
 import type { StoredPage } from '@lateraltranslucence/cera';
 import { mediaUploader, PageEditor } from '@lateraltranslucence/cera/admin';
 import type { PageSchedule } from '@lateraltranslucence/cera/supabase';
-import { contentTypes, formType } from '@/cera';
+import { contentTypes } from '@/cera';
+import { placeOf } from '../content.ts';
 import {
   cancelScheduleAction,
   deletePageAction,
   findMediaAction,
   findPagesAction,
   finishMediaUploadAction,
+  getIconsAction,
   pageHistoryAction,
   pageLinksAction,
   prepareMediaUploadAction,
   restoreRevisionAction,
   savePageAction,
+  searchIconsAction,
   unpublishPageAction,
 } from '../actions.ts';
 
@@ -27,6 +30,7 @@ const media = {
   upload: mediaUploader({ prepare: prepareMediaUploadAction, finish: finishMediaUploadAction }),
   find: findMediaAction,
 };
+const icons = { search: searchIconsAction, get: getIconsAction };
 
 export function EditorClient({
   page,
@@ -47,10 +51,8 @@ export function EditorClient({
 }) {
   const router = useRouter();
   const ct = contentTypes.find((c) => c.name === page.contentType);
-  // Forms live under /admin/forms; landing pages under /admin/pages, listed at /admin.
-  const isForm = page.contentType === formType.name;
-  const list = isForm ? '/admin/forms' : '/admin';
-  const base = isForm ? '/admin/forms' : '/admin/pages';
+  // Each type has its own list and editor path (app/admin/content.ts).
+  const { list, base, title, noun } = placeOf(page.contentType);
   if (!ct) return <p className="cera-status cera-status--error">This site has no content type “{page.contentType}”.</p>;
 
   return (
@@ -67,6 +69,7 @@ export function EditorClient({
       onSave={savePageAction}
       findPages={findPagesAction}
       media={media}
+      icons={icons}
       onUnpublish={async () => {
         await unpublishPageAction(page.id);
       }}
@@ -83,9 +86,9 @@ export function EditorClient({
       onRestore={(input) => restoreRevisionAction({ pageId: page.id, contentType: page.contentType, ...input })}
       onDelete={(input) => deletePageAction({ pageId: page.id, ...input })}
       findLinks={() => pageLinksAction(page.id)}
-      onDeleted={() => router.replace(`${list}?deleted=${encodeURIComponent(page.title || `Untitled ${isForm ? 'form' : 'page'}`)}`)}
+      onDeleted={() => router.replace(`${list}?deleted=${encodeURIComponent(page.title || `Untitled ${noun}`)}`)}
       backHref={list}
-      backLabel={isForm ? 'Forms' : 'Pages'}
+      backLabel={title}
       {...(ct.route && { previewHref: (slug: string) => `/admin/preview?slug=${encodeURIComponent(slug)}` })}
     />
   );
