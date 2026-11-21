@@ -1,8 +1,9 @@
-import { isLightColor, type LoadContext, type PageOf } from '@lateraltranslucence/cera';
+import { breadcrumbsFor, isLightColor, type LoadContext, type PageOf } from '@lateraltranslucence/cera';
 import { jsonLdString, Panels } from '@lateraltranslucence/cera/next';
 import { CtaLinks, Html } from '@lateraltranslucence/cera/panels';
 import { mediaUrl } from '@lateraltranslucence/cera/supabase';
 import { landingPage } from '../cera/index.ts';
+import { Breadcrumbs } from './Breadcrumbs.tsx';
 
 type LandingPage = PageOf<typeof landingPage>;
 
@@ -32,6 +33,7 @@ export async function LandingPageView({ page, loadContext }: { page: LandingPage
   return (
     <main className={page.boxes.admin.css || undefined}>
       {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />}
+      <Breadcrumbs trail={breadcrumbsFor(landingPage, page)} />
       <Hero hero={page.boxes.hero} fallbackTitle={page.title} />
       <Panels contentType={landingPage} page={page} loadContext={loadContext} />
     </main>

@@ -25,6 +25,8 @@ export const simplePage = defineContentType({
   route: '/[slug]',
   slugScope: 'landing_page',
   url: (page) => `/${page.slug}`,
+  // theme: settings()['breadcrumbs'], shown before every simple page.
+  breadcrumbs: [{ text: 'Home', url: '/' }],
 
   boxes: {
     content: {

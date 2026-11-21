@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getPageForEditing } from '@lateraltranslucence/cera/supabase';
 import { landingPage } from '@/cera';
-import { canEdit, requireStaff } from '@/lib/auth.ts';
+import { canEditContentType } from '@lateraltranslucence/cera';
+import { requireStaff } from '@/lib/auth.ts';
 import { Shell } from '../../Shell.tsx';
 import { EditorClient } from '../EditorClient.tsx';
 
@@ -27,7 +28,7 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
         unpublishedChanges={editable.unpublishedChanges}
         updatedAt={editable.updatedAt}
         schedule={editable.schedule}
-        readOnly={!canEdit(staff.role)}
+        readOnly={!canEditContentType(staff.role, landingPage)}
       />
     </Shell>
   );

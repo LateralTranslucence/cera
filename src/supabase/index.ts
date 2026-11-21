@@ -377,6 +377,13 @@ export async function savePage<Type extends AnyContentType>(
   raw: unknown,
   options: SaveOptions,
 ): Promise<SaveResult> {
+  if (contentType.publishable === false && options.mode !== 'draft') {
+    return {
+      ok: false,
+      reason: 'invalid',
+      issues: [{ severity: 'error', code: 'invalid-page', path: [], message: `${contentType.label} pages are never published; save them instead.` }],
+    };
+  }
   const schedule = options.mode === 'schedule';
   const publishAt = schedule ? new Date(String(options.publishAt ?? '')) : null;
   if (publishAt && (Number.isNaN(publishAt.getTime()) || publishAt.getTime() <= Date.now())) {

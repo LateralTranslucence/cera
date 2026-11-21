@@ -8,10 +8,17 @@
 import { z } from 'zod';
 import { type FieldMap, type InferFields, type MediaRef, objectSchema } from './fields.ts';
 import type { AnyPanel, PanelUnion } from './panel.ts';
+import type { CeraRole } from './roles.ts';
 
 export type BoxMap = Record<string, FieldMap>;
 
 export type PageStatus = 'draft' | 'published';
+
+/** One link in a breadcrumb trail. */
+export interface Breadcrumb {
+  text: string;
+  url: string;
+}
 
 export interface PageDocument<Name extends string, Boxes extends BoxMap, Panels extends readonly AnyPanel[]> {
   id: string;
@@ -42,6 +49,27 @@ export interface ContentTypeConfig<Name extends string, Boxes extends BoxMap, Pa
   slugScope?: string;
   /** A page's public URL. Defaults to `route` with `[slug]` filled in. */
   url?: (page: PageDocument<Name, Boxes, Panels>) => string;
+  /**
+   * The roles that may create, edit, publish and delete pages of this type
+   * (theme: settings()['restrict_users']). Default: admins and editors. Only
+   * admins and editors can save at all, so listing `viewer` changes nothing.
+   * The site's server actions enforce it (see `canEditContentType`).
+   */
+  editRoles?: readonly CeraRole[];
+  /**
+   * False for types whose pages are never published, like notes for the
+   * team: published versions are readable by anyone, so these stay working
+   * copies, read in the admin. `savePage` refuses to publish or schedule
+   * them, and the editor offers only Save. Default true.
+   */
+  publishable?: boolean;
+  /**
+   * Breadcrumbs shown before every page of this type
+   * (theme: settings()['breadcrumbs']), e.g. [{ text: 'Guides', url: '/guides' }].
+   */
+  breadcrumbs?: readonly Breadcrumb[];
+  /** A page's own breadcrumbs, after the type's, e.g. from a field editors fill in. */
+  pageBreadcrumbs?: (page: PageDocument<Name, Boxes, Panels>) => Breadcrumb[];
   boxes: Boxes;
   panels?: Panels;
   seo?: {
@@ -153,6 +181,16 @@ export function defineContentType<
 }
 
 /** A page's public URL: the content type's `url`, or its `route` with `[slug]` filled in. */
+/**
+ * A page's breadcrumb trail: the content type's breadcrumbs, then the
+ * page's own, then the page itself (without a link to itself, its url is
+ * kept for structured data). Links without text are left out.
+ */
+export function breadcrumbsFor<Type extends AnyContentType>(contentType: Type, page: PageOf<Type>): Breadcrumb[] {
+  const trail = [...(contentType.breadcrumbs ?? []), ...(contentType.pageBreadcrumbs?.(page) ?? [])].filter((crumb) => crumb.text?.trim());
+  return [...trail, { text: page.title, url: pageUrl(contentType, page) }];
+}
+
 export function pageUrl<Type extends AnyContentType>(contentType: Type, page: PageOf<Type>): string {
   if (contentType.url) return contentType.url(page);
   return contentType.route ? contentType.route.replace('[slug]', encodeURIComponent(page.slug)) : '';

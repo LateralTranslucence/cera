@@ -1,6 +1,7 @@
 import { listPages } from '@lateraltranslucence/cera/supabase';
 import { landingPage } from '@/cera';
-import { canEdit, requireStaff } from '@/lib/auth.ts';
+import { canEditContentType } from '@lateraltranslucence/cera';
+import { requireStaff } from '@/lib/auth.ts';
 import { Icon } from '@lateraltranslucence/cera/admin';
 import { Shell } from './Shell.tsx';
 import { PageListClient } from './PageListClient.tsx';
@@ -20,7 +21,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
             <p className="cera-breadcrumb">Content</p>
             <h1 className="cera-screen__title">Pages</h1>
           </div>
-          {canEdit(staff.role) && (
+          {canEditContentType(staff.role, landingPage) && (
             <a className="cera-button cera-button--primary cera-button--lg" href="/admin/pages/new">
               <Icon name="plus" size={18} strokeWidth={2} />
               New page
