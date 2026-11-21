@@ -76,6 +76,11 @@ a { color: var(--accent); }
 .cta { display: inline-block; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 6px; text-decoration: none; font-weight: 600; }
 .rich-text > :first-child { margin-top: 0; }
 .rich-text > :last-child { margin-bottom: 0; }
+/* Definition lists: each term in bold on its own line, its meaning below. */
+.rich-text dl { margin: 1em 0; }
+.rich-text dt { margin-top: 0.75em; font-weight: 700; }
+.rich-text dt:first-child { margin-top: 0; }
+.rich-text dd { margin: 0.25em 0 0; }
 
 .featured-post { display: grid; gap: 32px; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: center; }
 .featured-post:not(:has(.featured-post__image)) { grid-template-columns: 1fr; }
@@ -245,3 +250,29 @@ a { color: var(--accent); }
 .simple-page__image img { width: 100%; border-radius: 10px; }
 .simple-page__image figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
 .simple-page__content { margin-top: 32px; }
+
+/* Search panel (SearchClient). Result cards are the Posts panel's. */
+.cera-search { display: grid; gap: 20px; margin-top: 24px; }
+.cera-search__form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px 24px; }
+.cera-search__filter { display: grid; gap: 6px; min-width: min(100%, 220px); margin: 0; padding: 0; border: 0; }
+.cera-search__filter > label, .cera-search__filter > legend { padding: 0; font-weight: 600; font-size: 15px; }
+.cera-search__filter--text { flex: 1 1 320px; }
+.cera-search__filter--letters { flex: 1 1 100%; }
+.cera-search__text { display: flex; gap: 8px; }
+.cera-search input, .cera-search select { padding: 10px 12px; border: 1px solid var(--muted); border-radius: 6px; background: var(--card); color: var(--fg); font: inherit; }
+.cera-search__text input { flex: 1; min-width: 0; }
+.cera-search button { padding: 10px 16px; border: 1px solid var(--accent); border-radius: 6px; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.cera-search__text button { background: var(--accent); color: var(--bg); }
+.cera-search button:disabled { opacity: 0.45; cursor: not-allowed; }
+.cera-search :is(input, select, button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cera-search__letters { display: flex; flex-wrap: wrap; gap: 4px; }
+.cera-search__letters button { min-width: 36px; padding: 6px 8px; border-color: var(--line); color: var(--fg); font-weight: 500; }
+.cera-search__letters button[aria-pressed='true'] { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+.cera-search__summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.cera-search__statement { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; color: var(--muted); }
+.cera-search .cera-search__criterion { padding: 4px 10px; border-color: var(--line); border-radius: 999px; color: var(--fg); font-weight: 500; }
+.cera-search__sort { display: flex; align-items: center; gap: 8px; }
+.cera-search__results[aria-busy='true'] { opacity: 0.6; transition: opacity 0.2s; }
+.cera-search__empty, .cera-search__error { margin: 0 0 12px; }
+.cera-search__paging { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 24px; }
+.cera-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }

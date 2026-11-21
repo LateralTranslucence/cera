@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 131 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 137 tests).
 
 ## Goal
 
@@ -54,6 +54,7 @@ src/
   media.ts          uploadable types (MEDIA_TYPES), size limits, formatBytes, MediaItem, the upload/update/delete types, MediaUse, toMediaRef
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   svg.ts            cleanSvg / safeSvg: field.svg() values (custom icons) cleaned to drawing only, black → currentColor; loaded lazily
+  search/model.ts   the Search panel's settings, query (parseSearchQuery, searchQueryParams) and result types, shared by server and browser
   icons/            the `/icons` entry: IconSet, createIconLibrary (combines sets; values are `set:name`), lucideIcons (the
                     bundled set, from lucide-static's JSON, server only), fontAwesomeIcons (adapter for any Font Awesome
                     *-svg-icons pack, Free or a site's Pro), iconType (the cera_icon content type)
@@ -61,17 +62,19 @@ src/
                     publicForm (what visitors see), checkSubmission (server-side checks), submissionsCsv; server.ts holds
                     the anti-spam token and sender key (node:crypto, server only)
   panels/           the `/panels` entry: the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
-                    quotes, tabs, text, text-media v2, accordion, stats, gallery, posts, form; `corePanels` lists them), PanelFrame (the shared section,
+                    quotes, tabs, text, text-media v2, accordion, stats, gallery, posts, form, search; `corePanels` lists them), PanelFrame (the shared section,
                     background, title and copy), Html and CtaLink(s); Tabs and Decision Tree have small client parts
   next/cache.ts     the `/next/cache` entry: cacheLive (Next data cache, tag cera:pages) and pagesChanged (call after publishing)
   next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString, createFormHandler
-                    (the forms endpoint: token, honeypot, checks, rate limit); React lives only here
+                    (the forms endpoint: token, honeypot, checks, rate limit), createSearchHandler (the Search panel's
+                    endpoint: reads the live panel's settings, then searches within them); React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
                     createPageResolver (linked pages for panels' load: published-only live, working copies in preview),
                     prepareMediaUpload / finishMediaUpload / listMedia / updateMedia / mediaUsage / deleteMedia (media.ts), mediaUrl,
                     listCeraUsers / createCeraUser / setCeraRole (users.ts), getLiveForm / createFormResolver / addSubmission /
                     listSubmissions / submissionCounts / deleteSubmissions (forms.ts), findPublishedPage / findDraftPage
-                    (one slug across content types that share a route), supabaseIcons (a site's own icons as the `custom` set)
+                    (one slug across content types that share a route), supabaseIcons (a site's own icons as the `custom` set),
+                    createSearchResolver (search.ts: Search panels' filters and results over stored pages)
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers,
                     MediaInput, GalleryInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
                     PageEditor (top bar, card stack, dnd-kit reordering, schedule/unpublish/add-panel dialogs), PageList
@@ -114,6 +117,7 @@ test/
   rich-text.test.ts the editor schema under happy-dom: exact round trips, respellings, WordPress classes and images, what it would lose
   media.test.ts     upload paths, type/size checks, finishing against what Storage reports, the library, alt edits, usage, delete, grants
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
+  search.test.ts    Search: settings, URL queries, the resolver (words, A–Z, types, select lists, sort, paging, preview), the handler, the panel
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
   icons.test.ts     SVG cleaning, cleaning on save, Lucide search, Font Awesome packs, the library, custom icons, Blocks' icons
   simple-page.test.ts  slug scopes across types, findPublishedPage / findDraftPage, a simple page's metadata
@@ -157,6 +161,23 @@ test/
 33. **Icons: Lucide built in, sets plug in, custom icons are cleaned SVG** (decided 2026-11-20, the owner's choices; builds on decision 21). An `field.icon()` field stores `set:name` (`lucide:rocket`, `custom:<icon id>`, `fa-solid:house`), so values keep meaning the same icon as sets are added. `createIconLibrary([...sets])` combines sets in picker order; every set returns ready SVG, so pages inline only the icons they use (text color via `currentColor`, sized by CSS) and no icon library reaches the browser. Lucide (ISC, `lucide-static` pinned) is bundled; its 1.4 MB of icon and keyword JSON loads on the server on first use. Font Awesome isn't shipped: Pro is licensed per subscriber, so a site installs its own packs (with its token) and wraps each style with `fontAwesomeIcons({ name, label, icons })`; Free packs work the same way. A site's own icons are the `cera_icon` content type (from DO_Icon; no route): the file is an SVG stored with the icon (`field.svg()`), cleaned on every save to drawing only (no scripts, event handlers, foreignObject, style elements, images, `use`, links or outside `url()`), with black turned into `currentColor` as the theme's onsave did, and cleaned again when read; an unusable file blocks the save. `supabaseIcons` serves them as the `custom` set: published ones on the live site, working copies (marked "Not published") in preview and the admin; hidden icons aren't offered in the picker but still draw where they're used. Panels draw icons in `load` through `loadContext.icons` (Blocks does; the theme never drew a block's icon), so Blocks now needs a load context. The admin's picker searches every set (names, plus keywords at the start of a word) and shows the picked icon; the upload previews an SVG as an `<img>`, where scripts can't run, until it's cleaned on save.
 
 34. **Names are words** (decided 2026-11-20, the owner's rule). No single-character variables, parameters or type parameters: a callback over pages takes `page`, an event is `event`, a caught error is `error`, a sort compares `first` and `second`, and type parameters say what they are (`ContentType<Name, Boxes, Panels>`, `PanelDefinition<TypeName, Fields, Loaded>`, `Field<Kind, Schema, Config>`). The only exception is a loop counter or index (`for (let i …)`, `(item, i) =>`). Abbreviations are spelled out too (`options`, `context`, `contentType`, `definition`, `element`, not `opts`, `ctx`, `ct`, `def`, `el`); acronyms (`url`, `id`, `svg`, `aria`, `rpc`) and the standard React and Next names (`props`, `ref`, `params`) stay, as do names fixed by stored data or a library's API (`navLabel`, Tiptap's `attrs`). The field builder is `field` (`field.text()`), and the helper that makes each field is `buildField`. When the obvious name is already taken in scope, pick another rather than shadow it.
+35. **Search is a panel with its own endpoint; Developers Only is imported by script** (decided 2026-11-20; decision 22's import).
+    - **Search panel** (`cera/search`, from the theme's Search panel and DO_Search):
+      - Fields: Search Post Types; Search Fields (Text Search, Alphabet, Post Types, Select List); Posts Per Row; Posts Per Page (default 12, at most 48); Custom Sort By; Hide Sort By.
+      - Sorting: newest, oldest, title A–Z and Z–A. Custom Sort By relabels and reorders these, instead of naming meta keys.
+      - Dropped: Modal, as with Posts.
+      - `load` draws the filter form and the first page of results on the server through `loadContext.search` (`createSearchResolver`), so results show before any JavaScript runs.
+      - `SearchClient` then asks `createSearchHandler` (`/api/cera/search`). The handler reads that panel's settings from the live page (the working copy in draft mode), so a request can narrow a search but never widen it.
+      - The query lives in the URL (`?s=`, `letter`, `type`, `filter-N`, `sort`, `page`), so searches can be shared, and the theme's `?s=` still starts one.
+      - Matching is done in JavaScript over every visible page of the types searched: each word must appear in the title or any field, ignoring case, tags and accents. A–Z uses the title's first letter, `#` for anything else. A select list matches pages whose field (or, with none named, any field) links to the picked page. That suits a site's hundreds of pages; live results are cached like pages.
+    - **The Developers Only import** (`examples/next-site/scripts/import-developers-only.ts`, `npm run import:devo -w cera-next-site`):
+      - It reads the theme's REST API (a running copy at `http://localhost:8080`): landing pages, simple pages and forms. The theme had no custom icons.
+      - It maps every panel's numbered fields to Cera's and uploads images to the media library (the largest size WordPress offers), reusing files from earlier runs.
+      - It also converts the theme's named colors to hex, points WordPress links at the new addresses, and strips HTML from SEO fields.
+      - It's safe to rerun: a page whose address is taken is updated in place. The theme's home page goes to `/developers-only` (`--home-slug`), so the example's home stays.
+      - Imported locally: Developers Only (17 panels), Documentation (6 tab panels), Privacy Policy, and the Contact form.
+      - Full rich text now allows definition lists (`dl`/`dt`/`dd`), as the theme's `wp_kses_post` did, so Documentation keeps them. The visual editor can't make them, so a field holding one opens in the HTML view (decision 27). Still dropped: layout `div`s, and code samples the theme stored as raw tags (`<Route>`), which WordPress didn't show either.
+      - The import saves straight to the database, so the live site's cache (decision 25) shows imported changes within 5 minutes, or at once after anything is published in the admin.
 
 ## Pattern: keep fields in their own file
 
@@ -233,7 +254,7 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
    **Batch 1 done** (2026-11-20): `PanelFrame` (the theme's Panel + PanelWrapper: anchor id, background color/image/video with overlay, title, copy) and six panels: text, cta, quotes, featured-media, tabs, decision-tree. Blocks, Text + Media and Featured Post moved onto the frame, so they now draw their backgrounds. The example site's `/panels` page shows one of each. Differences from the theme: Quotes scrolls with CSS scroll snap instead of a slider script; CTA renders all its CTAs (the theme read one from a `ctas` field); Decision Tree's “CTA Text” + “CTA URL” are one `cta` field; Featured Media's `image_link` modal option isn't ported (no modals yet); a panel's anchor id isn't generated from its title.
    **Batch 2 done** (2026-11-20): accordion (WAI-ARIA accordion, one item open at a time), stats (numbers in the HTML, counted up on the client only when off screen at load and not for reduced motion) and gallery (a grid that opens images in a modal `<dialog>`, arrow keys between them), plus the admin's gallery picker (`GalleryInput`: upload several or drop them, pick several from the library, reorder, alt text per image). The theme's `accordion` and `stats` field types became repeaters. Differences: a gallery image's alt text doubles as its title (the theme had a separate title).
    **Posts done** (2026-11-20): cards for picked pages via `load` (like Featured Post: published, visible pages only on the live site, in the picked order), a per-row grid, and with Slider on and more pages than fit in a row, a scroll-snap row with Previous/Next buttons (`PostsSlider`). Not ported: “Modal”. The theme turned on its slider for more than three posts whatever the Slider field said; here the field decides.
-   **Form done** (decision 31). **Left:** search (filters, A–Z, text search, sorting and paging across content types). Which comes first depends on the Developers Only astronomy content (decision 22).
+   **Form done** (decision 31). **Search done** (decision 35): every theme panel now has a Cera panel.
 3. **Content-type parity.** Forms and submissions (decision 31), simple pages (decision 32) and icons (decision 33) are done. Left: decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped. Not yet for icons: Font Awesome on Developers Only itself (needs the Pro packages and token), and showing the save's "SVG cleaned" warning on a brand-new icon (the editor reloads at its new address after the first save, which drops save notes, as it does for rich text).
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). "Restore revision" is done (decision 30). Still to do: pruning old draft revisions.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.

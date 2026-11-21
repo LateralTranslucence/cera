@@ -2,3 +2,4 @@
 export { Panels, type PanelsProps } from './render.tsx';
 export { pageMetadata, jsonLdString, type PageMetadata, type MetadataOptions } from './metadata.ts';
 export { createFormHandler, defaultIp, type FormHandlerOptions } from './forms.ts';
+export { createSearchHandler, type SearchHandlerOptions } from './search.ts';

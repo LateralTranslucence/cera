@@ -44,6 +44,7 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 | `app/admin/` | Sign-in, page list and the editor (`PageEditor` from `@lateraltranslucence/cera/admin`) |
 | `app/admin/simple-pages`, `app/admin/icons` | Simple pages and icons, through the shared screens in `content-screens.tsx` (`content.ts` says where each type lives in the admin) |
 | `app/admin/forms`, `app/admin/submissions` | Forms (built in the same editor; fields are its panels) and what visitors sent (admins and editors; CSV download at `submissions/export`) |
+| `app/api/cera/search` | The Search panel's endpoint: `createSearchHandler` (live pages, or working copies in draft mode), with live results cached |
 | `app/api/cera/forms` | Where forms post: `createFormHandler` (token, honeypot, checks, rate limit), storing submissions with the secret key |
 | `app/admin/users`, `app/admin/account` | People (admins: add people, set roles) and Account (change your password) |
 | `app/admin/actions.ts` | Server actions: save/publish via `savePage` with the user from the verified session; media upload (prepare and finish, editors only) and the library; sign in/out |
@@ -55,3 +56,4 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 | `lib/icons.ts` | The site's icon sets (its own icons, then Lucide; add Font Awesome packs here) and the cached live icon lookup |
 | `lib/supabase.ts` | Anonymous client (published pages only) and secret-key client (server only) |
 | `scripts/seed.ts` | Admin account and pages, saved through `savePage` like the admin does |
+| `scripts/import-developers-only.ts` | One-off import of the Developers Only WordPress site's content from its REST API (`npm run import:devo`; see decision 35 in HANDOFF.md) |
