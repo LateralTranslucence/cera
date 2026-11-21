@@ -22,9 +22,11 @@ test('links: safe schemes and relative paths stay; javascript:, data: and protoc
   assert.equal(sanitizeRichText('<a href="https://ok.test" target="_top" rel="opener">x</a>'), '<a href="https://ok.test" rel="opener">x</a>');
 });
 
-test('full toolbar keeps headings, images over http(s), tables and classes', () => {
+test('full toolbar keeps headings, images over http(s), tables, definition lists and classes', () => {
   const html = '<h2 class="lead">T</h2><img src="https://cdn.test/a.png" alt="A" onerror="x()"><table><tr><td colspan="2">c</td></tr></table>';
   assert.equal(sanitizeRichText(html, 'full'), '<h2 class="lead">T</h2><img src="https://cdn.test/a.png" alt="A" /><table><tr><td colspan="2">c</td></tr></table>');
+  assert.equal(sanitizeRichText('<dl class="defs"><dt>No ACF</dt><dd onclick="x()">Fields are code.</dd></dl>', 'full'), '<dl class="defs"><dt>No ACF</dt><dd>Fields are code.</dd></dl>');
+  assert.equal(sanitizeRichText('<dl><dt>Term</dt><dd>Meaning</dd></dl>', 'limited'), 'TermMeaning');
   assert.equal(sanitizeRichText('<img src="data:image/png;base64,AAAA">', 'full'), '<img />');
 });
 

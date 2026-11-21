@@ -10,7 +10,8 @@
     "start": "next start --port 3100",
     "typecheck": "tsc --noEmit",
     "env": "node --import tsx scripts/env.ts",
-    "seed": "node --env-file=.env.local --import tsx scripts/seed.ts"
+    "seed": "node --env-file=.env.local --import tsx scripts/seed.ts",
+    "import:devo": "node --env-file=.env.local --import tsx scripts/import-developers-only.ts"
   },
   "dependencies": {
     "@lateraltranslucence/cera": "file:../..",

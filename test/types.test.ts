@@ -51,6 +51,7 @@ export type _tests = [
       | 'cera/gallery'
       | 'cera/posts'
       | 'cera/quotes'
+      | 'cera/search'
       | 'cera/stats'
       | 'cera/tabs'
       | 'cera/text'

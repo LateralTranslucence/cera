@@ -22,6 +22,8 @@ const FULL_TAGS = [
   'code', 'pre', 'hr', 'sub', 'sup', 'span',
   'img', 'figure', 'figcaption',
   'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+  // Definition lists (a term, then what it means), as wp_kses_post allowed; the visual editor can't make them, so fields with them open in the HTML view.
+  'dl', 'dt', 'dd',
 ];
 
 /** Links open in the same tab or a new one; anything else is dropped. New tabs get rel="noopener noreferrer". */

@@ -11,7 +11,13 @@
 //     160 characters, with its formatting removed.
 import { defineContentType, field } from '@lateraltranslucence/cera';
 
-const stripHtml = (html = '') => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+// Block tags become spaces ("<p>One</p><p>Two</p>" → "One Two"); inline ones just go ("<em>red</em>," → "red,").
+const stripHtml = (html = '') =>
+  html
+    .replace(/<\/?(?:p|br|li|ul|ol|h[1-6]|div|blockquote|tr|td|th)\b[^>]*>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 export const simplePage = defineContentType({
   name: 'simple_page',

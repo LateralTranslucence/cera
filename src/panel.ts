@@ -7,6 +7,7 @@ import type { z } from 'zod';
 import type { FieldMap, InferFields, MediaRef } from './fields.ts';
 import type { PublicForm } from './forms/model.ts';
 import type { IconResolver } from './icons/library.ts';
+import type { PublicSearch, SearchQuery, SearchResults, SearchSettings } from './search/model.ts';
 
 export interface PanelContext {
   pageId: string;
@@ -42,6 +43,15 @@ export interface PageResolver {
 }
 
 /** Looks up forms for Form panels (see `createFormResolver` in `cera/supabase`). */
+/** Runs searches for Search panels (see createSearchResolver). */
+export interface SearchResolver {
+  /** Where the panel's filter form asks for results (the site's search route handler). */
+  endpoint: string;
+  /** The filter form: each filter's label and options. */
+  describe(settings: SearchSettings): Promise<PublicSearch>;
+  run(settings: SearchSettings, query: SearchQuery): Promise<SearchResults>;
+}
+
 export interface FormResolver {
   /** The live form, or its working copy in draft-mode preview; null if there's none to show. */
   byId(id: string): Promise<PublicForm | null>;
@@ -56,6 +66,8 @@ export interface LoadContext {
   forms?: FormResolver;
   /** Needed by panels with icons (`field.icon()` fields), e.g. Blocks. Without it, icons aren't drawn. */
   icons?: IconResolver;
+  /** Needed by Search panels. */
+  search?: SearchResolver;
   /** True in draft-mode preview: linked pages resolve to their working copies. */
   draft: boolean;
   page: { id: string; contentType: string; slug: string };

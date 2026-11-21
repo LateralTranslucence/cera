@@ -1,9 +1,10 @@
 import 'server-only';
 import { cache } from 'react';
 import { draftMode } from 'next/headers';
-import { createFormResolver, createPageResolver, DEFAULT_FORM_ENDPOINT, findDraftPage, findPublishedPage, getLiveForm } from '@lateraltranslucence/cera/supabase';
+import { createFormResolver, createPageResolver, createSearchResolver, DEFAULT_FORM_ENDPOINT, DEFAULT_SEARCH_ENDPOINT, findDraftPage, findPublishedPage, getLiveForm } from '@lateraltranslucence/cera/supabase';
 import { cacheLive } from '@lateraltranslucence/cera/next/cache';
-import type { LoadContext, PageIssue } from '@lateraltranslucence/cera';
+import type { LoadContext, PageIssue, SearchResolver } from '@lateraltranslucence/cera';
+import type { SearchQuery, SearchSettings } from '@lateraltranslucence/cera/panels';
 import { contentTypes, routedTypes } from '../cera/index.ts';
 import { iconLibrary, liveIcons } from './icons.ts';
 import { publicClient, serviceClient } from './supabase.ts';
@@ -25,6 +26,19 @@ const liveLinkedPages = cacheLive('linked-pages', (ids: string[]) =>
   createPageResolver(publicClient(), contentTypes, { draft: false }).byIds(ids),
 );
 const liveForm = cacheLive('form', (id: string) => getLiveForm(publicClient(), id));
+// Search panels: their filter form and first results, cached like pages. The
+// cache keys on the settings and query, so they travel as JSON.
+const liveSearchForm = cacheLive('search-form', (settings: string) =>
+  createSearchResolver(publicClient(), contentTypes, { draft: false }).describe(JSON.parse(settings) as SearchSettings),
+);
+const liveSearchResults = cacheLive('search-results', (settings: string, query: string) =>
+  createSearchResolver(publicClient(), contentTypes, { draft: false }).run(JSON.parse(settings) as SearchSettings, JSON.parse(query) as SearchQuery),
+);
+const liveSearch: SearchResolver = {
+  endpoint: DEFAULT_SEARCH_ENDPOINT,
+  describe: (settings) => liveSearchForm(JSON.stringify(settings)),
+  run: (settings, query) => liveSearchResults(JSON.stringify(settings), JSON.stringify(query)),
+};
 
 /**
  * Loads the page at /[slug] for rendering, a landing page or a simple page
@@ -45,15 +59,21 @@ export const loadPage = cache(async (slug: string) => {
 });
 
 /**
- * How panels' `load` looks up linked pages, forms and icons: published ones
+ * How panels' `load` looks up linked pages, forms, icons and searches: published ones
  * for visitors (cached, like the pages themselves), working copies in
  * draft-mode preview (behind the draft-mode cookie, so the secret key is safe
  * to use there). Forms post to app/api/cera/forms.
  */
-export function loadContextFor(draft: boolean): Pick<LoadContext, 'pages' | 'forms' | 'icons' | 'draft'> {
+export function loadContextFor(draft: boolean): Pick<LoadContext, 'pages' | 'forms' | 'icons' | 'search' | 'draft'> {
   if (draft) {
     const client = serviceClient();
-    return { pages: createPageResolver(client, contentTypes, { draft }), forms: createFormResolver(client, { draft }), icons: iconLibrary(client, true), draft };
+    return {
+      pages: createPageResolver(client, contentTypes, { draft }),
+      forms: createFormResolver(client, { draft }),
+      icons: iconLibrary(client, true),
+      search: createSearchResolver(client, contentTypes, { draft }),
+      draft,
+    };
   }
-  return { pages: { byIds: (ids) => liveLinkedPages([...ids]) }, forms: { byId: liveForm, endpoint: DEFAULT_FORM_ENDPOINT }, icons: liveIcons, draft };
+  return { pages: { byIds: (ids) => liveLinkedPages([...ids]) }, forms: { byId: liveForm, endpoint: DEFAULT_FORM_ENDPOINT }, icons: liveIcons, search: liveSearch, draft };
 }

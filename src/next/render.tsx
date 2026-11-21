@@ -25,7 +25,7 @@ export interface PanelsProps<Type extends AnyContentType> {
    * Needed when any panel defines `load`: how to look up linked pages, and
    * whether this is a draft preview. Panels with `load` are skipped without it.
    */
-  loadContext?: Pick<LoadContext, 'pages' | 'draft' | 'forms' | 'icons'>;
+  loadContext?: Pick<LoadContext, 'pages' | 'draft' | 'forms' | 'icons' | 'search'>;
   /** Called when a panel's component or `load` fails. Defaults to console.error. */
   onError?: (error: unknown, panel: { id: string; type: string }) => void;
 }

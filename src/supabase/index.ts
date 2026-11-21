@@ -42,6 +42,7 @@ export {
   type Submission,
 } from './forms.ts';
 export { supabaseIcons } from './icons.ts';
+export { createSearchResolver, DEFAULT_SEARCH_ENDPOINT, searchableText, searchedTypes } from './search.ts';
 export { deleteMedia, finishMediaUpload, listMedia, MEDIA_BUCKET, mediaPathFor, mediaUsage, prepareMediaUpload, updateMedia } from './media.ts';
 export {
   CERA_ROLE_LABELS,

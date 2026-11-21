@@ -27,7 +27,7 @@ function Hero({ hero, fallbackTitle }: { hero: LandingPage['boxes']['hero']; fal
   );
 }
 
-export async function LandingPageView({ page, loadContext }: { page: LandingPage; loadContext: Pick<LoadContext, 'pages' | 'forms' | 'icons' | 'draft'> }) {
+export async function LandingPageView({ page, loadContext }: { page: LandingPage; loadContext: Pick<LoadContext, 'pages' | 'forms' | 'icons' | 'search' | 'draft'> }) {
   const jsonLd = jsonLdString(landingPage, page);
   return (
     <main className={page.boxes.admin.css || undefined}>
