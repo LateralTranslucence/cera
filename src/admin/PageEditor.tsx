@@ -22,7 +22,7 @@ import { Dialog } from './Dialog.tsx';
 import { FieldMapForm, IssueList, type FormContext } from './fields.tsx';
 import { GripIcon, Icon } from './icons.tsx';
 import { formatScheduled, formatWhen } from './PageList.tsx';
-import { duplicatePanel, humanize, issuesAt, moveItem, newPanel, panelName, panelSummary, removeItem, setIn, slugify } from './state.ts';
+import { duplicatePanel, humanize, issuesAt, moveItem, newPanel, panelName, removeItem, setIn, slugify } from './state.ts';
 
 export interface SaveInput {
   page: StoredPage;
@@ -549,9 +549,7 @@ export function PageEditor({
         {/* Page settings: title, address and the content type's boxes. */}
         <Card
           id={SETTINGS}
-          badge="Settings"
           name={`${Noun} settings`}
-          summary={<span className="cera-mono">{showSlug(page.slug)}</span>}
           open={open.has(SETTINGS) || settingsIssues.length > 0}
           onToggle={() => toggle(SETTINGS)}
           hasError={settingsIssues.some((issue) => issue.severity === 'error')}
@@ -629,7 +627,6 @@ export function PageEditor({
               lead
               badge={humanize(name)}
               name={panelName(undefined, data, humanize(name))}
-              summary={panelSummary(fields as FieldMap, data)}
               open={open.has(name) || boxIssues.length > 0}
               onToggle={() => toggle(name)}
               hasError={boxIssues.some((issue) => issue.severity === 'error')}
@@ -655,7 +652,6 @@ export function PageEditor({
                   onMove={move}
                   badge={def?.label ?? panel.type}
                   name={panelName(def, panel.data, panel.type)}
-                  summary={panelSummary(def?.fields, panel.data)}
                   hidden={panel.hidden}
                   open={!def || open.has(panel.id) || all.length > 0}
                   onToggle={() => toggle(panel.id)}
@@ -959,9 +955,9 @@ function StateLine({
 
 interface CardProps {
   id: string;
-  badge: string;
+  /** The pill before the name (a panel's type). Cards whose name says enough, like Page settings, have none. */
+  badge?: string;
   name: string;
-  summary?: ReactNode;
   open: boolean;
   onToggle: () => void;
   hasError?: boolean;
@@ -973,7 +969,7 @@ interface CardProps {
 }
 
 const Card = ({ ref, style, dragging, ...props }: CardProps & { ref?: (el: HTMLElement | null) => void; style?: CSSProperties; dragging?: boolean }) => {
-  const { id, badge, name, summary, open, onToggle, hasError, hidden, lead, actions, grip, children } = props;
+  const { id, badge, name, open, onToggle, hasError, hidden, lead, actions, grip, children } = props;
   const bodyId = `cera-panel-body-${id}`;
   return (
     <section
@@ -981,18 +977,18 @@ const Card = ({ ref, style, dragging, ...props }: CardProps & { ref?: (el: HTMLE
       style={style}
       id={`cera-panel-${id}`}
       className={`cera-panel-card${open ? ' is-open' : ''}${hidden ? ' is-hidden' : ''}${hasError ? ' has-error' : ''}${lead ? ' cera-panel-card--lead' : ''}${dragging ? ' is-dragging' : ''}`}
-      aria-label={`${badge}: ${name}`}
+      aria-label={badge ? `${badge}: ${name}` : name}
     >
       <div className="cera-panel-card__head">
         {grip ?? <span className="cera-grip-spacer" aria-hidden="true" />}
         <div className="cera-panel-card__label">
-          <span className={`cera-badge${open ? ' cera-badge--open' : ''}`}>{badge}</span>
+          {badge && <span className="cera-badge cera-badge--type">{badge}</span>}
           <span className="cera-panel-card__name">{name}</span>
-          {!open && summary && <span className="cera-panel-card__summary">{summary}</span>}
           {hidden && <span className="cera-tag">Hidden</span>}
         </div>
         <div className="cera-panel-card__actions">
-          {actions}
+          {/* The panel's tools (show/hide, duplicate, delete); at 600px and narrower they show only once the card is open (admin.css). */}
+          {actions && <span className="cera-panel-card__tools">{actions}</span>}
           <button
             type="button"
             className="cera-icon-button cera-panel-card__chevron"

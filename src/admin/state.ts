@@ -134,32 +134,6 @@ export function panelName(def: AnyPanel | undefined, data: Record<string, unknow
   return def?.label ?? type;
 }
 
-/**
- * One line about a folded panel: how many items its list fields hold ("3
- * blocks", "6 images"), or the start of its text. Empty when there's nothing
- * to say.
- */
-export function panelSummary(fields: FieldMap | undefined, data: Record<string, unknown>, max = 80): string {
-  if (!fields) return '';
-  const counts: string[] = [];
-  for (const [key, field] of Object.entries(fields)) {
-    const value = data[key];
-    if (!Array.isArray(value) || value.length === 0) continue;
-    if (!['repeater', 'gallery', 'relation', 'ctas'].includes(field.kind)) continue;
-    const noun = field.kind === 'gallery' ? 'image' : field.kind === 'relation' ? 'page' : field.kind === 'ctas' ? 'button' : (field.meta.label ?? humanize(key)).toLowerCase().replace(/s$/, '');
-    counts.push(`${value.length} ${noun}${value.length === 1 ? '' : 's'}`);
-  }
-  if (counts.length) return counts.join(', ');
-  for (const [key, field] of Object.entries(fields)) {
-    if (key === 'title' || !['html', 'textarea', 'text'].includes(field.kind)) continue;
-    const value = data[key];
-    if (typeof value !== 'string' || !value.trim()) continue;
-    const text = plainText(value);
-    return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
-  }
-  return '';
-}
-
 /** A copy of a panel with a new id, placed right after it. */
 export function duplicatePanel(list: readonly StoredPanel[], index: number, id = newId()): StoredPanel[] {
   const original = list[index];

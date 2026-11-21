@@ -53,22 +53,13 @@ test('slugify and humanize', () => {
   assert.equal(humanize('per_row'), 'Per row');
 });
 
-test('folded panels: a name from the title, a summary from list counts or the start of the text', async () => {
-  const { galleryFields } = await import('../src/panels/gallery.fields.ts');
-  const { textFields } = await import('../src/panels/text.fields.ts');
-  const { panelName, panelSummary } = await import('../src/admin/state.ts');
+test('folded panels: a name from the title, or the panel type when it has none', async () => {
+  const { panelName } = await import('../src/admin/state.ts');
 
   assert.equal(panelName(blocks, { title: 'What we <em>do</em>' }, 'cera/blocks'), 'What we do');
   assert.equal(panelName(blocks, { title: '  ' }, 'cera/blocks'), 'Blocks');
   assert.equal(panelName(undefined, {}, 'acme/unknown'), 'acme/unknown');
 
-  assert.equal(panelSummary(blocksFields, { blocks: [{}, {}, {}] }), '3 blocks');
-  assert.equal(panelSummary(galleryFields, { gallery: [{}] }), '1 image');
-  assert.equal(panelSummary(textFields, { ctas: [{}, {}] }), '2 buttons');
-  assert.equal(panelSummary(textFields, { copy: '<p>From the dazzling brilliance &amp; quiet&nbsp;mystery</p>' }), 'From the dazzling brilliance & quiet mystery');
-  assert.equal(panelSummary(textFields, { copy: `<p>${'word '.repeat(40)}</p>` }, 40).length, 40);
-  assert.equal(panelSummary(textFields, {}), '');
-  assert.equal(panelSummary(undefined, { anything: [1] }), '');
 });
 
 test('duplicatePanel puts a deep copy with a new id right after the original', async () => {
