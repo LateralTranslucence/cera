@@ -129,6 +129,18 @@ export function PageList({
             </button>
           ))}
         </div>
+        {/* The same filter as a select, shown instead of the buttons on narrow screens (admin.css). */}
+        <label className="cera-sort cera-list-toolbar__status">
+          <span className="cera-visually-hidden">Status</span>
+          <select value={filter} onChange={(e) => (setFilter(e.target.value as Filter), reset())}>
+            {FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label} · {counts[f.value]}
+              </option>
+            ))}
+          </select>
+          <Icon name="chevronDown" size={16} strokeWidth={2} />
+        </label>
         <label className="cera-sort">
           <span className="cera-visually-hidden">Sort by</span>
           <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
