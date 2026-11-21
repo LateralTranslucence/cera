@@ -147,6 +147,8 @@ export function PageEditor({
   onDeleted,
 }: PageEditorProps) {
   // What this content type calls itself and its panels ("page"/"panel", "form"/"field").
+  // Types that are never published (contentType.publishable: false) get a plain Save and no publishing controls.
+  const publishable = contentType.publishable !== false;
   const noun = contentType.editor?.noun ?? 'page';
   const nouns = contentType.editor?.nounPlural ?? `${noun}s`;
   const item = contentType.editor?.itemNoun ?? 'panel';
@@ -480,7 +482,7 @@ export function PageEditor({
         )}
         <div className="cera-topbar__title">
           <h1>{page.title || `Untitled ${noun}`}</h1>
-          <StateLine noun={noun} version={version} published={published} changes={changes} schedule={schedule} onCancelSchedule={!readOnly && onCancelSchedule ? cancelSchedule : undefined} />
+          <StateLine noun={noun} version={version} published={published} publishable={publishable} changes={changes} schedule={schedule} onCancelSchedule={!readOnly && onCancelSchedule ? cancelSchedule : undefined} />
         </div>
         <div className="cera-topbar__actions">
           {!readOnly && (
@@ -502,7 +504,12 @@ export function PageEditor({
               Preview
             </a>
           )}
-          {!readOnly && (
+          {!readOnly && !publishable && (
+            <button type="button" className="cera-button cera-button--lg cera-button--primary" disabled={saving || (!dirty && version > 0)} onClick={() => save('draft')}>
+              Save
+            </button>
+          )}
+          {!readOnly && publishable && (
             <>
               <button type="button" className="cera-button cera-button--lg cera-topbar__wide" disabled={saving || (!dirty && version > 0)} onClick={() => save('draft')}>
                 Save draft
@@ -516,15 +523,17 @@ export function PageEditor({
             </>
           )}
           {/* The other actions as one menu, shown instead of their buttons on narrow screens (admin.css). */}
-          <ActionsMenu
-            actions={[
-              ...(!readOnly ? [{ label: 'Save draft', disabled: saving || (!dirty && version > 0), onSelect: () => save('draft') }] : []),
-              ...(!readOnly && onCancelSchedule ? [{ label: 'Schedule', disabled: saving, onSelect: openSchedule }] : []),
-              ...(previewUrl ? [{ label: 'Preview', href: previewUrl }] : []),
-              ...(!readOnly && published && onUnpublish ? [{ label: 'Unpublish', danger: true, disabled: saving, onSelect: () => setDialog('unpublish') }] : []),
-            ]}
-          />
-          {!readOnly && (
+          {publishable && (
+            <ActionsMenu
+              actions={[
+                ...(!readOnly ? [{ label: 'Save draft', disabled: saving || (!dirty && version > 0), onSelect: () => save('draft') }] : []),
+                ...(!readOnly && onCancelSchedule ? [{ label: 'Schedule', disabled: saving, onSelect: openSchedule }] : []),
+                ...(previewUrl ? [{ label: 'Preview', href: previewUrl }] : []),
+                ...(!readOnly && published && onUnpublish ? [{ label: 'Unpublish', danger: true, disabled: saving, onSelect: () => setDialog('unpublish') }] : []),
+              ]}
+            />
+          )}
+          {!readOnly && publishable && (
             <button type="button" className="cera-button cera-button--lg cera-button--primary" disabled={saving || (published && !changes)} onClick={() => save('publish')}>
               {published ? 'Publish changes' : 'Publish'}
             </button>
@@ -899,6 +908,7 @@ function StateLine({
   noun,
   version,
   published,
+  publishable,
   changes,
   schedule,
   onCancelSchedule,
@@ -906,6 +916,7 @@ function StateLine({
   noun: string;
   version: number;
   published: boolean;
+  publishable: boolean;
   changes: boolean;
   schedule?: PageSchedule;
   onCancelSchedule?: () => void;
@@ -948,7 +959,7 @@ function StateLine({
   return (
     <span className="cera-state">
       <span className="cera-state__dot cera-state__dot--draft" aria-hidden="true" />
-      {version === 0 ? `New ${noun}, not saved yet` : 'Draft'}
+      {version === 0 ? `New ${noun}, not saved yet` : publishable ? 'Draft' : 'In the admin only'}
     </span>
   );
 }

@@ -2,7 +2,7 @@
 
 **For:** Claude Code
 **From:** LateralTranslucence
-**Status:** Working sketch. `npm run check` passes (typecheck plus 137 tests).
+**Status:** Working sketch. `npm run check` passes (typecheck plus 140 tests).
 
 ## Goal
 
@@ -98,8 +98,8 @@ supabase/
   migrations/…_cera_slug_scopes.sql   slug_scope on pages and revisions: slugs unique per scope (types sharing a route share one)
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
-    cera/           the landing_page and simple_page content types (both at /[slug], one slug scope), plus the
-                    package's form and icon types; it imports the package like a real site, and the library tests use it too
+    cera/           the landing_page and simple_page content types (both at /[slug], one slug scope), admin_page (team
+                    pages, read under Team in the admin, never published), plus the package's form (admins only) and icon types; it imports the package like a real site, and the library tests use it too
   sample-page.json  a stored page row
 test/
   types.test.ts     compile-time assertions on inferred types (Equal/Expect)
@@ -120,6 +120,7 @@ test/
   search.test.ts    Search: settings, URL queries, the resolver (words, A–Z, types, select lists, sort, paging, preview), the handler, the panel
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
   icons.test.ts     SVG cleaning, cleaning on save, Lucide search, Font Awesome packs, the library, custom icons, Blocks' icons
+  content-type-settings.test.ts  editRoles (canEditContentType), breadcrumbsFor, types that are never published
   simple-page.test.ts  slug scopes across types, findPublishedPage / findDraftPage, a simple page's metadata
   support/db.ts     PGlite (Postgres in-process, no Docker) with Supabase's roles stubbed, and a fake supabase-js client
 ```
@@ -178,6 +179,34 @@ test/
       - Imported locally: Developers Only (17 panels), Documentation (6 tab panels), Privacy Policy, and the Contact form.
       - Full rich text now allows definition lists (`dl`/`dt`/`dd`), as the theme's `wp_kses_post` did, so Documentation keeps them. The visual editor can't make them, so a field holding one opens in the HTML view (decision 27). Still dropped: layout `div`s, and code samples the theme stored as raw tags (`<Route>`), which WordPress didn't show either.
       - The import saves straight to the database, so the live site's cache (decision 25) shows imported changes within 5 minutes, or at once after anything is published in the admin.
+36. **The theme's content-type settings, reviewed** (decided 2026-11-20). Every key `DO_Custom_Post_Type::set_setting()` accepts:
+    - **Covered by Cera:**
+      - `post_title` / `post_name` → the built-in title and address.
+      - `slug`, `rest_slug`, `permalink` → `route` / `url`.
+      - `seo` → `seo`; `schema` → `jsonLd`; `noindex` → `seo.noindex`; `hide_field` → `hidden`.
+      - `character_count` / `notes` → a field's `maxLength` / `note`.
+      - `display_name` → `label`.
+      - `onsave_callback` / `aftersave_callback` → `hooks.beforeSave` / `afterSave`.
+      - `dynamic_interface` → panels.
+      - `post_content` / `post_excerpt` / `post_thumbnail` → no mirror columns: Search reads every field, and cards use `seo.description` / `seo.image`.
+      - `public` → whether a type has a `route`.
+    - **New:**
+      - `restrict_users` → `editRoles`. A type can name the roles allowed to create, edit, publish and delete its pages; `canEditContentType` checks it. The example's server actions enforce it on save, restore, delete, unpublish and cancel schedule. The admin hides New for those types and opens their pages read-only.
+      - Following the theme, the example limits forms and admin pages to admins. Editors still read submissions (decision 31).
+      - The database only knows admin and editor, so this is checked in the site's actions, like People.
+      - `breadcrumbs` → `breadcrumbs` (fixed crumbs before every page of the type) plus `pageBreadcrumbs` (a page's own, e.g. landing pages' Admin box). `breadcrumbsFor` builds the trail ending with the page itself, and the example site draws it on landing and simple pages.
+    - **Admin Pages** (from DO_Admin_Page / DO_Admin_Pages): the example's `admin_page` type.
+      - Fields: content; Permissions (who can read it: viewers and up, editors and admins, or admins only); Show In Menu; Menu Position; Menu Icon (from the admin's icons). The theme's PHP Template is dropped.
+      - Admin pages are never published: a new content-type option, `publishable: false`, makes `savePage` refuse publish and schedule, and the editor offers only Save. That's because published versions are readable by anyone.
+      - They're read under Team in the sidebar (`/admin/team/<slug>`) and managed by admins under Site → Admin Pages.
+      - Readers are limited by the admin's screens, not row-level security, as for other content.
+    - **Deferred:** `private_fields` (fields kept out of everything visitors can read), to be built with form email, when notification recipients arrive.
+    - **Dropped:**
+      - `archive_redirect` and `single_redirect`: stored but never used by the theme.
+      - `has_archive` and `orderby`: no archive pages; the Search and Posts panels replace them.
+      - `meta_prefix`, `bonus_fields`, `featured_field`, `post_file`: aliases for WordPress meta keys; Cera fields are typed JSON, and Featured Post picks pages directly.
+      - `comments`, `comment_status_callback`, `pre_form_callback`: WordPress features Cera doesn't have.
+      - `is_landing_page`, `menu_position`, `icon`, `show_in_menu`, `show_in_admin_bar`: the site's admin layout (its Shell) decides these.
 
 ## Pattern: keep fields in their own file
 
@@ -255,7 +284,7 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
    **Batch 2 done** (2026-11-20): accordion (WAI-ARIA accordion, one item open at a time), stats (numbers in the HTML, counted up on the client only when off screen at load and not for reduced motion) and gallery (a grid that opens images in a modal `<dialog>`, arrow keys between them), plus the admin's gallery picker (`GalleryInput`: upload several or drop them, pick several from the library, reorder, alt text per image). The theme's `accordion` and `stats` field types became repeaters. Differences: a gallery image's alt text doubles as its title (the theme had a separate title).
    **Posts done** (2026-11-20): cards for picked pages via `load` (like Featured Post: published, visible pages only on the live site, in the picked order), a per-row grid, and with Slider on and more pages than fit in a row, a scroll-snap row with Previous/Next buttons (`PostsSlider`). Not ported: “Modal”. The theme turned on its slider for more than three posts whatever the Slider field said; here the field decides.
    **Form done** (decision 31). **Search done** (decision 35): every theme panel now has a Cera panel.
-3. **Content-type parity.** Forms and submissions (decision 31), simple pages (decision 32) and icons (decision 33) are done. Left: decide which `settings()` keys still matter (e.g. `archive_redirect`, `restrict_users`, `menu_position`) and list the rest as intentionally dropped. Not yet for icons: Font Awesome on Developers Only itself (needs the Pro packages and token), and showing the save's "SVG cleaned" warning on a brand-new icon (the editor reloads at its new address after the first save, which drops save notes, as it does for rich text).
+3. **Content-type parity.** ✅ Forms and submissions (decision 31), simple pages (decision 32), icons (decision 33), admin pages and the `settings()` review (decision 36) are done. Left for later: private fields, with form email (decision 36). Not yet for icons: Font Awesome on Developers Only itself (needs the Pro packages and token), and showing the save's "SVG cleaned" warning on a brand-new icon (the editor reloads at its new address after the first save, which drops save notes, as it does for rich text).
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). "Restore revision" is done (decision 30). Still to do: pruning old draft revisions.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.
 6. **Next.js integration.** Started in A and B above. Still to do after them: per-panel error boundaries (a client component) and admin route handlers packaged in `./next`.

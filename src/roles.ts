@@ -15,6 +15,16 @@ export function isCeraRole(value: unknown): value is CeraRole {
   return typeof value === 'string' && (CERA_ROLES as readonly string[]).includes(value);
 }
 
+/**
+ * Whether someone with this role may create, edit, publish or delete pages
+ * of a content type: an admin or editor, and one the type's `editRoles`
+ * (theme: restrict_users) names, when it names any.
+ */
+export function canEditContentType(role: CeraRole | null | undefined, contentType: { editRoles?: readonly CeraRole[] }): boolean {
+  if (role !== 'admin' && role !== 'editor') return false;
+  return !contentType.editRoles || contentType.editRoles.includes(role);
+}
+
 /** An account as the Users page shows it. */
 export interface CeraUser {
   id: string;

@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import { AdminSidebar, type NavSection } from '@lateraltranslucence/cera/admin';
 import { listPages } from '@lateraltranslucence/cera/supabase';
+import { canEditContentType } from '@lateraltranslucence/cera';
 import { formType, iconType, landingPage, simplePage } from '@/cera';
+import { readableAdminPages } from '@/lib/admin-pages.ts';
 import { canEdit, canManagePeople, type Staff } from '@/lib/auth.ts';
 import { signOutAction } from './actions.ts';
 
-export type ShellSection = 'pages' | 'simple-pages' | 'forms' | 'submissions' | 'media' | 'icons' | 'people' | 'account';
+export type ShellSection = 'pages' | 'simple-pages' | 'forms' | 'submissions' | 'media' | 'icons' | 'admin-pages' | 'team' | 'people' | 'account';
 
 const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' } as const;
 
@@ -15,10 +17,25 @@ const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' } as con
  * main column. The lists and counts in the sidebar are read as the signed-in
  * user, like the screens they link to.
  */
-export async function Shell({ staff, active, currentPageId, children }: { staff: Staff; active?: ShellSection; currentPageId?: string; children: ReactNode }) {
-  const [pages, simplePages, forms, icons] = await Promise.all(
-    [landingPage, simplePage, formType, iconType].map((contentType) => listPages(staff.client, { contentType: contentType.name })),
-  );
+export async function Shell({
+  staff,
+  active,
+  currentPageId,
+  currentTeamSlug,
+  children,
+}: {
+  staff: Staff;
+  active?: ShellSection;
+  currentPageId?: string;
+  /** The admin page being read under Team. */
+  currentTeamSlug?: string;
+  children: ReactNode;
+}) {
+  const [[pages, simplePages, forms, icons], teamPages] = await Promise.all([
+    Promise.all([landingPage, simplePage, formType, iconType].map((contentType) => listPages(staff.client, { contentType: contentType.name }))),
+    readableAdminPages(staff),
+  ]);
+  const team = teamPages.filter((page) => page.boxes.settings.showInMenu);
   const sections: NavSection[] = [
     {
       label: 'Content',
@@ -31,7 +48,7 @@ export async function Shell({ staff, active, currentPageId, children }: { staff:
           count: pages!.length,
           expand: {
             defaultOpen: true,
-            ...(canEdit(staff.role) && { newHref: '/admin/pages/new', newLabel: 'New page' }),
+            ...(canEditContentType(staff.role, landingPage) && { newHref: '/admin/pages/new', newLabel: 'New page' }),
             items: pages!.map((page) => ({ label: page.title || 'Untitled', href: `/admin/pages/${page.id}`, current: page.id === currentPageId })),
           },
         },
@@ -48,7 +65,26 @@ export async function Shell({ staff, active, currentPageId, children }: { staff:
         { label: 'Icons', href: '/admin/icons', icon: 'shapes', active: active === 'icons', count: icons!.length },
       ],
     },
-    ...(canManagePeople(staff.role) ? [{ label: 'Site', items: [{ label: 'People', href: '/admin/users', icon: 'people' as const, active: active === 'people' }] }] : []),
+    // Admin pages, to read (theme: DO_Admin_Pages adds them to wp-admin's menu).
+    ...(team.length > 0
+      ? [
+          {
+            label: 'Team',
+            items: team.map((page) => ({ label: page.title, href: `/admin/team/${page.slug}`, icon: page.boxes.settings.menuIcon, active: active === 'team' && currentTeamSlug === page.slug })),
+          },
+        ]
+      : []),
+    ...(canManagePeople(staff.role)
+      ? [
+          {
+            label: 'Site',
+            items: [
+              { label: 'People', href: '/admin/users', icon: 'people' as const, active: active === 'people' },
+              { label: 'Admin Pages', href: '/admin/admin-pages', icon: 'settings' as const, active: active === 'admin-pages' },
+            ],
+          },
+        ]
+      : []),
   ];
 
   return (

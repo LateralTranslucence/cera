@@ -374,6 +374,24 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
   .cera-admin .cera-list-toolbar .cera-sort select { width: 100%; }
 }
 .cera-card { background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+/* Rich text to read in the admin (admin pages under Team): a comfortable column. */
+.cera-prose { max-width: 760px; padding: 28px 32px; font-size: 16px; line-height: 26px; overflow-wrap: anywhere; }
+@media (max-width: 720px) { .cera-prose { padding: 20px; } }
+.cera-prose > :first-child { margin-top: 0; }
+.cera-prose > :last-child { margin-bottom: 0; }
+.cera-prose :is(p, ul, ol, dl, blockquote, pre, table, figure) { margin: 0 0 16px; }
+.cera-prose :is(h2, h3, h4, h5, h6) { margin: 28px 0 10px; font-weight: 600; }
+.cera-prose h2 { font: 500 26px/32px var(--font-display); font-variation-settings: var(--display-settings); }
+.cera-prose h3 { font-size: 19px; line-height: 26px; }
+.cera-prose :is(ul, ol) { padding-left: 24px; }
+.cera-prose dt { margin-top: 12px; font-weight: 600; }
+.cera-prose dd { margin: 4px 0 0; }
+.cera-prose blockquote { padding-left: 16px; border-left: 3px solid var(--line-strong); color: var(--ink-muted); }
+.cera-prose :is(code, pre) { font-family: var(--font-mono); font-size: 0.9em; }
+.cera-prose pre { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-sunken); overflow-x: auto; }
+.cera-prose img { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+.cera-prose table { border-collapse: collapse; }
+.cera-prose :is(th, td) { padding: 6px 10px; border: 1px solid var(--line); text-align: left; }
 .cera-table-wrap { overflow-x: auto; }
 .cera-table { width: 100%; min-width: 760px; border-collapse: collapse; }
 .cera-table th { padding: 14px 16px; text-align: left; font: 600 12px/16px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted); white-space: nowrap; }

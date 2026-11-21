@@ -58,6 +58,9 @@ export const landingPage = defineContentType({
 
   hidden: (page) => page.boxes.admin.hidden,
 
+  // Each page's own breadcrumbs (the Admin box), after the type's (none here).
+  pageBreadcrumbs: (page) => page.boxes.admin.breadcrumbs.map((crumb) => ({ text: crumb.text ?? '', url: crumb.url ?? '' })),
+
   hooks: {
     // theme: DO_Landing_Page::onsave()
     beforeSave: (page) => (page.slug === 'home' ? { ...page, title: 'Home' } : page),

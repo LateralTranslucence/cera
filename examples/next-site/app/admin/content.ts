@@ -8,6 +8,7 @@ export const ADMIN_PLACES = {
   simple_page: { section: 'simple-pages', list: '/admin/simple-pages', base: '/admin/simple-pages', title: 'Simple Pages', noun: 'page' },
   cera_form: { section: 'forms', list: '/admin/forms', base: '/admin/forms', title: 'Forms', noun: 'form' },
   cera_icon: { section: 'icons', list: '/admin/icons', base: '/admin/icons', title: 'Icons', noun: 'icon' },
+  admin_page: { section: 'admin-pages', list: '/admin/admin-pages', base: '/admin/admin-pages', title: 'Admin Pages', noun: 'admin page' },
 } as const;
 
 export type AdminPlace = (typeof ADMIN_PLACES)[keyof typeof ADMIN_PLACES];

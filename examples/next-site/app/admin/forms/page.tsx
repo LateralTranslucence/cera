@@ -1,6 +1,7 @@
 import { listPages, submissionCounts } from '@lateraltranslucence/cera/supabase';
 import { Icon } from '@lateraltranslucence/cera/admin';
 import { formType } from '@/cera';
+import { canEditContentType } from '@lateraltranslucence/cera';
 import { canEdit, requireStaff } from '@/lib/auth.ts';
 import { Shell } from '../Shell.tsx';
 import { FormListClient } from './FormListClient.tsx';
@@ -22,7 +23,7 @@ export default async function FormsPage({ searchParams }: { searchParams: Promis
             <p className="cera-breadcrumb">Content</p>
             <h1 className="cera-screen__title">Forms</h1>
           </div>
-          {canEdit(staff.role) && (
+          {canEditContentType(staff.role, formType) && (
             <a className="cera-button cera-button--primary cera-button--lg" href="/admin/forms/new">
               <Icon name="plus" size={18} strokeWidth={2} />
               New form

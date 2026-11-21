@@ -1,6 +1,7 @@
 'use server';
 import { redirect } from 'next/navigation';
-import type { CeraRole, MediaDeleteResult, MediaItem, MediaQuery, MediaUpdate, MediaUse, MediaUploadDone, MediaUploadPrepared, MediaUploadRequest, MediaUploadResult } from '@lateraltranslucence/cera';
+import { canEditContentType } from '@lateraltranslucence/cera';
+import type { AnyContentType, CeraRole, MediaDeleteResult, MediaItem, MediaQuery, MediaUpdate, MediaUse, MediaUploadDone, MediaUploadPrepared, MediaUploadRequest, MediaUploadResult } from '@lateraltranslucence/cera';
 import type { PageOption, PageQuery, SaveInput } from '@lateraltranslucence/cera/admin';
 import {
   cancelSchedule,
@@ -35,17 +36,29 @@ import { pagesChanged } from '@lateraltranslucence/cera/next/cache';
 import { requireStaff, userClient } from '@/lib/auth.ts';
 import { serviceClient } from '@/lib/supabase.ts';
 
+/** Why someone can't change pages of a type limited to other roles (a content type's editRoles). */
+function notYours(contentType: AnyContentType): string {
+  return `Only ${(contentType.editRoles ?? []).map((role: CeraRole) => `${role}s`).join(' and ')} can change ${contentType.label.toLowerCase()} pages.`;
+}
+
+/** The content type of a stored page, read as the signed-in user; null for an unknown page or type. */
+async function contentTypeOfPage(staff: Awaited<ReturnType<typeof requireStaff>>, pageId: string): Promise<AnyContentType | null> {
+  const { data } = await staff.client.from('cera_pages').select('content_type').eq('id', pageId).maybeSingle();
+  return contentTypes.find((candidate) => candidate.name === (data as { content_type?: string } | null)?.content_type) ?? null;
+}
+
 /**
  * Saves or publishes a page. The user id comes from the verified session,
  * never from the request; `savePage` validates, and the database re-checks
  * the user's role.
  */
 export async function savePageAction(input: SaveInput): Promise<SaveResult> {
-  const { user } = await requireStaff('editor');
+  const { user, role } = await requireStaff('editor');
   const contentType = contentTypes.find((candidate) => candidate.name === input.page?.contentType);
   if (!contentType) {
     return { ok: false, reason: 'invalid', issues: [{ severity: 'error', code: 'invalid-page', path: ['contentType'], message: 'Unknown content type.' }] };
   }
+  if (!canEditContentType(role, contentType)) return { ok: false, reason: 'forbidden', message: notYours(contentType), issues: [] };
   const result = await savePage(serviceClient(), contentType, input.page, { mode: input.mode, publishAt: input.publishAt, expectedVersion: input.expectedVersion, userId: user.id });
   // Publishing changes the live site; a draft save doesn't, so it keeps the cache.
   if (result.ok && input.mode === 'publish') pagesChanged();
@@ -92,7 +105,10 @@ export async function getIconsAction(values: string[]): Promise<IconGlyph[]> {
 }
 
 export async function unpublishPageAction(pageId: string): Promise<void> {
-  const { user } = await requireStaff('editor');
+  const staff = await requireStaff('editor');
+  const contentType = await contentTypeOfPage(staff, pageId);
+  if (!contentType || !canEditContentType(staff.role, contentType)) throw new Error(contentType ? notYours(contentType) : 'Page not found.');
+  const { user } = staff;
   await unpublishPage(serviceClient(), pageId, user.id);
   pagesChanged();
 }
@@ -103,7 +119,10 @@ export async function unpublishPageAction(pageId: string): Promise<void> {
  * when due, and the cached live page catches up within its revalidate time.
  */
 export async function cancelScheduleAction(pageId: string): Promise<void> {
-  const { user } = await requireStaff('editor');
+  const staff = await requireStaff('editor');
+  const contentType = await contentTypeOfPage(staff, pageId);
+  if (!contentType || !canEditContentType(staff.role, contentType)) throw new Error(contentType ? notYours(contentType) : 'Page not found.');
+  const { user } = staff;
   await cancelSchedule(serviceClient(), pageId, user.id);
 }
 
@@ -112,7 +131,11 @@ export async function cancelScheduleAction(pageId: string): Promise<void> {
  * the live site changes and the page cache stays.
  */
 export async function deletePageAction(input: { pageId: string; expectedVersion: number }): Promise<DeletePageResult> {
-  const { user } = await requireStaff('editor');
+  const staff = await requireStaff('editor');
+  const contentType = await contentTypeOfPage(staff, input.pageId);
+  if (!contentType) return { ok: false, reason: 'not-found', message: 'Page not found.' };
+  if (!canEditContentType(staff.role, contentType)) return { ok: false, reason: 'forbidden', message: notYours(contentType) };
+  const { user } = staff;
   return deletePage(serviceClient(), input.pageId, { expectedVersion: input.expectedVersion, userId: user.id });
 }
 
@@ -130,9 +153,11 @@ export async function pageHistoryAction(input: { pageId: string; before?: number
 
 /** Restores an old version as a new draft. Drafts don't change the live site, so the cache stays. */
 export async function restoreRevisionAction(input: { pageId: string; contentType: string; version: number; expectedVersion: number }): Promise<SaveResult> {
-  const { user } = await requireStaff('editor');
+  const { user, role } = await requireStaff('editor');
+  // restoreRevision checks that the page really is this type.
   const contentType = contentTypes.find((candidate) => candidate.name === input.contentType);
   if (!contentType) return { ok: false, reason: 'not-found', message: 'Unknown content type.', issues: [] };
+  if (!canEditContentType(role, contentType)) return { ok: false, reason: 'forbidden', message: notYours(contentType), issues: [] };
   return restoreRevision(serviceClient(), contentType, input.pageId, input.version, { expectedVersion: input.expectedVersion, userId: user.id });
 }
 
