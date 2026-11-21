@@ -145,6 +145,8 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 
 .cera-app { display: flex; flex-wrap: wrap; min-height: 100vh; }
 .cera-sidebar { flex: 1 1 232px; display: flex; flex-direction: column; gap: 24px; padding: 24px 16px; border-right: 1px solid var(--line); background: var(--surface); }
+/* Sections and the person: the part that becomes the menu when the rail is too short (AdminSidebar). */
+.cera-sidebar__body { flex: 1; display: flex; flex-direction: column; gap: 24px; min-height: 0; }
 .cera-app__main { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; }
 
 .cera-lockup { display: inline-flex; align-items: center; gap: 10px; padding: 4px 8px; color: var(--ink) !important; text-decoration: none; }
@@ -195,7 +197,9 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
    lines, and expandable items' lists are hidden. */
 @media (max-width: 900px) {
   .cera-app { flex-wrap: nowrap; }
-  .cera-sidebar { flex: none; width: 56px; gap: 16px; padding: 20px 6px; }
+  /* The rail stays on screen while the page scrolls, above the main column (and its sticky top bar), so its tooltips and menu do too. */
+  .cera-sidebar { flex: none; align-self: flex-start; position: sticky; z-index: 20; top: 0; width: 56px; height: 100vh; height: 100dvh; gap: 16px; padding: 20px 6px; overflow: hidden; }
+  .cera-sidebar__body { gap: 16px; }
   .cera-sidebar .cera-lockup { justify-content: center; padding: 4px 0; }
   .cera-lockup__name, .cera-nav__toggle, .cera-nav__sub { display: none; }
   .cera-nav__label, .cera-nav__text, .cera-nav__count, .cera-user__text {
@@ -213,6 +217,36 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
   .cera-nav__link:is(:hover, :focus-visible) .cera-nav__tip,
   .cera-user__button:is(:hover, :focus-visible)[aria-expanded='false'] .cera-nav__tip { visibility: visible; }
 }
+
+/*
+ * Too short for the whole rail (AdminSidebar adds .is-compact): the rail
+ * keeps the seal and a menu button. The menu stays laid out at rail size
+ * but hidden, so the sidebar can tell when the screen is tall enough again;
+ * opened (.is-open), it's a panel beside the rail with the full labels.
+ */
+.cera-sidebar__menu-button { display: flex; align-items: center; justify-content: center; flex: none; width: 100%; height: 40px; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--ink); cursor: pointer; }
+.cera-sidebar__menu-button:hover { background: var(--surface-sunken); }
+.cera-sidebar__menu-button[aria-expanded='true'] { background: var(--honey-soft); }
+.cera-sidebar.is-compact:not(.is-open) .cera-sidebar__body { position: absolute; top: 0; left: 0; width: 56px; padding: 0 6px; visibility: hidden; pointer-events: none; }
+.cera-sidebar.is-open { overflow: visible; }
+.cera-sidebar.is-open .cera-sidebar__body {
+  position: fixed; top: 0; bottom: 0; left: 56px; width: min(280px, calc(100vw - 56px));
+  padding: 20px 16px; gap: 24px; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface); border-right: 1px solid var(--line); box-shadow: 8px 0 24px rgb(0 0 0 / 0.18);
+}
+.cera-sidebar.is-open :is(.cera-nav__label, .cera-nav__text, .cera-nav__count, .cera-user__text) {
+  position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal;
+}
+.cera-sidebar.is-open .cera-nav__label { margin: 0; padding: 0 12px 6px; }
+.cera-sidebar.is-open .cera-nav__count { margin: 0 0 0 auto; }
+.cera-sidebar.is-open .cera-user__text { margin: 0; }
+.cera-sidebar.is-open .cera-nav__section + .cera-nav__section { padding-top: 0; border-top: 0; }
+.cera-sidebar.is-open .cera-nav__toggle { display: flex; }
+.cera-sidebar.is-open .cera-nav__sub { display: block; }
+.cera-admin .cera-sidebar.is-open a.cera-nav__link { justify-content: flex-start; padding: 0 12px; }
+.cera-sidebar.is-open .cera-user__button { justify-content: flex-start; padding: 8px 12px; }
+.cera-sidebar.is-open .cera-user .cera-menu { right: 0; width: auto; }
+.cera-sidebar.is-open .cera-nav__tip { display: none; }
 
 /* Screens that aren't the editor: a padded column. */
 .cera-screen { width: 100%; max-width: calc(1120px + 96px); padding: 40px 48px 48px; display: flex; flex-direction: column; gap: 24px; }
