@@ -33,11 +33,11 @@ export function GalleryClient({ images }: { images: GalleryImage[] }) {
   return (
     <>
       <ul className="gallery">
-        {images.map((img, i) => (
-          <li key={img.key}>
+        {images.map((image, i) => (
+          <li key={image.key}>
             <button type="button" className="gallery__open" onClick={() => open(i)}>
-              <img src={img.src} alt="" width={img.width} height={img.height} loading="lazy" />
-              <span className="visually-hidden">{img.alt ? `Open: ${img.alt}` : `Open image ${i + 1}`}</span>
+              <img src={image.src} alt="" width={image.width} height={image.height} loading="lazy" />
+              <span className="visually-hidden">{image.alt ? `Open: ${image.alt}` : `Open image ${i + 1}`}</span>
             </button>
           </li>
         ))}

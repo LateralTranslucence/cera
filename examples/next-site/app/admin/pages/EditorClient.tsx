@@ -50,15 +50,15 @@ export function EditorClient({
   readOnly: boolean;
 }) {
   const router = useRouter();
-  const ct = contentTypes.find((contentType) => contentType.name === page.contentType);
+  const contentType = contentTypes.find((candidate) => candidate.name === page.contentType);
   // Each type has its own list and editor path (app/admin/content.ts).
   const { list, base, title, noun } = placeOf(page.contentType);
-  if (!ct) return <p className="cera-status cera-status--error">This site has no content type “{page.contentType}”.</p>;
+  if (!contentType) return <p className="cera-status cera-status--error">This site has no content type “{page.contentType}”.</p>;
 
   return (
     <PageEditor
-      contentType={ct}
-      contentTypes={contentTypes.map((contentType) => ({ name: contentType.name, label: contentType.label, public: Boolean(contentType.route) }))}
+      contentType={contentType}
+      contentTypes={contentTypes.map((type) => ({ name: type.name, label: type.label, public: Boolean(type.route) }))}
       page={page}
       version={version}
       published={published}
@@ -89,7 +89,7 @@ export function EditorClient({
       onDeleted={() => router.replace(`${list}?deleted=${encodeURIComponent(page.title || `Untitled ${noun}`)}`)}
       backHref={list}
       backLabel={title}
-      {...(ct.route && { previewHref: (slug: string) => `/admin/preview?slug=${encodeURIComponent(slug)}` })}
+      {...(contentType.route && { previewHref: (slug: string) => `/admin/preview?slug=${encodeURIComponent(slug)}` })}
     />
   );
 }

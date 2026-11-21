@@ -75,8 +75,8 @@ function toStored(id: string, row: PageRow): StoredPage {
 export { CeraDatabaseError };
 
 /** The page as the save functions take it: with its content type's address scope (see `slugScope`). */
-function forRpc(ct: AnyContentType, page: StoredPage) {
-  return { ...page, slugScope: ct.slugScope ?? ct.name };
+function forRpc(contentType: AnyContentType, page: StoredPage) {
+  return { ...page, slugScope: contentType.slugScope ?? contentType.name };
 }
 
 /* ------------------------------------------------------------------ */
@@ -86,40 +86,40 @@ function forRpc(ct: AnyContentType, page: StoredPage) {
 /** The live version of a page, for the public site. `null` if there is none. */
 export async function getPublishedPage<Type extends AnyContentType>(
   client: SupabaseClient,
-  ct: Type,
+  contentType: Type,
   slug: string,
-  opts: Omit<ReadOptions, 'status'> = {},
+  options: Omit<ReadOptions, 'status'> = {},
 ): Promise<ReadResult<PageOf<Type>> | null> {
   const { data, error } = await client
     .from('cera_page_revisions')
     .select(`page_id, ${PAGE_COLUMNS}`)
-    .eq('content_type', ct.name)
+    .eq('content_type', contentType.name)
     .eq('slug', slug)
     .eq('is_published', true)
     .maybeSingle();
   if (error) fail(error);
   if (!data) return null;
   const row = data as PageRow & { page_id: string };
-  return readPage(ct, toStored(row.page_id, row), { ...opts, status: 'published' });
+  return readPage(contentType, toStored(row.page_id, row), { ...options, status: 'published' });
 }
 
 /** The working copy by slug, typed for rendering. For draft-mode preview. */
 export async function getDraftPage<Type extends AnyContentType>(
   client: SupabaseClient,
-  ct: Type,
+  contentType: Type,
   slug: string,
-  opts: Omit<ReadOptions, 'status'> = {},
+  options: Omit<ReadOptions, 'status'> = {},
 ): Promise<ReadResult<PageOf<Type>> | null> {
   const { data, error } = await client
     .from('cera_pages')
     .select(`id, ${PAGE_COLUMNS}`)
-    .eq('content_type', ct.name)
+    .eq('content_type', contentType.name)
     .eq('slug', slug)
     .maybeSingle();
   if (error) fail(error);
   if (!data) return null;
   const row = data as PageRow & { id: string };
-  return readPage(ct, toStored(row.id, row), { ...opts, status: 'draft' });
+  return readPage(contentType, toStored(row.id, row), { ...options, status: 'draft' });
 }
 
 /** A page found among several content types; `type` names which one it is. */
@@ -134,12 +134,12 @@ export async function findPublishedPage<const Types extends readonly AnyContentT
   client: SupabaseClient,
   contentTypes: Types,
   slug: string,
-  opts: Omit<ReadOptions, 'status'> = {},
+  options: Omit<ReadOptions, 'status'> = {},
 ): Promise<FoundPage<Types[number]> | null> {
   const { data, error } = await client
     .from('cera_page_revisions')
     .select(`page_id, ${PAGE_COLUMNS}`)
-    .in('content_type', contentTypes.map((ct) => ct.name))
+    .in('content_type', contentTypes.map((type) => type.name))
     .eq('slug', slug)
     .eq('is_published', true)
     .limit(1)
@@ -147,8 +147,8 @@ export async function findPublishedPage<const Types extends readonly AnyContentT
   if (error) fail(error);
   if (!data) return null;
   const row = data as PageRow & { page_id: string };
-  const ct = contentTypes.find((contentType) => contentType.name === row.content_type)!;
-  return { ...readPage(ct, toStored(row.page_id, row), { ...opts, status: 'published' }), type: ct.name } as FoundPage<Types[number]>;
+  const contentType = contentTypes.find((candidate) => candidate.name === row.content_type)!;
+  return { ...readPage(contentType, toStored(row.page_id, row), { ...options, status: 'published' }), type: contentType.name } as FoundPage<Types[number]>;
 }
 
 /** Like `findPublishedPage`, for the working copies (draft-mode preview). */
@@ -156,20 +156,20 @@ export async function findDraftPage<const Types extends readonly AnyContentType[
   client: SupabaseClient,
   contentTypes: Types,
   slug: string,
-  opts: Omit<ReadOptions, 'status'> = {},
+  options: Omit<ReadOptions, 'status'> = {},
 ): Promise<FoundPage<Types[number]> | null> {
   const { data, error } = await client
     .from('cera_pages')
     .select(`id, ${PAGE_COLUMNS}`)
-    .in('content_type', contentTypes.map((ct) => ct.name))
+    .in('content_type', contentTypes.map((type) => type.name))
     .eq('slug', slug)
     .limit(1)
     .maybeSingle();
   if (error) fail(error);
   if (!data) return null;
   const row = data as PageRow & { id: string };
-  const ct = contentTypes.find((contentType) => contentType.name === row.content_type)!;
-  return { ...readPage(ct, toStored(row.id, row), { ...opts, status: 'draft' }), type: ct.name } as FoundPage<Types[number]>;
+  const contentType = contentTypes.find((candidate) => candidate.name === row.content_type)!;
+  return { ...readPage(contentType, toStored(row.id, row), { ...options, status: 'draft' }), type: contentType.name } as FoundPage<Types[number]>;
 }
 
 export interface EditablePage {
@@ -198,11 +198,11 @@ export interface PageSchedule {
  * The working copy for the admin. Deliberately *not* run through `readPage`:
  * the editor must receive everything, so a save can't drop what it never saw.
  */
-export async function getPageForEditing(client: SupabaseClient, ct: AnyContentType, id: string): Promise<EditablePage | null> {
+export async function getPageForEditing(client: SupabaseClient, contentType: AnyContentType, id: string): Promise<EditablePage | null> {
   const { data, error } = await client
     .from('cera_pages')
     .select(`id, version, updated_at, ${PAGE_COLUMNS}`)
-    .eq('content_type', ct.name)
+    .eq('content_type', contentType.name)
     .eq('id', id)
     .maybeSingle();
   if (error) fail(error);
@@ -220,7 +220,7 @@ export async function getPageForEditing(client: SupabaseClient, ct: AnyContentTy
     .eq('schedule_status', 'pending')
     .maybeSingle();
   if (pending.error) fail(pending.error);
-  const sched = pending.data as { page_version: number; scheduled_for: string } | null;
+  const schedule = pending.data as { page_version: number; scheduled_for: string } | null;
 
   return {
     page: toStored(row.id, row),
@@ -229,7 +229,7 @@ export async function getPageForEditing(client: SupabaseClient, ct: AnyContentTy
     liveVersion: liveRow?.page_version,
     unpublishedChanges: liveRow !== null && content(liveRow) !== content(row),
     updatedAt: row.updated_at,
-    ...(sched && { schedule: { at: sched.scheduled_for, version: sched.page_version } }),
+    ...(schedule && { schedule: { at: schedule.scheduled_for, version: schedule.page_version } }),
   };
 }
 
@@ -244,13 +244,13 @@ export async function getPageForEditing(client: SupabaseClient, ct: AnyContentTy
  *
  * Pages whose content type isn't in `contentTypes` are skipped.
  */
-export function createPageResolver(client: SupabaseClient, contentTypes: readonly AnyContentType[], opts: { draft: boolean }): PageResolver {
-  const byName = new Map(contentTypes.map((ct) => [ct.name as string, ct]));
+export function createPageResolver(client: SupabaseClient, contentTypes: readonly AnyContentType[], options: { draft: boolean }): PageResolver {
+  const byName = new Map(contentTypes.map((contentType) => [contentType.name as string, contentType]));
   return {
     async byIds(ids) {
       const wanted = [...new Set(ids)].filter((id) => UUID.test(id));
       if (wanted.length === 0) return [];
-      const { data, error } = opts.draft
+      const { data, error } = options.draft
         ? await client.from('cera_pages').select(`id, ${PAGE_COLUMNS}`).in('id', wanted)
         : await client.from('cera_page_revisions').select(`page_id, ${PAGE_COLUMNS}`).in('page_id', wanted).eq('is_published', true);
       if (error) fail(error);
@@ -258,19 +258,19 @@ export function createPageResolver(client: SupabaseClient, contentTypes: readonl
       const found = new Map<string, LinkedPage>();
       for (const row of data as Array<PageRow & { id?: string; page_id?: string }>) {
         const id = (row.page_id ?? row.id) as string;
-        const ct = byName.get(row.content_type);
-        if (!ct) continue;
-        const { page } = readPage(ct, toStored(id, row), { status: opts.draft ? 'draft' : 'published' });
-        if (!opts.draft && ct.hidden?.(page)) continue;
+        const contentType = byName.get(row.content_type);
+        if (!contentType) continue;
+        const { page } = readPage(contentType, toStored(id, row), { status: options.draft ? 'draft' : 'published' });
+        if (!options.draft && contentType.hidden?.(page)) continue;
         found.set(id, {
           id,
-          contentType: ct.name,
-          contentTypeLabel: ct.label,
+          contentType: contentType.name,
+          contentTypeLabel: contentType.label,
           slug: page.slug,
           title: page.title,
-          url: pageUrl(ct, page),
-          description: ct.seo?.description?.(page) || undefined,
-          image: ct.seo?.image?.(page),
+          url: pageUrl(contentType, page),
+          description: contentType.seo?.description?.(page) || undefined,
+          image: contentType.seo?.image?.(page),
         });
       }
       return ids.map((id) => found.get(id)).filter((linkedPage): linkedPage is LinkedPage => linkedPage !== undefined);
@@ -315,8 +315,8 @@ type SummaryRow = {
 };
 
 /** Working copies for the admin's page list, sorted by title. Staff client (row-level security). */
-export async function listPages(client: SupabaseClient, opts: { contentType?: string } = {}): Promise<PageSummary[]> {
-  const { data, error } = await client.rpc('cera_page_summaries', { p_content_type: opts.contentType ?? null });
+export async function listPages(client: SupabaseClient, options: { contentType?: string } = {}): Promise<PageSummary[]> {
+  const { data, error } = await client.rpc('cera_page_summaries', { p_content_type: options.contentType ?? null });
   if (error) fail(error);
   return ((data as SummaryRow[] | null) ?? [])
     .map((row) => ({
@@ -372,38 +372,38 @@ const REASONS: Record<string, 'conflict' | 'forbidden' | 'not-found' | 'slug-tak
  */
 export async function savePage<Type extends AnyContentType>(
   client: SupabaseClient,
-  ct: Type,
+  contentType: Type,
   raw: unknown,
-  opts: SaveOptions,
+  options: SaveOptions,
 ): Promise<SaveResult> {
-  const schedule = opts.mode === 'schedule';
-  const publishAt = schedule ? new Date(String(opts.publishAt ?? '')) : null;
+  const schedule = options.mode === 'schedule';
+  const publishAt = schedule ? new Date(String(options.publishAt ?? '')) : null;
   if (publishAt && (Number.isNaN(publishAt.getTime()) || publishAt.getTime() <= Date.now())) {
     return { ok: false, reason: 'bad-time', message: 'Pick a time in the future.', issues: [] };
   }
   // A scheduled version must be ready to go live, so it's checked like a publish.
-  const prepared = await preparePageForSave(ct, raw, { mode: schedule ? 'publish' : (opts.mode as SaveMode) });
+  const prepared = await preparePageForSave(contentType, raw, { mode: schedule ? 'publish' : (options.mode as SaveMode) });
   if (!prepared.ok) return { ok: false, reason: 'invalid', issues: prepared.issues };
 
   const { data, error } = publishAt
     ? await client.rpc('cera_schedule_page', {
-        p_page: forRpc(ct, prepared.page),
-        p_expected_version: opts.expectedVersion,
+        p_page: forRpc(contentType, prepared.page),
+        p_expected_version: options.expectedVersion,
         p_publish_at: publishAt.toISOString(),
-        p_user: opts.userId,
+        p_user: options.userId,
       })
     : await client.rpc('cera_save_page', {
-        p_page: forRpc(ct, prepared.page),
-        p_expected_version: opts.expectedVersion,
-        p_publish: opts.mode === 'publish',
-        p_user: opts.userId,
+        p_page: forRpc(contentType, prepared.page),
+        p_expected_version: options.expectedVersion,
+        p_publish: options.mode === 'publish',
+        p_user: options.userId,
       });
-  return finishSave(ct, prepared, data, error, opts.mode === 'publish' ? 'published' : 'draft');
+  return finishSave(contentType, prepared, data, error, options.mode === 'publish' ? 'published' : 'draft');
 }
 
 /** Maps a save rpc's outcome to a SaveResult and runs the content type's `afterSave`. */
 async function finishSave(
-  ct: AnyContentType,
+  contentType: AnyContentType,
   prepared: { page: StoredPage; issues: PageIssue[] },
   data: unknown,
   error: { code?: string; message: string } | null,
@@ -416,10 +416,10 @@ async function finishSave(
   }
   const saved = data as { id: string; version: number; revisionId: string };
 
-  const afterSave = ct.hooks?.afterSave;
+  const afterSave = contentType.hooks?.afterSave;
   if (afterSave) {
     try {
-      const { page } = readPage(ct, prepared.page, { status });
+      const { page } = readPage(contentType, prepared.page, { status });
       await afterSave(page);
     } catch (hookError) {
       console.error(`cera: afterSave failed for page ${saved.id}`, hookError);
@@ -480,8 +480,8 @@ const DELETE_REASONS: Record<string, 'live' | 'conflict' | 'forbidden' | 'not-fo
  * Pages linking to it stop showing it; check `pageLinks` first to warn.
  * Service-role client only (see top of file).
  */
-export async function deletePage(client: SupabaseClient, pageId: string, opts: { expectedVersion: number; userId: string }): Promise<DeletePageResult> {
-  const { data, error } = await client.rpc('cera_delete_page', { p_page_id: pageId, p_expected_version: opts.expectedVersion, p_user: opts.userId });
+export async function deletePage(client: SupabaseClient, pageId: string, options: { expectedVersion: number; userId: string }): Promise<DeletePageResult> {
+  const { data, error } = await client.rpc('cera_delete_page', { p_page_id: pageId, p_expected_version: options.expectedVersion, p_user: options.userId });
   if (error) {
     const reason = error.code ? DELETE_REASONS[error.code] : undefined;
     if (reason) return { ok: false, reason, message: error.message };
@@ -545,8 +545,8 @@ type HistoryRow = {
  * A page's saved versions, newest first: `limit` of them (default 30, at most
  * 100), older than version `before` when given. Staff client (row-level security).
  */
-export async function pageHistory(client: SupabaseClient, pageId: string, opts: { before?: number; limit?: number } = {}): Promise<PageRevision[]> {
-  const { data, error } = await client.rpc('cera_page_history', { p_page_id: pageId, p_before: opts.before ?? null, p_limit: opts.limit ?? 30 });
+export async function pageHistory(client: SupabaseClient, pageId: string, options: { before?: number; limit?: number } = {}): Promise<PageRevision[]> {
+  const { data, error } = await client.rpc('cera_page_history', { p_page_id: pageId, p_before: options.before ?? null, p_limit: options.limit ?? 30 });
   if (error) fail(error);
   return ((data as HistoryRow[] | null) ?? []).map((row) => ({
     version: row.page_version,
@@ -569,10 +569,10 @@ export async function pageHistory(client: SupabaseClient, pageId: string, opts: 
  */
 export async function restoreRevision<Type extends AnyContentType>(
   client: SupabaseClient,
-  ct: Type,
+  contentType: Type,
   pageId: string,
   version: number,
-  opts: { expectedVersion: number; userId: string },
+  options: { expectedVersion: number; userId: string },
 ): Promise<SaveResult> {
   const { data: row, error: readError } = await client
     .from('cera_page_revisions')
@@ -581,18 +581,18 @@ export async function restoreRevision<Type extends AnyContentType>(
     .eq('page_version', version)
     .maybeSingle();
   if (readError) fail(readError);
-  if (!row || (row as PageRow).content_type !== ct.name) {
+  if (!row || (row as PageRow).content_type !== contentType.name) {
     return { ok: false, reason: 'not-found', message: `This page has no version ${version}.`, issues: [] };
   }
 
-  const prepared = await preparePageForSave(ct, toStored(pageId, row as PageRow), { mode: 'draft' });
+  const prepared = await preparePageForSave(contentType, toStored(pageId, row as PageRow), { mode: 'draft' });
   if (!prepared.ok) return { ok: false, reason: 'invalid', issues: prepared.issues };
 
   const { data, error } = await client.rpc('cera_restore_revision', {
-    p_page: forRpc(ct, prepared.page),
+    p_page: forRpc(contentType, prepared.page),
     p_from: version,
-    p_expected_version: opts.expectedVersion,
-    p_user: opts.userId,
+    p_expected_version: options.expectedVersion,
+    p_user: options.userId,
   });
-  return finishSave(ct, prepared, data, error, 'draft');
+  return finishSave(contentType, prepared, data, error, 'draft');
 }

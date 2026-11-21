@@ -25,7 +25,7 @@ before(async () => {
 });
 
 const HOUR = 60 * 60 * 1000;
-const later = (ms = HOUR) => new Date(Date.now() + ms).toISOString();
+const later = (milliseconds = HOUR) => new Date(Date.now() + milliseconds).toISOString();
 
 function newPage(slug: string, title = slug): StoredPage {
   const page = structuredClone(sample) as unknown as StoredPage;

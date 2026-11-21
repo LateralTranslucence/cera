@@ -44,21 +44,21 @@ export function PanelFrame({
   className?: string;
   children?: ReactNode;
 }) {
-  const bg = data.background;
-  const media = bg?.media;
+  const background = data.background;
+  const media = background?.media;
   const video = media?.kind === 'video';
   const style: Record<string, string> = {};
-  if (bg?.color) style.backgroundColor = bg.color;
+  if (background?.color) style.backgroundColor = background.color;
   // Quoted, so a path with spaces or brackets can't break the url() token.
   if (media && media.kind === 'image') style['--background-image'] = `url("${mediaUrl(media).replace(/"/g, '%22')}")`;
 
   const classes = ['panel', `panel--${name}`];
   if (className) classes.push(className);
-  if (bg?.color || media) classes.push('has-background');
-  if (bg?.overlay) classes.push('has-overlay');
+  if (background?.color || media) classes.push('has-background');
+  if (background?.overlay) classes.push('has-overlay');
   if (video) classes.push('has-video');
   // An image, a video or the overlay makes the panel dark whatever the color.
-  if (!media && !bg?.overlay && isLightColor(bg?.color)) classes.push('has-light-background');
+  if (!media && !background?.overlay && isLightColor(background?.color)) classes.push('has-light-background');
 
   return (
     <section

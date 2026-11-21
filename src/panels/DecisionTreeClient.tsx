@@ -65,8 +65,8 @@ export function DecisionTreeClient({ cards }: { cards: DecisionCard[] }) {
               aria-controls={detailId}
               aria-expanded={isOpen}
               hidden={isOpen}
-              ref={(el) => {
-                expandRefs.current[i] = el;
+              ref={(element) => {
+                expandRefs.current[i] = element;
               }}
               onClick={() => {
                 focusNext.current = closeRefs.current[i] ?? null;
@@ -81,8 +81,8 @@ export function DecisionTreeClient({ cards }: { cards: DecisionCard[] }) {
               aria-controls={detailId}
               aria-expanded={isOpen}
               hidden={!isOpen}
-              ref={(el) => {
-                closeRefs.current[i] = el;
+              ref={(element) => {
+                closeRefs.current[i] = element;
               }}
               onClick={() => {
                 focusNext.current = expandRefs.current[i] ?? null;

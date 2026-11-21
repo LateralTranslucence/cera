@@ -12,9 +12,9 @@ let editor: string;
 let viewer: string;
 let objects: Map<string, FakeObject>;
 let server: SupabaseClient;
-let anon: SupabaseClient;
+let anonymous: SupabaseClient;
 
-const MB = 1024 * 1024;
+const MEGABYTE = 1024 * 1024;
 
 before(async () => {
   db = await createTestDb();
@@ -22,7 +22,7 @@ before(async () => {
   viewer = await addUser(db, 'viewer');
   objects = new Map();
   server = fakeSupabase(db, 'service_role', {}, objects);
-  anon = fakeSupabase(db, 'anon');
+  anonymous = fakeSupabase(db, 'anon');
 });
 
 /** Prepares, "uploads" (what Storage would hold afterward), and finishes. */
@@ -51,11 +51,11 @@ test('prepare refuses types and sizes outside the rules', async () => {
   if (!svg.ok) assert.match(svg.message, /can’t be uploaded/);
   assert.equal((await prepareMediaUpload(server, { name: 'page.html', type: 'text/html', size: 1000 })).ok, false);
   assert.equal((await prepareMediaUpload(server, { name: 'empty.png', type: 'image/png', size: 0 })).ok, false);
-  const big = await prepareMediaUpload(server, { name: 'huge.jpg', type: 'image/jpeg', size: 11 * MB });
+  const big = await prepareMediaUpload(server, { name: 'huge.jpg', type: 'image/jpeg', size: 11 * MEGABYTE });
   assert.equal(big.ok, false);
   if (!big.ok) assert.match(big.message, /11 MB; images can be up to 10 MB/);
   // Videos may be larger than images.
-  assert.equal((await prepareMediaUpload(server, { name: 'clip.mp4', type: 'video/mp4', size: 40 * MB })).ok, true);
+  assert.equal((await prepareMediaUpload(server, { name: 'clip.mp4', type: 'video/mp4', size: 40 * MEGABYTE })).ok, true);
 });
 
 test('prepare needs the secret key: a browser client gets no upload URL', async () => {
@@ -64,12 +64,12 @@ test('prepare needs the secret key: a browser client gets no upload URL', async 
 });
 
 test('upload records the file with what Storage reports, and the library lists it', async () => {
-  const { path, result } = await upload('Olympus Mons.jpg', 'image/jpeg', 2 * MB, { alt: '  Olympus Mons from orbit ', width: 1600, height: 900 });
+  const { path, result } = await upload('Olympus Mons.jpg', 'image/jpeg', 2 * MEGABYTE, { alt: '  Olympus Mons from orbit ', width: 1600, height: 900 });
   assert.equal(result.ok, true, JSON.stringify(result));
   if (!result.ok) return;
   assert.deepEqual(
     { ...result.item, id: undefined, createdAt: undefined },
-    { id: undefined, path, kind: 'image', mimeType: 'image/jpeg', alt: 'Olympus Mons from orbit', width: 1600, height: 900, sizeBytes: 2 * MB, createdAt: undefined },
+    { id: undefined, path, kind: 'image', mimeType: 'image/jpeg', alt: 'Olympus Mons from orbit', width: 1600, height: 900, sizeBytes: 2 * MEGABYTE, createdAt: undefined },
   );
   assert.deepEqual(toMediaRef(result.item), { id: result.item.id, path, kind: 'image', alt: 'Olympus Mons from orbit', width: 1600, height: 900 });
 
@@ -77,16 +77,16 @@ test('upload records the file with what Storage reports, and the library lists i
   assert.equal(row?.created_by, editor);
 
   // Anyone can read the library (the files are public), newest first.
-  const video = await upload('Rover clip.mp4', 'video/mp4', 5 * MB);
+  const video = await upload('Rover clip.mp4', 'video/mp4', 5 * MEGABYTE);
   assert.equal(video.result.ok, true);
-  const all = await listMedia(anon);
+  const all = await listMedia(anonymous);
   assert.deepEqual(all.slice(0, 2).map((media) => media.path), [video.path, path]);
-  assert.deepEqual((await listMedia(anon, { kinds: ['video'] })).map((media) => media.path), [video.path]);
-  assert.deepEqual((await listMedia(anon, { search: 'ORBIT' })).map((media) => media.path), [path]);
-  assert.deepEqual((await listMedia(anon, { search: 'olympus mons' })).map((media) => media.path), [path]);
+  assert.deepEqual((await listMedia(anonymous, { kinds: ['video'] })).map((media) => media.path), [video.path]);
+  assert.deepEqual((await listMedia(anonymous, { search: 'ORBIT' })).map((media) => media.path), [path]);
+  assert.deepEqual((await listMedia(anonymous, { search: 'olympus mons' })).map((media) => media.path), [path]);
   // LIKE wildcards in a search are literal.
-  assert.deepEqual(await listMedia(anon, { search: '%' }), []);
-  assert.equal((await listMedia(anon, { limit: 1 })).length, 1);
+  assert.deepEqual(await listMedia(anonymous, { search: '%' }), []);
+  assert.equal((await listMedia(anonymous, { limit: 1 })).length, 1);
 });
 
 test('finish trusts Storage, not the browser: a disallowed object is deleted', async () => {
@@ -94,7 +94,7 @@ test('finish trusts Storage, not the browser: a disallowed object is deleted', a
   assert.equal(sneaky.result.ok, false);
   assert.equal(objects.has(sneaky.path), false);
 
-  const swollen = await upload('photo.png', 'image/png', 1000, { stored: { size: 30 * MB } });
+  const swollen = await upload('photo.png', 'image/png', 1000, { stored: { size: 30 * MEGABYTE } });
   assert.equal(swollen.result.ok, false);
   assert.equal(objects.has(swollen.path), false);
 
@@ -139,17 +139,17 @@ test('the bucket enforces the same types, without SVG', async () => {
     'service_role',
     `select allowed_mime_types, file_size_limit from storage.buckets where id = 'cera-media'`,
   );
-  assert.equal(Number(bucket?.file_size_limit), 50 * MB);
+  assert.equal(Number(bucket?.file_size_limit), 50 * MEGABYTE);
   assert.deepEqual([...(bucket?.allowed_mime_types ?? [])].sort(), mediaAccept(['image', 'video']).split(',').sort());
   assert.equal(mediaAccept(['image']).includes('video/'), false);
 });
 
 /** Saves a page straight through cera_save_page, with `panels` as given. */
-async function savePanels(id: string, slug: string, panels: unknown[], opts: { publish: boolean; version: number }) {
+async function savePanels(id: string, slug: string, panels: unknown[], options: { publish: boolean; version: number }) {
   const { error } = await server.rpc('cera_save_page', {
     p_page: { id, contentType: 'landing_page', slug, title: `Page ${slug}`, boxes: {}, panels },
-    p_expected_version: opts.version,
-    p_publish: opts.publish,
+    p_expected_version: options.version,
+    p_publish: options.publish,
     p_user: editor,
   });
   assert.equal(error, null, JSON.stringify(error));
@@ -166,7 +166,7 @@ test('update changes only the library alt text, and checks the role', async () =
   const changed = await updateMedia(server, { id: item.id, alt: '  Gale crater  ' }, { userId: editor });
   assert.equal(changed.ok, true, JSON.stringify(changed));
   if (changed.ok) assert.deepEqual(changed.item, { ...item, alt: 'Gale crater' });
-  assert.deepEqual((await listMedia(anon, { search: 'gale crater' })).map((media) => media.id), [item.id]);
+  assert.deepEqual((await listMedia(anonymous, { search: 'gale crater' })).map((media) => media.id), [item.id]);
 
   const cleared = await updateMedia(server, { id: item.id, alt: '   ' }, { userId: editor });
   assert.equal(cleared.ok && cleared.item.alt, undefined);
@@ -223,7 +223,7 @@ test('delete refuses a file a page uses, and removes an unused one from the libr
   assert.equal(objects.has(unused.path), true);
   assert.deepEqual(await deleteMedia(server, unused.id, { userId: editor }), { ok: true });
   assert.equal(objects.has(unused.path), false);
-  assert.deepEqual((await listMedia(anon, { search: 'unused' })).map((media) => media.id), []);
+  assert.deepEqual((await listMedia(anonymous, { search: 'unused' })).map((media) => media.id), []);
   const again = await deleteMedia(server, unused.id, { userId: editor });
   assert.equal(again.ok, false);
   if (!again.ok) assert.match(again.message, /isn’t in the library/);

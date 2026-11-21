@@ -17,7 +17,7 @@ const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' } as con
  */
 export async function Shell({ staff, active, currentPageId, children }: { staff: Staff; active?: ShellSection; currentPageId?: string; children: ReactNode }) {
   const [pages, simplePages, forms, icons] = await Promise.all(
-    [landingPage, simplePage, formType, iconType].map((ct) => listPages(staff.client, { contentType: ct.name })),
+    [landingPage, simplePage, formType, iconType].map((contentType) => listPages(staff.client, { contentType: contentType.name })),
   );
   const sections: NavSection[] = [
     {

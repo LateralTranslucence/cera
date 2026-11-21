@@ -60,15 +60,15 @@ export function FieldMapForm({
   value,
   onChange,
   path,
-  ctx,
+  context,
 }: {
   fields: FieldMap;
   value: unknown;
   onChange: Change;
   path: Path;
-  ctx: FormContext;
+  context: FormContext;
 }) {
-  const obj = isObject(value) ? value : {};
+  const objectValue = isObject(value) ? value : {};
   return (
     <div className="cera-fields">
       {Object.entries(fields).map(([key, field]) => (
@@ -76,11 +76,11 @@ export function FieldMapForm({
           key={key}
           name={key}
           field={field}
-          value={obj[key]}
-          onChange={(fieldValue) => onChange(setIn(obj, [key], fieldValue))}
+          value={objectValue[key]}
+          onChange={(fieldValue) => onChange(setIn(objectValue, [key], fieldValue))}
           path={[...path, key]}
-          siblings={obj}
-          ctx={ctx}
+          siblings={objectValue}
+          context={context}
         />
       ))}
     </div>
@@ -101,14 +101,14 @@ interface FieldProps {
   path: Path;
   /** The other values at the same level (e.g. a relation reads the content types picked in a sibling field). */
   siblings: Record<string, unknown>;
-  ctx: FormContext;
+  context: FormContext;
 }
 
 function FieldRow(props: FieldProps) {
-  const { name, field, value, path, ctx } = props;
+  const { name, field, value, path, context } = props;
   const id = useId();
   const label = field.meta.label ?? humanize(name);
-  const own = issuesAt(ctx.issues, path);
+  const own = issuesAt(context.issues, path);
   const max = field.meta.maxLength;
   const length = typeof value === 'string' ? value.length : 0;
   const group = GROUP_KINDS.has(field.kind) && !(field.kind === 'selectFrom' && !(field.config as { multiple: boolean }).multiple);
@@ -135,7 +135,7 @@ function FieldRow(props: FieldProps) {
         <label htmlFor={id} className="cera-field__label">
           {label}
         </label>
-        <input type="checkbox" id={id} checked={value === true} disabled={ctx.readOnly} onChange={(event) => props.onChange(event.target.checked)} />
+        <input type="checkbox" id={id} checked={value === true} disabled={context.readOnly} onChange={(event) => props.onChange(event.target.checked)} />
         {extras}
       </div>
     );
@@ -182,11 +182,11 @@ export function IssueList({ issues }: { issues: readonly PageIssue[] }) {
 /* Controls                                                            */
 /* ------------------------------------------------------------------ */
 
-function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps & { id: string }): ReactNode {
-  const ro = ctx.readOnly;
+function Control({ field, value, onChange, path, siblings, context, id }: FieldProps & { id: string }): ReactNode {
+  const readOnly = context.readOnly;
   switch (field.kind) {
     case 'icon':
-      if (ctx.icons) return <IconPicker value={value} onChange={onChange} icons={ctx.icons} readOnly={ro} id={id} />;
+      if (context.icons) return <IconPicker value={value} onChange={onChange} icons={context.icons} readOnly={readOnly} id={id} />;
     // falls through: without the icon sets, a typed value
     case 'text':
     case 'url':
@@ -195,7 +195,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
           id={id}
           type="text"
           value={asString(value)}
-          readOnly={ro}
+          readOnly={readOnly}
           inputMode={field.kind === 'url' ? 'url' : undefined}
           placeholder={field.kind === 'url' ? '/path or https://…' : undefined}
           onChange={(event) => onChange(emptyToUndefined(event.target.value))}
@@ -203,10 +203,10 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
       );
 
     case 'svg':
-      return <SvgInput value={value} onChange={onChange} readOnly={ro} id={id} />;
+      return <SvgInput value={value} onChange={onChange} readOnly={readOnly} id={id} />;
 
     case 'textarea':
-      return <textarea id={id} rows={3} value={asString(value)} readOnly={ro} onChange={(event) => onChange(emptyToUndefined(event.target.value))} />;
+      return <textarea id={id} rows={3} value={asString(value)} readOnly={readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))} />;
 
     case 'html':
       return (
@@ -215,23 +215,23 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
           labelledBy={`${id}-label`}
           value={value}
           onChange={onChange}
-          readOnly={ro}
+          readOnly={readOnly}
           toolbar={(field.config as { toolbar?: 'full' | 'limited' } | undefined)?.toolbar}
-          media={ctx.media}
+          media={context.media}
         />
       );
 
     case 'number':
     case 'perRow': {
-      const cfg = (field.config ?? {}) as { min?: number; max?: number };
+      const config = (field.config ?? {}) as { min?: number; max?: number };
       return (
         <input
           id={id}
           type="number"
           value={typeof value === 'number' ? value : ''}
-          min={field.kind === 'perRow' ? 1 : cfg.min}
-          max={cfg.max}
-          readOnly={ro}
+          min={field.kind === 'perRow' ? 1 : config.min}
+          max={config.max}
+          readOnly={readOnly}
           onChange={(event) => onChange(event.target.value === '' ? undefined : Number(event.target.value))}
         />
       );
@@ -240,7 +240,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
     case 'select': {
       const options = (field.config as { options: Record<string, string> }).options;
       return (
-        <select id={id} value={asString(value)} disabled={ro} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
+        <select id={id} value={asString(value)} disabled={readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
           {fieldDefault(field) === undefined && <option value="">—</option>}
           {value !== undefined && !(asString(value) in options) && <option value={asString(value)}>{asString(value)} (not an option)</option>}
           {Object.entries(options).map(([key, label]) => (
@@ -253,22 +253,22 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
     }
 
     case 'selectFrom':
-      return <SelectFrom field={field} value={value} onChange={onChange} id={id} ctx={ctx} />;
+      return <SelectFrom field={field} value={value} onChange={onChange} id={id} context={context} />;
 
     case 'media':
-      return <MediaInput value={value} onChange={onChange} readOnly={ro} media={ctx.media} accept={(field.config as { accept?: Array<'image' | 'video' | 'embed'> } | undefined)?.accept} />;
+      return <MediaInput value={value} onChange={onChange} readOnly={readOnly} media={context.media} accept={(field.config as { accept?: Array<'image' | 'video' | 'embed'> } | undefined)?.accept} />;
 
     case 'background': {
-      const bg = isObject(value) ? value : {};
+      const background = isObject(value) ? value : {};
       return (
         <div className="cera-group">
           <label className="cera-inline">
             Color
-            <input type="text" value={asString(bg.color)} placeholder="#2b2118" readOnly={ro} onChange={(event) => onChange(setIn(bg, ['color'], emptyToUndefined(event.target.value)))} />
+            <input type="text" value={asString(background.color)} placeholder="#2b2118" readOnly={readOnly} onChange={(event) => onChange(setIn(background, ['color'], emptyToUndefined(event.target.value)))} />
           </label>
-          <MediaInput value={bg.media} onChange={(media) => onChange(setIn(bg, ['media'], media))} readOnly={ro} media={ctx.media} accept={['image', 'video']} />
+          <MediaInput value={background.media} onChange={(media) => onChange(setIn(background, ['media'], media))} readOnly={readOnly} media={context.media} accept={['image', 'video']} />
           <label className="cera-check">
-            <input type="checkbox" checked={bg.overlay === true} disabled={ro} onChange={(event) => onChange(setIn(bg, ['overlay'], event.target.checked))} />
+            <input type="checkbox" checked={background.overlay === true} disabled={readOnly} onChange={(event) => onChange(setIn(background, ['overlay'], event.target.checked))} />
             Dark overlay
           </label>
         </div>
@@ -277,11 +277,11 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
 
     case 'cta':
       return value === undefined ? (
-        <button type="button" className="cera-button cera-button--small" disabled={ro} onClick={() => onChange({ text: '', url: '' })}>
+        <button type="button" className="cera-button cera-button--small" disabled={readOnly} onClick={() => onChange({ text: '', url: '' })}>
           Add call to action
         </button>
       ) : (
-        <CtaInput value={value} onChange={onChange} onRemove={() => onChange(undefined)} readOnly={ro} />
+        <CtaInput value={value} onChange={onChange} onRemove={() => onChange(undefined)} readOnly={readOnly} />
       );
 
     case 'ctas': {
@@ -296,13 +296,13 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
               onChange={(itemValue) => onChange(setIn(list, [i], itemValue))}
               onRemove={() => onChange(removeItem(list, i))}
               onMove={(delta) => onChange(moveItem(list, i, i + delta))}
-              readOnly={ro}
+              readOnly={readOnly}
             />
           ))}
           <button
             type="button"
             className="cera-button cera-button--small"
-            disabled={ro || (limit !== undefined && list.length >= limit)}
+            disabled={readOnly || (limit !== undefined && list.length >= limit)}
             onClick={() => onChange([...list, { text: '', url: '' }])}
           >
             Add call to action
@@ -312,13 +312,13 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
     }
 
     case 'gallery':
-      return <GalleryInput value={value} onChange={onChange} readOnly={ro} media={ctx.media} limit={(field.config as { limit?: number } | undefined)?.limit} />;
+      return <GalleryInput value={value} onChange={onChange} readOnly={readOnly} media={context.media} limit={(field.config as { limit?: number } | undefined)?.limit} />;
 
     case 'repeater':
-      return <Repeater field={field} value={value} onChange={onChange} path={path} ctx={ctx} />;
+      return <Repeater field={field} value={value} onChange={onChange} path={path} context={context} />;
 
     case 'relation': {
-      if (ctx.findPages) return <PagePicker field={field} value={value} onChange={onChange} siblings={siblings} ctx={ctx} findPages={ctx.findPages} id={id} />;
+      if (context.findPages) return <PagePicker field={field} value={value} onChange={onChange} siblings={siblings} context={context} findPages={context.findPages} id={id} />;
       const ids = asArray(value).map(asString);
       return (
         <>
@@ -326,7 +326,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
             id={id}
             type="text"
             value={ids.join(', ')}
-            readOnly={ro}
+            readOnly={readOnly}
             placeholder="Page ids, comma-separated"
             onChange={(event) => onChange(event.target.value.split(',').map((pageId) => pageId.trim()).filter(Boolean))}
           />
@@ -406,14 +406,14 @@ function ItemButtons({ onMove, onRemove, readOnly }: { onMove?: (delta: -1 | 1) 
   );
 }
 
-function Repeater({ field, value, onChange, path, ctx }: { field: AnyField; value: unknown; onChange: Change; path: Path; ctx: FormContext }) {
-  const cfg = field.config as { fields: FieldMap; limit?: number; itemTitle?: string };
+function Repeater({ field, value, onChange, path, context }: { field: AnyField; value: unknown; onChange: Change; path: Path; context: FormContext }) {
+  const config = field.config as { fields: FieldMap; limit?: number; itemTitle?: string };
   const items = asArray(value);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const itemId = (item: unknown, i: number) => (isObject(item) && typeof item._id === 'string' ? item._id : `index-${i}`);
 
   const add = () => {
-    const item = newRepeaterItem(cfg.fields, newId());
+    const item = newRepeaterItem(config.fields, newId());
     setOpen((previous) => new Set(previous).add(item._id as string));
     onChange([...items, item]);
   };
@@ -422,8 +422,8 @@ function Repeater({ field, value, onChange, path, ctx }: { field: AnyField; valu
     <div className="cera-list">
       {items.map((item, i) => {
         const key = itemId(item, i);
-        const title = cfg.itemTitle ? asString(getIn(item, [cfg.itemTitle])) : '';
-        const itemIssues = issuesAt(ctx.issues, [...path, i]);
+        const title = config.itemTitle ? asString(getIn(item, [config.itemTitle])) : '';
+        const itemIssues = issuesAt(context.issues, [...path, i]);
         return (
           <details
             key={key}
@@ -441,34 +441,34 @@ function Repeater({ field, value, onChange, path, ctx }: { field: AnyField; valu
           >
             <summary>
               <span className="cera-item-title">{title || `Item ${i + 1}`}</span>
-              <ItemButtons onMove={(delta) => onChange(moveItem(items, i, i + delta))} onRemove={() => onChange(removeItem(items, i))} readOnly={ctx.readOnly} />
+              <ItemButtons onMove={(delta) => onChange(moveItem(items, i, i + delta))} onRemove={() => onChange(removeItem(items, i))} readOnly={context.readOnly} />
             </summary>
-            <FieldMapForm fields={cfg.fields} value={item} onChange={(itemValue) => onChange(setIn(items, [i], itemValue))} path={[...path, i]} ctx={ctx} />
+            <FieldMapForm fields={config.fields} value={item} onChange={(itemValue) => onChange(setIn(items, [i], itemValue))} path={[...path, i]} context={context} />
           </details>
         );
       })}
-      <button type="button" className="cera-button cera-button--small" disabled={ctx.readOnly || (cfg.limit !== undefined && items.length >= cfg.limit)} onClick={add}>
+      <button type="button" className="cera-button cera-button--small" disabled={context.readOnly || (config.limit !== undefined && items.length >= config.limit)} onClick={add}>
         Add item
       </button>
-      {cfg.limit !== undefined && <p className="cera-note">Up to {cfg.limit}.</p>}
+      {config.limit !== undefined && <p className="cera-note">Up to {config.limit}.</p>}
     </div>
   );
 }
 
-function SelectFrom({ field, value, onChange, id, ctx }: { field: AnyField; value: unknown; onChange: Change; id: string; ctx: FormContext }) {
-  const cfg = field.config as { options: OptionsSource; multiple: boolean };
+function SelectFrom({ field, value, onChange, id, context }: { field: AnyField; value: unknown; onChange: Change; id: string; context: FormContext }) {
+  const config = field.config as { options: OptionsSource; multiple: boolean };
   const [options, setOptions] = useState<Option[] | null>(null);
   useEffect(() => {
     let live = true;
-    Promise.resolve(cfg.options(ctx.options)).then((loadedOptions) => live && setOptions(loadedOptions));
+    Promise.resolve(config.options(context.options)).then((loadedOptions) => live && setOptions(loadedOptions));
     return () => {
       live = false;
     };
-  }, [cfg, ctx.options]);
+  }, [config, context.options]);
 
   if (!options) return <p className="cera-note">Loading options…</p>;
 
-  if (cfg.multiple) {
+  if (config.multiple) {
     const selected = new Set(asArray(value).map(asString));
     return (
       <div className="cera-checks">
@@ -477,7 +477,7 @@ function SelectFrom({ field, value, onChange, id, ctx }: { field: AnyField; valu
             <input
               type="checkbox"
               checked={selected.has(option.value)}
-              disabled={ctx.readOnly}
+              disabled={context.readOnly}
               onChange={(event) => {
                 const next = new Set(selected);
                 if (event.target.checked) next.add(option.value);
@@ -492,7 +492,7 @@ function SelectFrom({ field, value, onChange, id, ctx }: { field: AnyField; valu
     );
   }
   return (
-    <select id={id} value={asString(value)} disabled={ctx.readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
+    <select id={id} value={asString(value)} disabled={context.readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
       <option value="">—</option>
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -512,7 +512,7 @@ function PagePicker({
   value,
   onChange,
   siblings,
-  ctx,
+  context,
   findPages,
   id,
 }: {
@@ -520,20 +520,20 @@ function PagePicker({
   value: unknown;
   onChange: Change;
   siblings: Record<string, unknown>;
-  ctx: FormContext;
+  context: FormContext;
   findPages: NonNullable<FormContext['findPages']>;
   id: string;
 }) {
-  const cfg = field.config as { to: string[] | { field: string }; limit?: number };
+  const config = field.config as { to: string[] | { field: string }; limit?: number };
   const ids = asArray(value).map(asString).filter(Boolean);
   const idsKey = ids.join(',');
 
   // Allowed content types: fixed, or read from a sibling field (theme: post_types_field). None ticked
   // means any type with pages of its own (not forms, which only show inside other pages).
-  const picked0 = Array.isArray(cfg.to) ? cfg.to : asArray(siblings[cfg.to.field]).map(asString).filter(Boolean);
-  const types = picked0.length > 0 ? picked0 : ctx.options.contentTypes.filter((contentType) => contentType.public).map((contentType) => contentType.name);
+  const picked0 = Array.isArray(config.to) ? config.to : asArray(siblings[config.to.field]).map(asString).filter(Boolean);
+  const types = picked0.length > 0 ? picked0 : context.options.contentTypes.filter((contentType) => contentType.public).map((contentType) => contentType.name);
   const typesKey = types.join(',');
-  const labelOf = (name: string) => ctx.options.contentTypes.find((contentType) => contentType.name === name)?.label ?? name;
+  const labelOf = (name: string) => context.options.contentTypes.find((contentType) => contentType.name === name)?.label ?? name;
 
   // Details for the picked ids.
   const [picked, setPicked] = useState<PageOption[]>([]);
@@ -562,8 +562,8 @@ function PagePicker({
     };
   }, [open, search, typesKey, findPages]);
 
-  const single = cfg.limit === 1;
-  const full = cfg.limit !== undefined && ids.length >= cfg.limit && !single;
+  const single = config.limit === 1;
+  const full = config.limit !== undefined && ids.length >= config.limit && !single;
   const pick = (page: PageOption) => {
     onChange(single ? [page.id] : [...ids, page.id]);
     setSearch('');
@@ -577,16 +577,16 @@ function PagePicker({
         <p className="cera-note">No page picked.</p>
       ) : (
         <ul className="cera-picker__picked">
-          {ids.map((pid, i) => {
-            const page = picked.find((pickedPage) => pickedPage.id === pid);
+          {ids.map((pageId, i) => {
+            const page = picked.find((pickedPage) => pickedPage.id === pageId);
             return (
-              <li key={pid}>
+              <li key={pageId}>
                 <span className="cera-picker__title">{page ? page.title || page.slug : 'Page not found'}</span>
                 <span className="cera-picker__meta">
                   {page ? `${page.contentTypeLabel} · ${page.slug}` : 'It may have been deleted. Remove it or pick another.'}
                 </span>
                 {page && !page.published && <span className="cera-badge cera-badge--dirty">Not published: hidden on the live site</span>}
-                {!ctx.readOnly && (
+                {!context.readOnly && (
                   <button type="button" className="cera-icon-button cera-danger" aria-label="Remove page" title="Remove" onClick={() => onChange(removeItem(ids, i))}>
                     ✕
                   </button>
@@ -596,7 +596,7 @@ function PagePicker({
           })}
         </ul>
       )}
-      {!ctx.readOnly && !full && (
+      {!context.readOnly && !full && (
         <div className="cera-picker__search">
           <input
             id={id}

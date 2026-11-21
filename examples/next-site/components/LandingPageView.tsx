@@ -7,17 +7,17 @@ import { landingPage } from '../cera/index.ts';
 type LandingPage = PageOf<typeof landingPage>;
 
 function Hero({ hero, fallbackTitle }: { hero: LandingPage['boxes']['hero']; fallbackTitle: string }) {
-  const bg = hero.background;
+  const background = hero.background;
   const style = {
-    ...(bg.color && { backgroundColor: bg.color }),
-    ...(bg.media && bg.media.kind === 'image' && { backgroundImage: `url(${mediaUrl(bg.media)})` }),
+    ...(background.color && { backgroundColor: background.color }),
+    ...(background.media && background.media.kind === 'image' && { backgroundImage: `url(${mediaUrl(background.media)})` }),
   };
   return (
     <header
-      className={`hero${bg.overlay ? ' hero--overlay' : ''}${bg.color || bg.media ? ' hero--has-bg' : ''}${!bg.media && !bg.overlay && isLightColor(bg.color) ? ' hero--light' : ''}`}
+      className={`hero${background.overlay ? ' hero--overlay' : ''}${background.color || background.media ? ' hero--has-bg' : ''}${!background.media && !background.overlay && isLightColor(background.color) ? ' hero--light' : ''}`}
       style={style}
     >
-      {bg.media?.kind === 'video' && <video className="hero__video" src={mediaUrl(bg.media)} autoPlay muted loop playsInline />}
+      {background.media?.kind === 'video' && <video className="hero__video" src={mediaUrl(background.media)} autoPlay muted loop playsInline />}
       <div className="hero__inner">
         <h1>{hero.title || fallbackTitle}</h1>
         {hero.copy && <Html html={hero.copy} />}

@@ -93,13 +93,13 @@ const QUIET = { announcements: { onDragStart: () => undefined, onDragOver: () =>
  * Upgrades known panels to their current version so the form matches the
  * definition. A panel whose migration fails is left as stored; saving reports it.
  */
-function upgradeForEditing(ct: AnyContentType, page: StoredPage): StoredPage {
-  const defs = new Map<string, AnyPanel>(ct.panels.map((definition: AnyPanel) => [definition.type, definition]));
+function upgradeForEditing(contentType: AnyContentType, page: StoredPage): StoredPage {
+  const definitions = new Map<string, AnyPanel>(contentType.panels.map((definition: AnyPanel) => [definition.type, definition]));
   const panels = page.panels.map((panel) => {
-    const def = defs.get(panel.type);
-    if (!def) return panel;
+    const definition = definitions.get(panel.type);
+    if (!definition) return panel;
     try {
-      return upgradePanel(def, panel);
+      return upgradePanel(definition, panel);
     } catch {
       return panel;
     }
@@ -121,7 +121,7 @@ function toLocalInput(date: Date): string {
 }
 
 export function PageEditor({
-  contentType: ct,
+  contentType,
   page: initialPage,
   version: initialVersion,
   published: initialPublished,
@@ -147,16 +147,16 @@ export function PageEditor({
   onDeleted,
 }: PageEditorProps) {
   // What this content type calls itself and its panels ("page"/"panel", "form"/"field").
-  const noun = ct.editor?.noun ?? 'page';
-  const nouns = ct.editor?.nounPlural ?? `${noun}s`;
-  const item = ct.editor?.itemNoun ?? 'panel';
+  const noun = contentType.editor?.noun ?? 'page';
+  const nouns = contentType.editor?.nounPlural ?? `${noun}s`;
+  const item = contentType.editor?.itemNoun ?? 'panel';
   const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
   const Item = item.charAt(0).toUpperCase() + item.slice(1);
-  const slugLabel = ct.editor?.slugLabel ?? 'Address';
+  const slugLabel = contentType.editor?.slugLabel ?? 'Address';
   const slugWord = slugLabel.charAt(0).toLowerCase() + slugLabel.slice(1);
-  const showSlug = (slug: string) => (ct.route ? (slug === 'home' ? '/' : `/${slug || '…'}`) : slug || '…');
+  const showSlug = (slug: string) => (contentType.route ? (slug === 'home' ? '/' : `/${slug || '…'}`) : slug || '…');
 
-  const [page, setPage] = useState(() => upgradeForEditing(ct, initialPage));
+  const [page, setPage] = useState(() => upgradeForEditing(contentType, initialPage));
   const [version, setVersion] = useState(initialVersion);
   const [published, setPublished] = useState(initialPublished);
   const [unpublished, setUnpublished] = useState(initialUnpublished);
@@ -190,9 +190,9 @@ export function PageEditor({
     setScrollTo(null);
   }, [scrollTo]);
 
-  const defs = useMemo(() => new Map<string, AnyPanel>(ct.panels.map((definition: AnyPanel) => [definition.type, definition])), [ct]);
-  const options = useMemo<OptionsContext>(() => ({ contentTypes: contentTypes ?? [{ name: ct.name, label: ct.label, public: true }] }), [contentTypes, ct]);
-  const ctx: FormContext = { issues, options, readOnly, findPages, media, icons };
+  const definitions = useMemo(() => new Map<string, AnyPanel>(contentType.panels.map((definition: AnyPanel) => [definition.type, definition])), [contentType]);
+  const options = useMemo<OptionsContext>(() => ({ contentTypes: contentTypes ?? [{ name: contentType.name, label: contentType.label, public: true }] }), [contentTypes, contentType]);
+  const context: FormContext = { issues, options, readOnly, findPages, media, icons };
 
   // Warn before leaving with unsaved changes.
   useEffect(() => {
@@ -343,7 +343,7 @@ export function PageEditor({
         if (result.ok) {
           setVersion(result.version);
           setSavedAt(new Date().toISOString());
-          setPage(upgradeForEditing(ct, result.page));
+          setPage(upgradeForEditing(contentType, result.page));
           setDirty(false);
           setDeleted(null);
           setUnpublished(published);
@@ -420,12 +420,12 @@ export function PageEditor({
   const removePanel = (index: number) => {
     const panel = page.panels[index];
     if (!panel) return;
-    setDeleted({ panel, index, name: panelName(defs.get(panel.type), panel.data, panel.type) });
+    setDeleted({ panel, index, name: panelName(definitions.get(panel.type), panel.data, panel.type) });
     setPanels(removeItem(page.panels, index));
   };
 
-  const addPanel = (def: AnyPanel) => {
-    const panel = newPanel(def);
+  const addPanel = (definition: AnyPanel) => {
+    const panel = newPanel(definition);
     setOpen((previous) => new Set(previous).add(panel.id));
     setScrollTo(panel.id);
     setPanels([...page.panels, panel]);
@@ -434,10 +434,10 @@ export function PageEditor({
 
   // Where each box goes, from the content type's `editor` layout: page and
   // other boxes in Page settings, lead boxes (the hero) as fixed cards.
-  const lead = new Set<string>(ct.editor?.leadBoxes ?? []);
-  const allBoxes = Object.entries(ct.boxes as BoxMap);
-  const settingsBoxes = allBoxes.filter(([name]) => !lead.has(name) || (ct.editor?.pageBoxes ?? []).includes(name));
-  const leadBoxes = allBoxes.filter(([name]) => lead.has(name) && !(ct.editor?.pageBoxes ?? []).includes(name));
+  const lead = new Set<string>(contentType.editor?.leadBoxes ?? []);
+  const allBoxes = Object.entries(contentType.boxes as BoxMap);
+  const settingsBoxes = allBoxes.filter(([name]) => !lead.has(name) || (contentType.editor?.pageBoxes ?? []).includes(name));
+  const leadBoxes = allBoxes.filter(([name]) => lead.has(name) && !(contentType.editor?.pageBoxes ?? []).includes(name));
   const settingsIssues = [...issuesAt(issues, ['title']), ...issuesAt(issues, ['slug']), ...settingsBoxes.flatMap(([name]) => issuesAt(issues, ['boxes', name]))];
   const errorCount = issues.filter((issue) => issue.severity === 'error').length;
   const changes = published && (dirty || unpublished);
@@ -445,7 +445,7 @@ export function PageEditor({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const nameAt = (index: number) => {
     const panel = page.panels[index];
-    return panel ? panelName(defs.get(panel.type), panel.data, panel.type) : '';
+    return panel ? panelName(definitions.get(panel.type), panel.data, panel.type) : '';
   };
   const move = (from: number, to: number) => {
     if (to < 0 || to >= page.panels.length || from === to) return;
@@ -558,7 +558,7 @@ export function PageEditor({
             <div className="cera-fields">
               <div className="cera-field cera-field--text" data-field="title">
                 <label htmlFor="cera-title" className="cera-field__label">
-                  {ct.editor?.titleLabel ?? 'Title'}
+                  {contentType.editor?.titleLabel ?? 'Title'}
                 </label>
                 <input
                   id="cera-title"
@@ -587,7 +587,7 @@ export function PageEditor({
                     update({ ...page, slug: event.target.value });
                   }}
                 />
-                <p className="cera-note">{ct.editor?.slugNote ?? 'Lowercase words joined by hyphens. “home” is the front page.'}</p>
+                <p className="cera-note">{contentType.editor?.slugNote ?? 'Lowercase words joined by hyphens. “home” is the front page.'}</p>
                 <IssueList issues={issuesAt(issues, ['slug'])} />
               </div>
             </div>
@@ -595,7 +595,7 @@ export function PageEditor({
           {settingsBoxes.map(([name, fields]) => (
             <div key={name} className="cera-panel-card__group">
               <h3>{humanize(name)}</h3>
-              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(boxValue) => update(setIn(page, ['boxes', name], boxValue))} path={['boxes', name]} ctx={ctx} />
+              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(boxValue) => update(setIn(page, ['boxes', name], boxValue))} path={['boxes', name]} context={context} />
             </div>
           ))}
           {version > 0 && (loadHistory || (!readOnly && onDelete)) && (
@@ -631,7 +631,7 @@ export function PageEditor({
               onToggle={() => toggle(name)}
               hasError={boxIssues.some((issue) => issue.severity === 'error')}
             >
-              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(boxValue) => update(setIn(page, ['boxes', name], boxValue))} path={['boxes', name]} ctx={ctx} />
+              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(boxValue) => update(setIn(page, ['boxes', name], boxValue))} path={['boxes', name]} context={context} />
             </Card>
           );
         })}
@@ -639,7 +639,7 @@ export function PageEditor({
         <DndContext sensors={sensors} collisionDetection={closestCenter} accessibility={QUIET} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setAnnouncement('Move canceled.')}>
           <SortableContext items={page.panels.map((panel) => panel.id)} strategy={verticalListSortingStrategy}>
             {page.panels.map((panel, i) => {
-              const def = defs.get(panel.type);
+              const definition = definitions.get(panel.type);
               const path = ['panels', i];
               const all = issuesAt(issues, path);
               return (
@@ -650,10 +650,10 @@ export function PageEditor({
                   count={page.panels.length}
                   readOnly={readOnly}
                   onMove={move}
-                  badge={def?.label ?? panel.type}
-                  name={panelName(def, panel.data, panel.type)}
+                  badge={definition?.label ?? panel.type}
+                  name={panelName(definition, panel.data, panel.type)}
                   hidden={panel.hidden}
-                  open={!def || open.has(panel.id) || all.length > 0}
+                  open={!definition || open.has(panel.id) || all.length > 0}
                   onToggle={() => toggle(panel.id)}
                   hasError={all.some((issue) => issue.severity === 'error')}
                   actions={
@@ -680,8 +680,8 @@ export function PageEditor({
                   }
                 >
                   <IssueList issues={issuesAt(issues, path, true)} />
-                  {def ? (
-                    <FieldMapForm fields={def.fields} value={panel.data} onChange={(data) => setPanels(setIn(page.panels, [i, 'data'], data))} path={[...path, 'data']} ctx={ctx} />
+                  {definition ? (
+                    <FieldMapForm fields={definition.fields} value={panel.data} onChange={(data) => setPanels(setIn(page.panels, [i, 'data'], data))} path={[...path, 'data']} context={context} />
                   ) : (
                     <p className="cera-note">This site has no definition for “{panel.type}” {item}s, so it can’t be edited here. It is kept exactly as stored when you save.</p>
                   )}
@@ -712,7 +712,7 @@ export function PageEditor({
           </p>
         )}
 
-        {!readOnly && ct.panels.length > 0 && (
+        {!readOnly && contentType.panels.length > 0 && (
           <button type="button" className="cera-add-panel" onClick={() => setDialog('add')}>
             <Icon name="plus" strokeWidth={2} />
             Add {item}
@@ -865,11 +865,11 @@ export function PageEditor({
       <Dialog open={dialog === 'add'} onClose={() => setDialog(null)} title={`Add a ${item}`} wide>
         <p className="cera-note">New {item}s go at the end of the {noun}. Drag them by the handle to move them.</p>
         <ul className="cera-picker-grid">
-          {ct.panels.map((def: AnyPanel) => (
-            <li key={def.type}>
-              <button type="button" onClick={() => addPanel(def)}>
-                <strong>{def.label}</strong>
-                {def.description && <span>{def.description}</span>}
+          {contentType.panels.map((definition: AnyPanel) => (
+            <li key={definition.type}>
+              <button type="button" onClick={() => addPanel(definition)}>
+                <strong>{definition.label}</strong>
+                {definition.description && <span>{definition.description}</span>}
               </button>
             </li>
           ))}
@@ -968,7 +968,7 @@ interface CardProps {
   children: ReactNode;
 }
 
-const Card = ({ ref, style, dragging, ...props }: CardProps & { ref?: (el: HTMLElement | null) => void; style?: CSSProperties; dragging?: boolean }) => {
+const Card = ({ ref, style, dragging, ...props }: CardProps & { ref?: (element: HTMLElement | null) => void; style?: CSSProperties; dragging?: boolean }) => {
   const { id, badge, name, open, onToggle, hasError, hidden, lead, actions, grip, children } = props;
   const bodyId = `cera-panel-body-${id}`;
   return (

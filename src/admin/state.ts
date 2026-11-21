@@ -17,12 +17,12 @@ function isContainer(value: unknown): value is Container {
 }
 
 export function getIn(value: unknown, path: Path): unknown {
-  let cur = value;
+  let current = value;
   for (const key of path) {
-    if (!isContainer(cur)) return undefined;
-    cur = (cur as Record<string | number, unknown>)[key];
+    if (!isContainer(current)) return undefined;
+    current = (current as Record<string | number, unknown>)[key];
   }
-  return cur;
+  return current;
 }
 
 /**
@@ -79,8 +79,8 @@ export function newId(): string {
 }
 
 /** A new panel instance with its defaults filled in, at the definition's current version. */
-export function newPanel(def: AnyPanel, id = newId()): StoredPanel {
-  return { id, type: def.type, v: def.version, hidden: false, data: defaultsFor(def.fields) };
+export function newPanel(definition: AnyPanel, id = newId()): StoredPanel {
+  return { id, type: definition.type, v: definition.version, hidden: false, data: defaultsFor(definition.fields) };
 }
 
 export function newRepeaterItem(fields: FieldMap, id = newId()): Record<string, unknown> {
@@ -125,13 +125,13 @@ const plainText = (html: string) =>
     .trim();
 
 /** A folded panel's name: its title, or the panel type's label. */
-export function panelName(def: AnyPanel | undefined, data: Record<string, unknown>, type: string): string {
+export function panelName(definition: AnyPanel | undefined, data: Record<string, unknown>, type: string): string {
   // Panels have titles; form fields have labels (or a section's legend).
   for (const key of ['title', 'label', 'legend']) {
     const value = data[key];
     if (typeof value === 'string' && value.trim()) return plainText(value);
   }
-  return def?.label ?? type;
+  return definition?.label ?? type;
 }
 
 /** A copy of a panel with a new id, placed right after it. */

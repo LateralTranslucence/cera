@@ -39,9 +39,9 @@ test('save keeps panels of unknown types, in place, with a warning', async () =>
 
 test('save upgrades old panels to the current version', async () => {
   const result = await preparePageForSave(landingPage, clone(), { mode: 'draft' });
-  const tm = result.page!.panels[1]!;
-  assert.equal(tm.v, 2);
-  assert.equal(tm.data.alignment, 'right');
+  const textMedia = result.page!.panels[1]!;
+  assert.equal(textMedia.v, 2);
+  assert.equal(textMedia.data.alignment, 'right');
 });
 
 /* ---------------------------- draft vs publish ---------------------------- */
@@ -112,7 +112,7 @@ test('read: unknown, too-new and unrepairable panels are skipped; the rest rende
     fields: { text: field.text({ required: true }) },
     component: async () => ({ default: () => null }),
   });
-  const ct = defineContentType({ name: 'landing_page', label: 'x', route: '/[slug]', boxes: landingPage.boxes, panels: [...landingPage.panels, quote] });
+  const contentType = defineContentType({ name: 'landing_page', label: 'x', route: '/[slug]', boxes: landingPage.boxes, panels: [...landingPage.panels, quote] });
 
   const raw = clone();
   raw.panels.push(
@@ -120,7 +120,7 @@ test('read: unknown, too-new and unrepairable panels are skipped; the rest rende
     { id: 'n', type: 'cera/text-media', v: 3, data: {} }, // newer than the definition (v2)
     { id: 'q', type: 'quote', v: 1, data: { text: 42 } }, // required field, wrong type, no default
   );
-  const { page, issues } = readPage(ct, raw);
+  const { page, issues } = readPage(contentType, raw);
   assert.deepEqual(page.panels.map((panel) => panel.id), ['p_8f2a', 'p_19cc']);
   assert.deepEqual(
     issues.map((issue) => [issue.code, issue.panelId]),

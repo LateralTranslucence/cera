@@ -66,10 +66,10 @@ export type Finalize<Schema extends z.ZodType, Options> =
   : Options extends { required: true } ? Schema
   : z.ZodOptional<Schema>;
 
-function finalize<Schema extends z.ZodType, Options extends BaseOptions<unknown>>(schema: Schema, opts: Options): Finalize<Schema, Options> {
+function finalize<Schema extends z.ZodType, Options extends BaseOptions<unknown>>(schema: Schema, options: Options): Finalize<Schema, Options> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (opts.default !== undefined) return (schema as any).default(opts.default);
-  if (opts.required) return schema as unknown as Finalize<Schema, Options>;
+  if (options.default !== undefined) return (schema as any).default(options.default);
+  if (options.required) return schema as unknown as Finalize<Schema, Options>;
   return schema.optional() as unknown as Finalize<Schema, Options>;
 }
 
@@ -80,10 +80,10 @@ function metaOf(meta: FieldMeta): FieldMeta {
 function buildField<Kind extends string, Schema, Config = undefined>(
   kind: Kind,
   schema: Schema,
-  opts: FieldMeta,
+  options: FieldMeta,
   config?: Config,
 ): Field<Kind, Schema, Config> {
-  return { kind, schema, meta: metaOf(opts), config: config as Config };
+  return { kind, schema, meta: metaOf(options), config: config as Config };
 }
 
 /** Runtime: field map → Zod object shape. */
@@ -145,7 +145,7 @@ export interface OptionsContext {
   contentTypes: { name: string; label: string; public: boolean }[];
   // TODO: add a typed DB/query handle once the Supabase layer exists.
 }
-export type OptionsSource = (ctx: OptionsContext) => Option[] | Promise<Option[]>;
+export type OptionsSource = (context: OptionsContext) => Option[] | Promise<Option[]>;
 
 /* ------------------------------------------------------------------ */
 /* Builders                                                            */
@@ -158,111 +158,111 @@ export const MAX_SVG_LENGTH = 100_000;
 
 export const field = {
   /** Single-line text (theme: `text`, `varchar`). */
-  text: <const Options extends StrOpts = {}>(opts: Options = {} as Options) =>
-    buildField<'text', Finalize<z.ZodString, Options>>('text', finalize(z.string(), opts), opts),
+  text: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'text', Finalize<z.ZodString, Options>>('text', finalize(z.string(), options), options),
 
   /** Multi-line plain text (theme: `textarea`). */
-  textarea: <const Options extends StrOpts = {}>(opts: Options = {} as Options) =>
-    buildField<'textarea', Finalize<z.ZodString, Options>>('textarea', finalize(z.string(), opts), opts),
+  textarea: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'textarea', Finalize<z.ZodString, Options>>('textarea', finalize(z.string(), options), options),
 
   /** Rich text stored as sanitized HTML (theme: `html`, `wp_editor`, `wp_editor_limited`). */
-  html: <const Options extends StrOpts & { toolbar?: 'full' | 'limited' } = {}>(opts: Options = {} as Options) =>
-    buildField<'html', Finalize<z.ZodString, Options>, { toolbar: 'full' | 'limited' }>('html', finalize(z.string(), opts), opts, { toolbar: opts.toolbar ?? 'full' }),
+  html: <const Options extends StrOpts & { toolbar?: 'full' | 'limited' } = {}>(options: Options = {} as Options) =>
+    buildField<'html', Finalize<z.ZodString, Options>, { toolbar: 'full' | 'limited' }>('html', finalize(z.string(), options), options, { toolbar: options.toolbar ?? 'full' }),
 
   /** URL or internal path (theme: `url`). */
-  url: <const Options extends StrOpts = {}>(opts: Options = {} as Options) =>
-    buildField<'url', Finalize<z.ZodString, Options>>('url', finalize(z.string(), opts), opts),
+  url: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'url', Finalize<z.ZodString, Options>>('url', finalize(z.string(), options), options),
 
   /** Icon key from the icon library (theme: `icon`, devo_icon post type). */
-  icon: <const Options extends StrOpts = {}>(opts: Options = {} as Options) =>
-    buildField<'icon', Finalize<z.ZodString, Options>>('icon', finalize(z.string(), opts), opts),
+  icon: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'icon', Finalize<z.ZodString, Options>>('icon', finalize(z.string(), options), options),
 
   /**
    * An SVG drawing (custom icons; theme: the icon post type's File). Cleaned
    * on save to shapes only, with black turned into currentColor (svg.ts).
    */
-  svg: <const Options extends StrOpts = {}>(opts: Options = {} as Options) =>
-    buildField<'svg', Finalize<z.ZodString, Options>>('svg', finalize(z.string().max(MAX_SVG_LENGTH), opts), opts),
+  svg: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'svg', Finalize<z.ZodString, Options>>('svg', finalize(z.string().max(MAX_SVG_LENGTH), options), options),
 
   /** Boolean, always present, defaults to false (theme: `binary`). */
-  toggle: (opts: FieldMeta & { default?: boolean } = {}) =>
-    buildField('toggle', z.boolean().default(opts.default ?? false), opts),
+  toggle: (options: FieldMeta & { default?: boolean } = {}) =>
+    buildField('toggle', z.boolean().default(options.default ?? false), options),
 
   /** Number (theme: `int`). */
-  number: <const Options extends BaseOptions<number> & { min?: number; max?: number; int?: boolean } = {}>(opts: Options = {} as Options) => {
+  number: <const Options extends BaseOptions<number> & { min?: number; max?: number; int?: boolean } = {}>(options: Options = {} as Options) => {
     let schema = z.number();
-    if (opts.int) schema = schema.int();
-    if (opts.min !== undefined) schema = schema.min(opts.min);
-    if (opts.max !== undefined) schema = schema.max(opts.max);
-    return buildField<'number', Finalize<z.ZodNumber, Options>, { min?: number; max?: number }>('number', finalize(schema, opts), opts, { min: opts.min, max: opts.max });
+    if (options.int) schema = schema.int();
+    if (options.min !== undefined) schema = schema.min(options.min);
+    if (options.max !== undefined) schema = schema.max(options.max);
+    return buildField<'number', Finalize<z.ZodNumber, Options>, { min?: number; max?: number }>('number', finalize(schema, options), options, { min: options.min, max: options.max });
   },
 
   /** Items per row in a grid (theme: `per_row`). Theme note: "Default is 3." */
-  perRow: (opts: FieldMeta & { default?: number; max?: number } = {}) =>
-    buildField('perRow', z.number().int().min(1).max(opts.max ?? 6).default(opts.default ?? 3), opts, { max: opts.max ?? 6 }),
+  perRow: (options: FieldMeta & { default?: number; max?: number } = {}) =>
+    buildField('perRow', z.number().int().min(1).max(options.max ?? 6).default(options.default ?? 3), options, { max: options.max ?? 6 }),
 
   /**
    * Select with static options. Value type is the union of option keys.
    *   field.select({ options: { card: 'Card (default)', plain: 'Plain' }, default: 'card' })
    */
-  select: <const Options extends BaseOptions<string> & { options: Record<string, string> }>(opts: Options) => {
-    const keys = Object.keys(opts.options) as [string, ...string[]];
+  select: <const Options extends BaseOptions<string> & { options: Record<string, string> }>(options: Options) => {
+    const keys = Object.keys(options.options) as [string, ...string[]];
     const schema = z.enum(keys) as unknown as z.ZodType<keyof Options['options'] & string>;
-    return buildField<'select', Finalize<typeof schema, Options>, { options: Options['options'] }>('select', finalize(schema, opts), opts, { options: opts.options });
+    return buildField<'select', Finalize<typeof schema, Options>, { options: Options['options'] }>('select', finalize(schema, options), options, { options: options.options });
   },
 
   /**
    * Select whose options are resolved at edit time (theme: `select` / `select_multiple`
    * with a callback like 'devo_get_public_post_types'). Value is not narrowed at the type level.
    */
-  selectFrom: <const Options extends FieldMeta & { options: OptionsSource; multiple?: boolean }>(opts: Options) => {
-    const schema = (opts.multiple ? z.array(z.string()).default([]) : z.string().optional()) as unknown as
+  selectFrom: <const Options extends FieldMeta & { options: OptionsSource; multiple?: boolean }>(options: Options) => {
+    const schema = (options.multiple ? z.array(z.string()).default([]) : z.string().optional()) as unknown as
       Options extends { multiple: true } ? z.ZodDefault<z.ZodArray<z.ZodString>> : z.ZodOptional<z.ZodString>;
-    return buildField<'selectFrom', typeof schema, { options: OptionsSource; multiple: boolean }>('selectFrom', schema, opts, { options: opts.options, multiple: !!opts.multiple });
+    return buildField<'selectFrom', typeof schema, { options: OptionsSource; multiple: boolean }>('selectFrom', schema, options, { options: options.options, multiple: !!options.multiple });
   },
 
   /** Single media item (theme: `media`). */
-  media: <const Options extends BaseOptions<MediaRef> & { accept?: Array<'image' | 'video' | 'embed'> } = {}>(opts: Options = {} as Options) =>
-    buildField<'media', Finalize<typeof mediaRef, Options>, { accept: Array<'image' | 'video' | 'embed'> }>('media', finalize(mediaRef, opts), opts, { accept: opts.accept ?? ['image', 'video', 'embed'] }),
+  media: <const Options extends BaseOptions<MediaRef> & { accept?: Array<'image' | 'video' | 'embed'> } = {}>(options: Options = {} as Options) =>
+    buildField<'media', Finalize<typeof mediaRef, Options>, { accept: Array<'image' | 'video' | 'embed'> }>('media', finalize(mediaRef, options), options, { accept: options.accept ?? ['image', 'video', 'embed'] }),
 
   /** Ordered list of media (theme: `gallery`). */
-  gallery: (opts: FieldMeta & { limit?: number } = {}) => {
+  gallery: (options: FieldMeta & { limit?: number } = {}) => {
     let schema = z.array(mediaRef);
-    if (opts.limit) schema = schema.max(opts.limit);
-    return buildField('gallery', schema.default([]), opts, { limit: opts.limit });
+    if (options.limit) schema = schema.max(options.limit);
+    return buildField('gallery', schema.default([]), options, { limit: options.limit });
   },
 
   /** Section background (theme: `background`). */
-  background: (opts: FieldMeta = {}) =>
-    buildField('background', background.default({ overlay: false }), opts),
+  background: (options: FieldMeta = {}) =>
+    buildField('background', background.default({ overlay: false }), options),
 
   /** One call to action (theme: `cta`). */
-  cta: <const Options extends BaseOptions<CTA> = {}>(opts: Options = {} as Options) =>
-    buildField<'cta', Finalize<typeof cta, Options>>('cta', finalize(cta, opts), opts),
+  cta: <const Options extends BaseOptions<CTA> = {}>(options: Options = {} as Options) =>
+    buildField<'cta', Finalize<typeof cta, Options>>('cta', finalize(cta, options), options),
 
   /** List of calls to action (theme: `ctas`). */
-  ctas: (opts: FieldMeta & { limit?: number } = {}) => {
+  ctas: (options: FieldMeta & { limit?: number } = {}) => {
     let schema = z.array(cta);
-    if (opts.limit) schema = schema.max(opts.limit);
-    return buildField('ctas', schema.default([]), opts, { limit: opts.limit });
+    if (options.limit) schema = schema.max(options.limit);
+    return buildField('ctas', schema.default([]), options, { limit: options.limit });
   },
 
   /**
    * Repeating group (theme: `multi_array`). Items get a stable `_id`
    * so the admin can reorder/key them without index-based keys.
    */
-  repeater: <const Fields extends FieldMap>(opts: FieldMeta & { fields: Fields; limit?: number; min?: number; itemTitle?: keyof Fields & string }) => {
+  repeater: <const Fields extends FieldMap>(options: FieldMeta & { fields: Fields; limit?: number; min?: number; itemTitle?: keyof Fields & string }) => {
     // Loose for the same reason as objectSchema: unknown keys survive a save.
-    const item = z.looseObject({ _id: z.string(), ...shapeOf(opts.fields) });
+    const item = z.looseObject({ _id: z.string(), ...shapeOf(options.fields) });
     let schema = z.array(item);
-    if (opts.limit) schema = schema.max(opts.limit);
-    if (opts.min) schema = schema.min(opts.min);
+    if (options.limit) schema = schema.max(options.limit);
+    if (options.min) schema = schema.min(options.min);
     type Item = { _id: string } & InferFields<Fields>;
-    return buildField<'repeater', z.ZodDefault<z.ZodType<Item[]>>, { fields: Fields; limit?: number; min?: number; itemTitle?: keyof Fields & string }>('repeater', schema.default([]) as never, opts, {
-      fields: opts.fields,
-      limit: opts.limit,
-      min: opts.min,
-      itemTitle: opts.itemTitle,
+    return buildField<'repeater', z.ZodDefault<z.ZodType<Item[]>>, { fields: Fields; limit?: number; min?: number; itemTitle?: keyof Fields & string }>('repeater', schema.default([]) as never, options, {
+      fields: options.fields,
+      limit: options.limit,
+      min: options.min,
+      itemTitle: options.itemTitle,
     });
   },
 
@@ -272,10 +272,10 @@ export const field = {
    * types from a sibling field at edit time (theme: settings.post_types_field).
    * Always an array; `limit: 1` for a single pick.
    */
-  relation: (opts: FieldMeta & { to: string[] | { field: string }; limit?: number }) => {
+  relation: (options: FieldMeta & { to: string[] | { field: string }; limit?: number }) => {
     let schema = z.array(z.string());
-    if (opts.limit) schema = schema.max(opts.limit);
-    return buildField('relation', schema.default([]), opts, { to: opts.to, limit: opts.limit });
+    if (options.limit) schema = schema.max(options.limit);
+    return buildField('relation', schema.default([]), options, { to: options.to, limit: options.limit });
   },
 } as const;
 
@@ -283,9 +283,9 @@ export const field = {
  * Stats list (theme: `stats`). Theme note: "Number Field: can ONLY be a number."
  * TODO(verify): confirm sub-fields against the theme's stats field definition.
  */
-export const stats = (opts: FieldMeta = {}) =>
+export const stats = (options: FieldMeta = {}) =>
   field.repeater({
-    ...opts,
+    ...options,
     itemTitle: 'label',
     fields: {
       number: field.number({ required: true }),
@@ -299,8 +299,8 @@ export const stats = (opts: FieldMeta = {}) =>
 export function custom<Kind extends string, Schema extends z.ZodType, Config = undefined>(
   kind: Kind,
   schema: Schema,
-  opts: FieldMeta = {},
+  options: FieldMeta = {},
   config?: Config,
 ): Field<Kind, Schema, Config> {
-  return buildField(kind, schema, opts, config);
+  return buildField(kind, schema, options, config);
 }

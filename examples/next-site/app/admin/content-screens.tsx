@@ -16,13 +16,13 @@ import { Shell, type ShellSection } from './Shell.tsx';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function ListScreen({ ct, group, deleted }: { ct: AnyContentType; group: string; deleted?: string }) {
+export async function ListScreen({ contentType, group, deleted }: { contentType: AnyContentType; group: string; deleted?: string }) {
   const staff = await requireStaff();
-  const place = placeOf(ct.name);
-  const pages = await listPages(staff.client, { contentType: ct.name });
+  const place = placeOf(contentType.name);
+  const pages = await listPages(staff.client, { contentType: contentType.name });
   // Icons show themselves: the cleaned SVG of each working copy.
   const previews =
-    ct.name === iconType.name
+    contentType.name === iconType.name
       ? Object.fromEntries((await supabaseIcons(staff.client, { draft: true }).get(pages.map((page) => page.id))).map((glyph) => [glyph.value.slice('custom:'.length), glyph.svg]))
       : undefined;
 
@@ -46,30 +46,30 @@ export async function ListScreen({ ct, group, deleted }: { ct: AnyContentType; g
             Deleted “{deleted}”.
           </p>
         )}
-        <ContentListClient pages={pages} contentType={ct.name} previews={previews} />
+        <ContentListClient pages={pages} contentType={contentType.name} previews={previews} />
       </div>
     </Shell>
   );
 }
 
-export async function NewScreen({ ct }: { ct: AnyContentType }) {
+export async function NewScreen({ contentType }: { contentType: AnyContentType }) {
   const staff = await requireStaff('editor');
-  const page: StoredPage = { id: randomUUID(), contentType: ct.name, slug: '', title: '', boxes: {}, panels: [] };
+  const page: StoredPage = { id: randomUUID(), contentType: contentType.name, slug: '', title: '', boxes: {}, panels: [] };
   return (
-    <Shell staff={staff} active={placeOf(ct.name).section as ShellSection}>
+    <Shell staff={staff} active={placeOf(contentType.name).section as ShellSection}>
       <EditorClient page={page} version={0} published={false} readOnly={false} />
     </Shell>
   );
 }
 
-export async function EditScreen({ ct, id }: { ct: AnyContentType; id: string }) {
+export async function EditScreen({ contentType, id }: { contentType: AnyContentType; id: string }) {
   const staff = await requireStaff();
   if (!UUID.test(id)) notFound();
   // Read as the signed-in user: row-level security decides what they can see.
-  const editable = await getPageForEditing(staff.client, ct, id);
+  const editable = await getPageForEditing(staff.client, contentType, id);
   if (!editable) notFound();
   return (
-    <Shell staff={staff} active={placeOf(ct.name).section as ShellSection}>
+    <Shell staff={staff} active={placeOf(contentType.name).section as ShellSection}>
       <EditorClient
         page={editable.page}
         version={editable.version}

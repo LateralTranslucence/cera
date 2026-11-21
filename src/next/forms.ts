@@ -42,13 +42,13 @@ export function defaultIp(request: Request): string | undefined {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip')?.trim() || undefined;
 }
 
-export function createFormHandler(opts: FormHandlerOptions) {
-  const ipOf = opts.ip ?? defaultIp;
+export function createFormHandler(options: FormHandlerOptions) {
+  const ipOf = options.ip ?? defaultIp;
 
   async function GET(request: Request): Promise<Response> {
     const formId = new URL(request.url).searchParams.get('form') ?? '';
     if (!UUID.test(formId)) return json({ error: 'Unknown form.' }, 400);
-    return json({ token: issueFormToken(opts.secret(), formId) });
+    return json({ token: issueFormToken(options.secret(), formId) });
   }
 
   async function POST(request: Request): Promise<Response> {
@@ -71,7 +71,7 @@ export function createFormHandler(opts: FormHandlerOptions) {
     // A bot filled the field people never see: pretend it worked.
     if (text(HONEYPOT_FIELD)) return json({ ok: true });
 
-    const secret = opts.secret();
+    const secret = options.secret();
     const token = checkFormToken(secret, formId, text(TOKEN_FIELD));
     if (token === 'too-fast') return json({ ok: false, reason: 'too-fast', message: 'That was very quick. Wait a moment, then send the form again.' }, 429);
     if (token === 'expired') {
@@ -79,7 +79,7 @@ export function createFormHandler(opts: FormHandlerOptions) {
     }
     if (token === 'invalid') return bad('The form couldn’t be checked. Reload the page and try again.', 403);
 
-    const client = opts.client();
+    const client = options.client();
     const form = await getLiveForm(client, formId);
     if (!form) return json({ ok: false, reason: 'not-live', message: 'This form isn’t taking submissions right now.' }, 404);
 
@@ -93,7 +93,7 @@ export function createFormHandler(opts: FormHandlerOptions) {
     const stored = await addSubmission(
       client,
       { form, values: check.values, email: check.email, pagePath: pagePath.startsWith('/') ? pagePath : undefined, senderKey: senderKey(secret, ipOf(request)) },
-      opts.limit,
+      options.limit,
     );
     if (!stored.ok) {
       return stored.reason === 'rate-limited'
@@ -101,9 +101,9 @@ export function createFormHandler(opts: FormHandlerOptions) {
         : json({ ok: false, reason: 'not-live', message: 'This form changed while you were filling it in. Reload the page and send it again.' }, 409);
     }
 
-    if (opts.afterSubmit) {
+    if (options.afterSubmit) {
       try {
-        await opts.afterSubmit({ id: stored.id, form, values: check.values, email: check.email });
+        await options.afterSubmit({ id: stored.id, form, values: check.values, email: check.email });
       } catch (error) {
         console.error(`cera: afterSubmit failed for submission ${stored.id}`, error);
       }

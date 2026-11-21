@@ -139,15 +139,15 @@ export function publicForm(page: PageOf<FormType>, version: number): PublicForm 
       const seen = new Set<string>();
       field.options = [];
       for (const option of data.options as Array<Record<string, unknown>>) {
-        const optLabel = clean(option.label);
-        const value = clean(option.value) || optLabel;
+        const optionLabel = clean(option.label);
+        const value = clean(option.value) || optionLabel;
         if (!value || seen.has(value)) continue;
         seen.add(value);
-        field.options.push({ label: optLabel || value, value, ...(clean(option.description) && { description: clean(option.description) }) });
+        field.options.push({ label: optionLabel || value, value, ...(clean(option.description) && { description: clean(option.description) }) });
       }
     }
     if (type === 'range') {
-      const int = (input: unknown, dflt: number) => (typeof input === 'number' && Number.isFinite(input) ? Math.max(-1e9, Math.min(1e9, Math.round(input))) : dflt);
+      const int = (input: unknown, fallback: number) => (typeof input === 'number' && Number.isFinite(input) ? Math.max(-1e9, Math.min(1e9, Math.round(input))) : fallback);
       const min = int(data.min, 0);
       field.min = min;
       field.max = Math.max(min, int(data.max, 100));

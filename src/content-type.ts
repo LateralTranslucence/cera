@@ -153,7 +153,7 @@ export function defineContentType<
 }
 
 /** A page's public URL: the content type's `url`, or its `route` with `[slug]` filled in. */
-export function pageUrl<Type extends AnyContentType>(ct: Type, page: PageOf<Type>): string {
-  if (ct.url) return ct.url(page);
-  return ct.route ? ct.route.replace('[slug]', encodeURIComponent(page.slug)) : '';
+export function pageUrl<Type extends AnyContentType>(contentType: Type, page: PageOf<Type>): string {
+  if (contentType.url) return contentType.url(page);
+  return contentType.route ? contentType.route.replace('[slug]', encodeURIComponent(page.slug)) : '';
 }

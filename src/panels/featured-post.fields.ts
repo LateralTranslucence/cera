@@ -10,7 +10,7 @@ export const featuredPostFields = {
     label: 'Post Type',
     note: 'Limits which pages you can pick below. None ticked: any type.',
     multiple: true,
-    options: (ctx) => ctx.contentTypes.filter((contentType) => contentType.public).map((contentType) => ({ label: contentType.label, value: contentType.name })),
+    options: (context) => context.contentTypes.filter((contentType) => contentType.public).map((contentType) => ({ label: contentType.label, value: contentType.name })),
   }),
   post: field.relation({ label: 'Post', to: { field: 'postTypes' }, limit: 1 }),
   overrideImage: field.media({ label: 'Override Image', note: 'Default: the page’s SEO image.' }),

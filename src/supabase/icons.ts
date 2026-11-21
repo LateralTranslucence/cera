@@ -25,15 +25,15 @@ interface IconRow {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function supabaseIcons(client: SupabaseClient, opts: { draft: boolean; label?: string }): IconSet {
+export function supabaseIcons(client: SupabaseClient, options: { draft: boolean; label?: string }): IconSet {
   const rows = async (ids?: readonly string[]): Promise<Array<IconRow & { live: boolean }>> => {
-    const query = opts.draft
+    const query = options.draft
       ? client.from('cera_pages').select('id, title, boxes').eq('content_type', iconType.name)
       : client.from('cera_page_revisions').select('page_id, title, boxes').eq('content_type', iconType.name).eq('is_published', true);
-    const { data, error } = ids ? await (opts.draft ? query.in('id', ids) : query.in('page_id', ids)) : await query;
+    const { data, error } = ids ? await (options.draft ? query.in('id', ids) : query.in('page_id', ids)) : await query;
     if (error) fail(error);
     const found = ((data ?? []) as Array<Omit<IconRow, 'id'> & { id?: string; page_id?: string }>).map((row) => ({ ...row, id: (row.id ?? row.page_id)! }));
-    if (!opts.draft || found.length === 0) return found.map((row) => ({ ...row, live: true }));
+    if (!options.draft || found.length === 0) return found.map((row) => ({ ...row, live: true }));
     const live = await client.from('cera_page_revisions').select('page_id').in('page_id', found.map((row) => row.id)).eq('is_published', true);
     if (live.error) fail(live.error);
     const liveIds = new Set((live.data as Array<{ page_id: string }>).map((revision) => revision.page_id));
@@ -48,7 +48,7 @@ export function supabaseIcons(client: SupabaseClient, opts: { draft: boolean; la
 
   return {
     name: 'custom',
-    label: opts.label ?? 'Your icons',
+    label: options.label ?? 'Your icons',
 
     async search(query, limit) {
       const words = queryWords(query);

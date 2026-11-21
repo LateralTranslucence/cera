@@ -23,8 +23,8 @@ type State =
   | { kind: 'error'; message: string; errors: Record<string, string> };
 
 export function FormClient({ form, endpoint, preview = false }: { form: PublicForm; endpoint: string; preview?: boolean }) {
-  const uid = useId();
-  const idFor = (name: string) => `${uid}-${name}`;
+  const baseId = useId();
+  const idFor = (name: string) => `${baseId}-${name}`;
   const [state, setState] = useState<State>({ kind: 'idle' });
   const [token, setToken] = useState<string | null>(null);
   const [hidden, setHidden] = useState<Record<string, string>>({});
@@ -76,8 +76,8 @@ export function FormClient({ form, endpoint, preview = false }: { form: PublicFo
         setToken(current);
       }
       body.set(TOKEN_FIELD, current);
-      const res = await fetch(endpoint, { method: 'POST', body, headers: { Accept: 'application/json' } });
-      const result = (await res.json()) as FormResponse;
+      const response = await fetch(endpoint, { method: 'POST', body, headers: { Accept: 'application/json' } });
+      const result = (await response.json()) as FormResponse;
       if (result.ok) {
         if (form.thankYouRedirect) window.location.assign(form.thankYouRedirect);
         else setState({ kind: 'sent' });
@@ -183,12 +183,12 @@ function Field({ field, id, error, hiddenValue }: { field: FormField; id: string
       )}
     </>
   );
-  const wrap = (children: ReactNode) => <div className={`cera-form__field cera-form__field--${field.type}${error ? ' has-error' : ''}`}>{children}</div>;
+  const wrapField = (children: ReactNode) => <div className={`cera-form__field cera-form__field--${field.type}${error ? ' has-error' : ''}`}>{children}</div>;
 
   // Groups of choices: a fieldset whose legend is the label.
   if (field.type === 'radio' || field.type === 'button-select' || field.type === 'checkbox') {
     const multiple = field.type === 'checkbox';
-    return wrap(
+    return wrapField(
       <fieldset
         className="cera-form__choices"
         {...(!multiple && { role: 'radiogroup' })}
@@ -202,13 +202,13 @@ function Field({ field, id, error, hiddenValue }: { field: FormField; id: string
         </legend>
         {(field.options ?? []).map((option, i) => {
           const optionId = i === 0 ? id : `${id}-${i}`;
-          const descId = option.description ? `${optionId}-desc` : undefined;
+          const descriptionId = option.description ? `${optionId}-desc` : undefined;
           return (
             <div key={option.value} className="cera-form__choice">
-              <input id={optionId} type={multiple ? 'checkbox' : 'radio'} name={field.name} value={option.value} aria-describedby={descId} />
+              <input id={optionId} type={multiple ? 'checkbox' : 'radio'} name={field.name} value={option.value} aria-describedby={descriptionId} />
               <label htmlFor={optionId}>
                 <span>{option.label}</span>
-                {option.description && <span id={descId} className="cera-form__choice-desc">{option.description}</span>}
+                {option.description && <span id={descriptionId} className="cera-form__choice-desc">{option.description}</span>}
               </label>
             </div>
           );
@@ -219,7 +219,7 @@ function Field({ field, id, error, hiddenValue }: { field: FormField; id: string
   }
 
   if (field.type === 'binary') {
-    return wrap(
+    return wrapField(
       <>
         <div className="cera-form__choice">
           <input id={id} type="checkbox" name={field.name} value="yes" {...aria} />
@@ -232,9 +232,9 @@ function Field({ field, id, error, hiddenValue }: { field: FormField; id: string
     );
   }
 
-  if (field.type === 'toggle') return wrap(<Toggle field={field} id={id} aria={aria} label={labelText} labelClass={labelClass} extras={extras} />);
+  if (field.type === 'toggle') return wrapField(<Toggle field={field} id={id} aria={aria} label={labelText} labelClass={labelClass} extras={extras} />);
 
-  if (field.type === 'range') return wrap(<Range field={field} id={id} aria={aria} label={labelText} labelClass={labelClass} extras={extras} />);
+  if (field.type === 'range') return wrapField(<Range field={field} id={id} aria={aria} label={labelText} labelClass={labelClass} extras={extras} />);
 
   const input =
     field.type === 'textarea' ? (
@@ -259,7 +259,7 @@ function Field({ field, id, error, hiddenValue }: { field: FormField; id: string
         {...aria}
       />
     );
-  return wrap(
+  return wrapField(
     <>
       <label htmlFor={id} className={labelClass}>
         {labelText}

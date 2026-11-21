@@ -41,19 +41,19 @@ export async function Panels<Type extends AnyContentType>({
 
   const prepared = await Promise.all(
     visible.map(async (instance, index) => {
-      const def = byType.get(instance.type);
-      if (!def) return null;
+      const definition = byType.get(instance.type);
+      if (!definition) return null;
       const panel: PanelContext = { pageId: page.id, panelId: instance.id, index, contentType: contentType.name };
       try {
-        const [mod, loaded] = await Promise.all([
-          def.component(),
-          def.load
+        const [componentModule, loaded] = await Promise.all([
+          definition.component(),
+          definition.load
             ? loadContext
-              ? def.load(instance.data as Record<string, unknown>, { ...loadContext, page: { id: page.id, contentType: contentType.name, slug: page.slug }, panel })
+              ? definition.load(instance.data as Record<string, unknown>, { ...loadContext, page: { id: page.id, contentType: contentType.name, slug: page.slug }, panel })
               : Promise.reject(new Error(`Panel "${instance.type}" loads data, but <Panels> was given no loadContext.`))
             : undefined,
         ]);
-        return { instance, panel, loaded, hasLoad: Boolean(def.load), Component: mod.default as ComponentType<Record<string, unknown>> };
+        return { instance, panel, loaded, hasLoad: Boolean(definition.load), Component: componentModule.default as ComponentType<Record<string, unknown>> };
       } catch (error) {
         onError(error, instance);
         return null;

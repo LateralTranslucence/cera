@@ -21,18 +21,18 @@ export function StatCount({ value, decimal = false, countDown = false }: { value
   const [shown, setShown] = useState(end);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    if (el.getBoundingClientRect().top < window.innerHeight) return; // already visible: keep the final value
+    const element = ref.current;
+    if (!element || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (element.getBoundingClientRect().top < window.innerHeight) return; // already visible: keep the final value
     setShown(start);
     let frame = 0;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry?.isIntersecting) return;
         observer.disconnect();
-        const t0 = performance.now();
+        const startTime = performance.now();
         const tick = (now: number) => {
-          const progress = Math.min((now - t0) / DURATION, 1);
+          const progress = Math.min((now - startTime) / DURATION, 1);
           setShown(start + (end - start) * ease(progress));
           if (progress < 1) frame = requestAnimationFrame(tick);
         };
@@ -40,7 +40,7 @@ export function StatCount({ value, decimal = false, countDown = false }: { value
       },
       { threshold: 0.5 },
     );
-    observer.observe(el);
+    observer.observe(element);
     return () => {
       observer.disconnect();
       cancelAnimationFrame(frame);

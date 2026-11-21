@@ -45,7 +45,7 @@ export interface IconResolver {
 export interface IconLibrary extends IconResolver {
   sets: ReadonlyArray<{ name: string; label: string }>;
   /** Matches from every set (or just `set`), `limit` per set, in the library's set order. */
-  search(query: string, opts?: { limit?: number; set?: string }): Promise<IconGlyph[]>;
+  search(query: string, options?: { limit?: number; set?: string }): Promise<IconGlyph[]>;
 }
 
 const SET_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -70,9 +70,9 @@ export function createIconLibrary(sets: readonly IconSet[]): IconLibrary {
   return {
     sets: sets.map((iconSet) => ({ name: iconSet.name, label: iconSet.label })),
 
-    async search(query, opts = {}) {
-      const limit = Math.min(Math.max(opts.limit ?? 48, 1), 200);
-      const chosen = opts.set ? sets.filter((iconSet) => iconSet.name === opts.set) : sets;
+    async search(query, options = {}) {
+      const limit = Math.min(Math.max(options.limit ?? 48, 1), 200);
+      const chosen = options.set ? sets.filter((iconSet) => iconSet.name === options.set) : sets;
       const found = await Promise.all(chosen.map((iconSet) => Promise.resolve(iconSet.search(query.trim(), limit)).then((matches) => matches.slice(0, limit))));
       return found.flat();
     },
@@ -129,6 +129,6 @@ export function queryWords(query: string): string[] {
 }
 
 /** Escapes an SVG attribute value. */
-export function attr(value: string | number): string {
+export function escapeAttribute(value: string | number): string {
   return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }

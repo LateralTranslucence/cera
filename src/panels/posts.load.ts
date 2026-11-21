@@ -5,8 +5,8 @@ import type { InferFields } from '../fields.ts';
 import type { LoadContext } from '../panel.ts';
 import type { postsFields } from './posts.fields.ts';
 
-export async function loadPosts(data: InferFields<typeof postsFields>, ctx: LoadContext) {
-  return { pages: data.posts.length > 0 ? await ctx.pages.byIds(data.posts) : [] };
+export async function loadPosts(data: InferFields<typeof postsFields>, context: LoadContext) {
+  return { pages: data.posts.length > 0 ? await context.pages.byIds(data.posts) : [] };
 }
 
 export type PostsLoaded = Awaited<ReturnType<typeof loadPosts>>;

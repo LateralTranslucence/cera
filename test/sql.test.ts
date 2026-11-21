@@ -43,8 +43,8 @@ test('a draft save creates the page and a revision, but nothing is public', asyn
   const result = await save(page(id, 'draft-only', 'Draft'), 0, false);
   assert.equal(result.version, 1);
   assert.deepEqual(await publicLookup('draft-only'), []);
-  const revs = await queryAs(db, 'service_role', 'select kind, is_published from public.cera_page_revisions where page_id = $1', [id]);
-  assert.deepEqual(revs, [{ kind: 'draft', is_published: false }]);
+  const revisions = await queryAs(db, 'service_role', 'select kind, is_published from public.cera_page_revisions where page_id = $1', [id]);
+  assert.deepEqual(revisions, [{ kind: 'draft', is_published: false }]);
 });
 
 test('publishing makes a revision live; later drafts do not change the live page', async () => {

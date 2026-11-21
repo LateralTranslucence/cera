@@ -13,7 +13,7 @@
  * `fa-solid:house`. Search matches icon names and their aliases (the
  * packages don't carry Font Awesome's search keywords).
  */
-import { attr, iconLabel, matchScore, queryWords, type IconGlyph, type IconSet } from './library.ts';
+import { escapeAttribute, iconLabel, matchScore, queryWords, type IconGlyph, type IconSet } from './library.ts';
 
 /** The shape of an icon in Font Awesome's `*-svg-icons` packages. */
 export interface FontAwesomeIcon {
@@ -23,25 +23,25 @@ export interface FontAwesomeIcon {
   icon: [number, number, Array<string | number>, string, string | string[]];
 }
 
-export function fontAwesomeIcons(opts: { name: string; label: string; icons: Record<string, FontAwesomeIcon> | readonly FontAwesomeIcon[] }): IconSet {
+export function fontAwesomeIcons(options: { name: string; label: string; icons: Record<string, FontAwesomeIcon> | readonly FontAwesomeIcon[] }): IconSet {
   // Packages export each icon under several names (faHouse, faHome): keep one per iconName.
   const byName = new Map<string, FontAwesomeIcon>();
-  for (const def of Object.values(opts.icons)) {
-    if (def && typeof def === 'object' && typeof def.iconName === 'string' && Array.isArray(def.icon)) byName.set(def.iconName, def);
+  for (const definition of Object.values(options.icons)) {
+    if (definition && typeof definition === 'object' && typeof definition.iconName === 'string' && Array.isArray(definition.icon)) byName.set(definition.iconName, definition);
   }
   const names = [...byName.keys()].sort();
 
   const glyph = (name: string): IconGlyph => {
     const [width, height, , , path] = byName.get(name)!.icon;
     const paths = Array.isArray(path)
-      ? `<path d="${attr(path[0] ?? '')}" opacity="0.4"/><path d="${attr(path[1] ?? '')}"/>`
-      : `<path d="${attr(path)}"/>`;
-    return { value: `${opts.name}:${name}`, label: iconLabel(name), svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" fill="currentColor">${paths}</svg>` };
+      ? `<path d="${escapeAttribute(path[0] ?? '')}" opacity="0.4"/><path d="${escapeAttribute(path[1] ?? '')}"/>`
+      : `<path d="${escapeAttribute(path)}"/>`;
+    return { value: `${options.name}:${name}`, label: iconLabel(name), svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" fill="currentColor">${paths}</svg>` };
   };
 
   return {
-    name: opts.name,
-    label: opts.label,
+    name: options.name,
+    label: options.label,
     search(query, limit) {
       const words = queryWords(query);
       const scored: Array<[number, string]> = [];

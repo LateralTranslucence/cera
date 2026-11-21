@@ -17,7 +17,7 @@ const common = {
   note: field.text({ label: 'Help text', note: 'Shown under the field.' }),
 };
 
-const options = (opts: { describe?: boolean } = {}) =>
+const options = (settings: { describe?: boolean } = {}) =>
   field.repeater({
     label: 'Options',
     itemTitle: 'label',
@@ -25,7 +25,7 @@ const options = (opts: { describe?: boolean } = {}) =>
     fields: {
       label: field.text({ label: 'Label', required: true }),
       value: field.text({ label: 'Value', note: 'Saved with the answer. Default: the label.' }),
-      ...(opts.describe ? { description: field.text({ label: 'Description' }) } : {}),
+      ...(settings.describe ? { description: field.text({ label: 'Description' }) } : {}),
     },
   });
 

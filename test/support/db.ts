@@ -61,10 +61,10 @@ export async function queryAs<Row = Record<string, unknown>>(
   params: unknown[] = [],
   claims: Record<string, unknown> = {},
 ): Promise<Row[]> {
-  return db.transaction(async (tx) => {
-    await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)]);
-    await tx.exec(`set local role ${role}`);
-    const result = await tx.query<Row>(sql, params);
+  return db.transaction(async (transaction) => {
+    await transaction.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)]);
+    await transaction.exec(`set local role ${role}`);
+    const result = await transaction.query<Row>(sql, params);
     return result.rows;
   });
 }
@@ -72,8 +72,8 @@ export async function queryAs<Row = Record<string, unknown>>(
 type PgError = { code?: string; message: string };
 
 function toError(error: unknown): PgError {
-  const err = error as { code?: string; message?: string };
-  return { code: err.code, message: err.message ?? String(error) };
+  const databaseError = error as { code?: string; message?: string };
+  return { code: databaseError.code, message: databaseError.message ?? String(error) };
 }
 
 /**
@@ -98,8 +98,8 @@ export function fakeSupabase(
     let limit = '';
     // [column, value, operator]: `=` for eq, `= any` for in (value is an array), `ilike` for ilike.
     const filters: Array<[string, unknown, 'eq' | 'in' | 'ilike']> = [];
-    const condition = ([column, , op]: (typeof filters)[number], i: number) =>
-      op === 'in' ? `${column}::text = any($${i + 1}::text[])` : op === 'ilike' ? `${column} ilike $${i + 1}` : `${column} = $${i + 1}`;
+    const condition = ([column, , operator]: (typeof filters)[number], i: number) =>
+      operator === 'in' ? `${column}::text = any($${i + 1}::text[])` : operator === 'ilike' ? `${column} ilike $${i + 1}` : `${column} = $${i + 1}`;
     const run = async (single: boolean) => {
       const where = filters.length ? ` where ${filters.map(condition).join(' and ')}` : '';
       try {
@@ -111,8 +111,8 @@ export function fakeSupabase(
       }
     };
     const builder = {
-      select(cols: string) {
-        columns = cols;
+      select(columnList: string) {
+        columns = columnList;
         return builder;
       },
       eq(column: string, value: unknown) {
@@ -127,8 +127,8 @@ export function fakeSupabase(
         filters.push([column, pattern, 'ilike']);
         return builder;
       },
-      order(column: string, opts: { ascending?: boolean } = {}) {
-        orderBy = ` order by ${column} ${opts.ascending === false ? 'desc' : 'asc'}`;
+      order(column: string, options: { ascending?: boolean } = {}) {
+        orderBy = ` order by ${column} ${options.ascending === false ? 'desc' : 'asc'}`;
         return builder;
       },
       limit(maxRows: number) {
@@ -141,21 +141,21 @@ export function fakeSupabase(
     return builder;
   };
 
-  const rpc = async (fn: string, args: Record<string, unknown> = {}) => {
-    const keys = Object.keys(args);
-    const call = `public.${fn}(${keys.map((key, i) => `${key} => $${i + 1}`).join(', ')})`;
+  const rpc = async (functionName: string, parameters: Record<string, unknown> = {}) => {
+    const keys = Object.keys(parameters);
+    const call = `public.${functionName}(${keys.map((key, i) => `${key} => $${i + 1}`).join(', ')})`;
     // Functions that return rows come back as a JSON array, as PostgREST sends them (times as ISO strings).
-    const procs = await db.query<{ proretset: boolean; names: string[] | null; types: string[] }>(
+    const procedures = await db.query<{ proretset: boolean; names: string[] | null; types: string[] }>(
       `select p.proretset, p.proargnames as names, p.proargtypes::regtype[]::text[] as types
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = $1 limit 1`,
-      [fn],
+      [functionName],
     );
-    const proc = procs.rows[0];
-    const sql = proc?.proretset ? `select coalesce(jsonb_agg(t), '[]'::jsonb) as result from ${call} t` : `select ${call} as result`;
+    const procedure = procedures.rows[0];
+    const sql = procedure?.proretset ? `select coalesce(jsonb_agg(t), '[]'::jsonb) as result from ${call} t` : `select ${call} as result`;
     // As PostgREST does: JSON for json/jsonb arguments, Postgres arrays for array arguments.
-    const typeOf = (key: string) => proc?.types[proc.names?.indexOf(key) ?? -1] ?? '';
+    const typeOf = (key: string) => procedure?.types[procedure.names?.indexOf(key) ?? -1] ?? '';
     const params = keys.map((key) => {
-      const value = args[key];
+      const value = parameters[key];
       if (Array.isArray(value) && typeOf(key).endsWith('[]')) return value;
       return value !== null && typeof value === 'object' ? JSON.stringify(value) : value;
     });
