@@ -97,6 +97,21 @@ const PATHS = {
       <path d="M8 8h8M8 12h8M8 16h4" />
     </>
   ),
+  article: (
+    <>
+      <path d="M6 3h8l4 4v14H6z" />
+      <path d="M14 3v4h4" />
+      <path d="M9 12h6M9 16h6" />
+    </>
+  ),
+  shapes: (
+    <>
+      <circle cx="7.5" cy="7.5" r="3.5" />
+      <path d="M16.5 3.5l4 7h-8z" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1" />
+      <path d="M3.5 20.5l4-7 4 7z" />
+    </>
+  ),
   inbox: (
     <>
       <path d="M3 13l2.5-8h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />

@@ -27,7 +27,10 @@ import {
   type SaveResult,
   type UserResult,
 } from '@lateraltranslucence/cera/supabase';
+import type { IconGlyph } from '@lateraltranslucence/cera/icons';
+import type { IconSearchResult } from '@lateraltranslucence/cera/admin';
 import { contentTypes } from '@/cera';
+import { iconLibrary } from '@/lib/icons.ts';
 import { pagesChanged } from '@lateraltranslucence/cera/next/cache';
 import { requireStaff, userClient } from '@/lib/auth.ts';
 import { serviceClient } from '@/lib/supabase.ts';
@@ -68,6 +71,24 @@ export async function findPagesAction(query: PageQuery): Promise<PageOption[]> {
     .filter((p) => words.every((w) => `${p.title} ${p.slug}`.toLowerCase().includes(w)))
     .slice(0, ids ? undefined : 20)
     .map((p) => ({ id: p.id, title: p.title, slug: p.slug, contentType: p.contentType, contentTypeLabel: known.get(p.contentType)!, published: p.published }));
+}
+
+/**
+ * The editor's icon picker: every icon set, with the site's own icons as
+ * working copies (marked "Not published" until they're live). Read as the
+ * signed-in user.
+ */
+export async function searchIconsAction(query: string): Promise<IconSearchResult> {
+  const staff = await requireStaff();
+  const library = iconLibrary(staff.client, true);
+  return { sets: library.sets, icons: await library.search(String(query ?? '').slice(0, 100), { limit: 60 }) };
+}
+
+/** The picked icons, drawn, for the picker. */
+export async function getIconsAction(values: string[]): Promise<IconGlyph[]> {
+  const staff = await requireStaff();
+  const wanted = (Array.isArray(values) ? values : []).filter((v): v is string => typeof v === 'string').slice(0, 50);
+  return [...(await iconLibrary(staff.client, true).byValues(wanted)).values()];
 }
 
 export async function unpublishPageAction(pageId: string): Promise<void> {

@@ -7,10 +7,12 @@ import { landingPage } from '../examples/next-site/cera/content-types/landing-pa
 import sample from '../examples/sample-page.json' with { type: 'json' };
 
 const clone = (): StoredPage => structuredClone(sample) as unknown as StoredPage;
+// Blocks loads its icons, so every page with blocks needs a load context.
+const loadContext = { pages: { byIds: async () => [] }, draft: false };
 
 test('renders panels in order with typed data and defaults', async () => {
   const { page } = readPage(landingPage, clone());
-  const html = renderToStaticMarkup(await Panels({ contentType: landingPage, page }));
+  const html = renderToStaticMarkup(await Panels({ contentType: landingPage, page, loadContext }));
   assert.match(html, /<section[^>]*class="panel panel--blocks panel--card"[^>]*data-index="0"/);
   assert.match(html, /--per-row:3/);
   assert.match(html, /<h3>Design<\/h3>/);
@@ -21,7 +23,7 @@ test('hidden panels are not rendered', async () => {
   const raw = clone();
   raw.panels[0]!.hidden = true;
   const { page } = readPage(landingPage, raw);
-  const html = renderToStaticMarkup(await Panels({ contentType: landingPage, page }));
+  const html = renderToStaticMarkup(await Panels({ contentType: landingPage, page, loadContext }));
   assert.doesNotMatch(html, /panel--blocks/);
 });
 
@@ -40,7 +42,7 @@ test('a panel whose component fails to load is skipped; the rest render', async 
   const { page } = readPage(ct, raw);
 
   const errors: string[] = [];
-  const html = renderToStaticMarkup(await Panels({ contentType: ct, page, onError: (_e, p) => errors.push(p.id) }));
+  const html = renderToStaticMarkup(await Panels({ contentType: ct, page, loadContext, onError: (_e, p) => errors.push(p.id) }));
   assert.deepEqual(errors, ['b']);
   assert.match(html, /panel--blocks/);
 });

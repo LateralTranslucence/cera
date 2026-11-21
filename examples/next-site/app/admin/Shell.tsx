@@ -1,21 +1,24 @@
 import type { ReactNode } from 'react';
 import { AdminSidebar, type NavSection } from '@lateraltranslucence/cera/admin';
 import { listPages } from '@lateraltranslucence/cera/supabase';
-import { formType, landingPage } from '@/cera';
+import { formType, iconType, landingPage, simplePage } from '@/cera';
 import { canEdit, canManagePeople, type Staff } from '@/lib/auth.ts';
 import { signOutAction } from './actions.ts';
 
-export type ShellSection = 'pages' | 'forms' | 'submissions' | 'media' | 'people' | 'account';
+export type ShellSection = 'pages' | 'simple-pages' | 'forms' | 'submissions' | 'media' | 'icons' | 'people' | 'account';
 
 const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' } as const;
 
 /**
- * The admin's frame: the sidebar (only what exists: Pages, Media, and People
- * for admins) and the main column. The Pages list in the sidebar is read as
- * the signed-in user, like the Pages screen.
+ * The admin's frame: the sidebar (only what exists: Pages, Simple Pages,
+ * Forms, Submissions for editors, Media, Icons, and People for admins) and the
+ * main column. The lists and counts in the sidebar are read as the signed-in
+ * user, like the screens they link to.
  */
 export async function Shell({ staff, active, currentPageId, children }: { staff: Staff; active?: ShellSection; currentPageId?: string; children: ReactNode }) {
-  const [pages, forms] = await Promise.all([listPages(staff.client, { contentType: landingPage.name }), listPages(staff.client, { contentType: formType.name })]);
+  const [pages, simplePages, forms, icons] = await Promise.all(
+    [landingPage, simplePage, formType, iconType].map((ct) => listPages(staff.client, { contentType: ct.name })),
+  );
   const sections: NavSection[] = [
     {
       label: 'Content',
@@ -25,19 +28,26 @@ export async function Shell({ staff, active, currentPageId, children }: { staff:
           href: '/admin',
           icon: 'pages',
           active: active === 'pages',
-          count: pages.length,
+          count: pages!.length,
           expand: {
             defaultOpen: true,
             ...(canEdit(staff.role) && { newHref: '/admin/pages/new', newLabel: 'New page' }),
-            items: pages.map((p) => ({ label: p.title || 'Untitled', href: `/admin/pages/${p.id}`, current: p.id === currentPageId })),
+            items: pages!.map((p) => ({ label: p.title || 'Untitled', href: `/admin/pages/${p.id}`, current: p.id === currentPageId })),
           },
         },
-        { label: 'Forms', href: '/admin/forms', icon: 'form', active: active === 'forms', count: forms.length },
+        { label: 'Simple Pages', href: '/admin/simple-pages', icon: 'article', active: active === 'simple-pages', count: simplePages!.length },
+        { label: 'Forms', href: '/admin/forms', icon: 'form', active: active === 'forms', count: forms!.length },
         // Submissions are personal data: admins and editors only.
         ...(canEdit(staff.role) ? [{ label: 'Submissions', href: '/admin/submissions', icon: 'inbox' as const, active: active === 'submissions' }] : []),
       ],
     },
-    { label: 'Library', items: [{ label: 'Media', href: '/admin/media', icon: 'media', active: active === 'media' }] },
+    {
+      label: 'Library',
+      items: [
+        { label: 'Media', href: '/admin/media', icon: 'media', active: active === 'media' },
+        { label: 'Icons', href: '/admin/icons', icon: 'shapes', active: active === 'icons', count: icons!.length },
+      ],
+    },
     ...(canManagePeople(staff.role) ? [{ label: 'Site', items: [{ label: 'People', href: '/admin/users', icon: 'people' as const, active: active === 'people' }] }] : []),
   ];
 

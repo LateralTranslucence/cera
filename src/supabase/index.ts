@@ -41,6 +41,7 @@ export {
   type AddSubmissionResult,
   type Submission,
 } from './forms.ts';
+export { supabaseIcons } from './icons.ts';
 export { deleteMedia, finishMediaUpload, listMedia, MEDIA_BUCKET, mediaPathFor, mediaUsage, prepareMediaUpload, updateMedia } from './media.ts';
 export {
   CERA_ROLE_LABELS,
@@ -72,6 +73,11 @@ function toStored(id: string, row: PageRow): StoredPage {
 }
 
 export { CeraDatabaseError };
+
+/** The page as the save functions take it: with its content type's address scope (see `slugScope`). */
+function forRpc(ct: AnyContentType, page: StoredPage) {
+  return { ...page, slugScope: ct.slugScope ?? ct.name };
+}
 
 /* ------------------------------------------------------------------ */
 /* Reading                                                             */
@@ -114,6 +120,56 @@ export async function getDraftPage<CT extends AnyContentType>(
   if (!data) return null;
   const row = data as PageRow & { id: string };
   return readPage(ct, toStored(row.id, row), { ...opts, status: 'draft' });
+}
+
+/** A page found among several content types; `type` names which one it is. */
+export type FoundPage<CT extends AnyContentType> = CT extends AnyContentType ? ReadResult<PageOf<CT>> & { type: CT['name'] } : never;
+
+/**
+ * The live page at `slug` among several content types, for a route they
+ * share (give them one `slugScope`, so at most one can hold the slug).
+ * Plain data, so it can be cached; `type` says which content type it is.
+ */
+export async function findPublishedPage<const CTs extends readonly AnyContentType[]>(
+  client: SupabaseClient,
+  contentTypes: CTs,
+  slug: string,
+  opts: Omit<ReadOptions, 'status'> = {},
+): Promise<FoundPage<CTs[number]> | null> {
+  const { data, error } = await client
+    .from('cera_page_revisions')
+    .select(`page_id, ${PAGE_COLUMNS}`)
+    .in('content_type', contentTypes.map((ct) => ct.name))
+    .eq('slug', slug)
+    .eq('is_published', true)
+    .limit(1)
+    .maybeSingle();
+  if (error) fail(error);
+  if (!data) return null;
+  const row = data as PageRow & { page_id: string };
+  const ct = contentTypes.find((c) => c.name === row.content_type)!;
+  return { ...readPage(ct, toStored(row.page_id, row), { ...opts, status: 'published' }), type: ct.name } as FoundPage<CTs[number]>;
+}
+
+/** Like `findPublishedPage`, for the working copies (draft-mode preview). */
+export async function findDraftPage<const CTs extends readonly AnyContentType[]>(
+  client: SupabaseClient,
+  contentTypes: CTs,
+  slug: string,
+  opts: Omit<ReadOptions, 'status'> = {},
+): Promise<FoundPage<CTs[number]> | null> {
+  const { data, error } = await client
+    .from('cera_pages')
+    .select(`id, ${PAGE_COLUMNS}`)
+    .in('content_type', contentTypes.map((ct) => ct.name))
+    .eq('slug', slug)
+    .limit(1)
+    .maybeSingle();
+  if (error) fail(error);
+  if (!data) return null;
+  const row = data as PageRow & { id: string };
+  const ct = contentTypes.find((c) => c.name === row.content_type)!;
+  return { ...readPage(ct, toStored(row.id, row), { ...opts, status: 'draft' }), type: ct.name } as FoundPage<CTs[number]>;
 }
 
 export interface EditablePage {
@@ -331,13 +387,13 @@ export async function savePage<CT extends AnyContentType>(
 
   const { data, error } = publishAt
     ? await client.rpc('cera_schedule_page', {
-        p_page: prepared.page,
+        p_page: forRpc(ct, prepared.page),
         p_expected_version: opts.expectedVersion,
         p_publish_at: publishAt.toISOString(),
         p_user: opts.userId,
       })
     : await client.rpc('cera_save_page', {
-        p_page: prepared.page,
+        p_page: forRpc(ct, prepared.page),
         p_expected_version: opts.expectedVersion,
         p_publish: opts.mode === 'publish',
         p_user: opts.userId,
@@ -533,7 +589,7 @@ export async function restoreRevision<CT extends AnyContentType>(
   if (!prepared.ok) return { ok: false, reason: 'invalid', issues: prepared.issues };
 
   const { data, error } = await client.rpc('cera_restore_revision', {
-    p_page: prepared.page,
+    p_page: forRpc(ct, prepared.page),
     p_from: version,
     p_expected_version: opts.expectedVersion,
     p_user: opts.userId,

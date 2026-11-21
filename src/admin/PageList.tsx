@@ -17,8 +17,8 @@ export interface PageListProps {
   /** What the list holds, lowercase. Default "page" / "pages". */
   noun?: string;
   nounPlural?: string;
-  /** Heading for the panel count. Default "Panels" (forms: "Fields"). */
-  countLabel?: string;
+  /** Heading for the panel count. Default "Panels" (forms: "Fields"); null for types without panels. */
+  countLabel?: string | null;
   /** Show slugs as paths ("/about", the default) or as plain IDs ("contact"). */
   slugs?: 'path' | 'id';
   /** One more column after the count, e.g. a form's submissions. */
@@ -157,7 +157,7 @@ export function PageList({
             <tr>
               <th scope="col">Title</th>
               <th scope="col">Status</th>
-              <th scope="col">{countLabel}</th>
+              {countLabel !== null && <th scope="col">{countLabel}</th>}
               {extra && <th scope="col">{extra.label}</th>}
               <th scope="col">Last edited by</th>
               <th scope="col" className="is-end">
@@ -168,7 +168,7 @@ export function PageList({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={extra ? 6 : 5} className="cera-table__empty">
+                <td colSpan={4 + (countLabel !== null ? 1 : 0) + (extra ? 1 : 0)} className="cera-table__empty">
                   {pages.length === 0 ? `No ${nounPlural} yet.` : `No ${nounPlural} match.`}
                 </td>
               </tr>
@@ -184,7 +184,7 @@ export function PageList({
                   <td>
                     <PageStatus page={p} />
                   </td>
-                  <td className="cera-table__muted">{p.panelCount}</td>
+                  {countLabel !== null && <td className="cera-table__muted">{p.panelCount}</td>}
                   {extra && <td className="cera-table__muted">{extra.render(p)}</td>}
                   <td className="cera-table__muted">{p.updatedBy ?? '—'}</td>
                   <td className="cera-table__muted is-end">

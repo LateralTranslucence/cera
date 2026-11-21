@@ -153,6 +153,9 @@ export type OptionsSource = (ctx: OptionsContext) => Option[] | Promise<Option[]
 
 type StrOpts = BaseOptions<string>;
 
+/** Longest `f.svg()` value, in characters. */
+export const MAX_SVG_LENGTH = 100_000;
+
 export const f = {
   /** Single-line text (theme: `text`, `varchar`). */
   text: <const O extends StrOpts = {}>(opts: O = {} as O) =>
@@ -173,6 +176,13 @@ export const f = {
   /** Icon key from the icon library (theme: `icon`, devo_icon post type). */
   icon: <const O extends StrOpts = {}>(opts: O = {} as O) =>
     field<'icon', Finalize<z.ZodString, O>>('icon', finalize(z.string(), opts), opts),
+
+  /**
+   * An SVG drawing (custom icons; theme: the icon post type's File). Cleaned
+   * on save to shapes only, with black turned into currentColor (svg.ts).
+   */
+  svg: <const O extends StrOpts = {}>(opts: O = {} as O) =>
+    field<'svg', Finalize<z.ZodString, O>>('svg', finalize(z.string().max(MAX_SVG_LENGTH), opts), opts),
 
   /** Boolean, always present, defaults to false (theme: `binary`). */
   toggle: (opts: FieldMeta & { default?: boolean } = {}) =>
