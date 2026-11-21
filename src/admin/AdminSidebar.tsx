@@ -8,11 +8,14 @@
  * section's index, and a chevron button shows its items, with "+ New" on
  * top. Whether each one is open is remembered per browser.
  *
- * At 900px and narrower the sidebar collapses to a rail of icons (admin.css):
- * labels stay for screen readers and show as a tooltip on hover or focus, and
- * expandable items' lists are hidden.
+ * At 900px and narrower the sidebar collapses to a rail of icons (admin.css)
+ * that stays on screen as the page scrolls: labels stay for screen readers
+ * and show as a tooltip on hover or focus, and expandable items' lists are
+ * hidden. When the screen is too short for the whole rail (a phone held
+ * sideways), the rail shows just the seal and a menu button, which opens the
+ * full menu, with labels, beside it.
  */
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { CeraLockup, Icon, type IconName } from './icons.tsx';
 
 export interface NavItem {
@@ -63,17 +66,96 @@ export function initials(name: string): string {
   return words.slice(0, 2).map((word) => word[0]!.toUpperCase()).join('') || '?';
 }
 
+/** The width at which the sidebar becomes a rail (keep in step with admin.css). */
+const RAIL_QUERY = '(max-width: 900px)';
+
+// useLayoutEffect warns during server rendering; there's nothing to measure there anyway.
+const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 export function AdminSidebar({ homeHref, sections, user, userLinks = [], signOut }: AdminSidebarProps) {
+  const navRef = useRef<HTMLElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const bodyId = useId();
+  // Compact: the rail doesn't fit the screen's height, so it's a menu button.
+  const [compact, setCompact] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Whether the whole rail fits: the seal, then every section and the person,
+  // at their rail sizes. While compact, the menu is still laid out (hidden) at
+  // rail size, so it can be measured; while the menu is open it's laid out as
+  // a panel instead, so the last answer stands.
+  useBrowserLayoutEffect(() => {
+    const nav = navRef.current;
+    const body = bodyRef.current;
+    if (!nav || !body) return;
+    const rail = window.matchMedia(RAIL_QUERY);
+    const measure = () => {
+      if (!rail.matches) return setCompact(false);
+      if (nav.classList.contains('is-open')) return;
+      const navStyle = getComputedStyle(nav);
+      const children = [...body.children] as HTMLElement[];
+      const gaps = parseFloat(getComputedStyle(body).rowGap) || 0;
+      const content = children.reduce((total, child) => total + child.offsetHeight, 0) + gaps * Math.max(children.length - 1, 0);
+      const lockup = nav.querySelector<HTMLElement>('.cera-lockup')?.offsetHeight ?? 0;
+      const needed = parseFloat(navStyle.paddingTop) + lockup + (parseFloat(navStyle.rowGap) || 0) + content + parseFloat(navStyle.paddingBottom);
+      setCompact(needed > window.innerHeight);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    rail.addEventListener('change', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      rail.removeEventListener('change', measure);
+    };
+  }, [sections]);
+
+  // Leaving compact mode closes the menu.
+  useEffect(() => {
+    if (!compact) setMenuOpen(false);
+  }, [compact]);
+
+  // An open menu closes on Escape (back to its button) or a click outside the sidebar.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    const onClick = (event: MouseEvent) => !navRef.current?.contains(event.target as Node) && setMenuOpen(false);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onClick);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onClick);
+    };
+  }, [menuOpen]);
+
   return (
-    <nav className="cera-sidebar" aria-label="Main">
+    <nav ref={navRef} className={`cera-sidebar${compact ? ' is-compact' : ''}${menuOpen ? ' is-open' : ''}`} aria-label="Main">
       <CeraLockup href={homeHref} />
-      {sections.map((section) => (
-        <div key={section.label} className="cera-nav__section">
-          <div className="cera-nav__label">{section.label}</div>
-          {section.items.map((item) => (item.expand ? <ExpandableItem key={item.href} item={item} /> : <Item key={item.href} item={item} />))}
-        </div>
-      ))}
-      <UserChip user={user} links={userLinks} signOut={signOut} />
+      <button
+        ref={menuButtonRef}
+        type="button"
+        className="cera-sidebar__menu-button"
+        aria-label={menuOpen ? 'Close menu' : 'Menu'}
+        aria-expanded={menuOpen}
+        aria-controls={bodyId}
+        hidden={!compact}
+        onClick={() => setMenuOpen(!menuOpen)}
+      >
+        <Icon name={menuOpen ? 'close' : 'menu'} />
+      </button>
+      <div ref={bodyRef} id={bodyId} className="cera-sidebar__body">
+        {sections.map((section) => (
+          <div key={section.label} className="cera-nav__section">
+            <div className="cera-nav__label">{section.label}</div>
+            {section.items.map((item) => (item.expand ? <ExpandableItem key={item.href} item={item} /> : <Item key={item.href} item={item} />))}
+          </div>
+        ))}
+        <UserChip user={user} links={userLinks} signOut={signOut} />
+      </div>
     </nav>
   );
 }
