@@ -126,6 +126,8 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 .cera-admin a.cera-button { color: var(--ink); }
 /* Black text on orange, links and buttons alike (.cera-admin button and a would otherwise set it). */
 .cera-admin :is(a, button).cera-button--primary { color: var(--on-honey); }
+/* Disabled, the orange fades instead of the whole button, so the text stays solid black. */
+.cera-button--primary:disabled { opacity: 1; background: color-mix(in srgb, var(--honey) 45%, var(--surface)); border-color: transparent; }
 .cera-icon-button {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
   width: 40px; height: 40px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-muted); cursor: pointer;
@@ -310,7 +312,8 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 .cera-pill--scheduled { border-color: var(--honey-soft); background: var(--honey-soft); color: var(--ink); }
 .cera-pill--scheduled::before { background: var(--honey-ink); border-radius: 2px; }
 .cera-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--ink); font-size: 12px; font-weight: 600; white-space: nowrap; }
-.cera-badge--open { background: var(--honey-soft); }
+/* A card's type pill (Blocks, Hero…): honey, folded or open. */
+.cera-badge--type { background: var(--honey-soft); }
 .cera-tag { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-pill); color: var(--ink-muted); font-size: 12px; white-space: nowrap; }
 .cera-flag { font-size: 12px; line-height: 16px; color: var(--honey-ink); }
 .cera-flag--danger { color: var(--danger); }
@@ -395,8 +398,15 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 .cera-panel-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 8px 8px 4px; }
 .cera-panel-card.is-open > .cera-panel-card__head { padding: 12px 8px 12px 4px; border-bottom: 1px solid var(--line); }
 .cera-panel-card__label { flex: 1 1 200px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+/* 800px and narrower: the type pill sits above the title, pulled 8px left. */
+@media (max-width: 800px) {
+  .cera-panel-card__label { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .cera-panel-card__label > .cera-badge { margin-left: -8px; }
+}
 .cera-panel-card__name { font-size: 15px; line-height: 22px; font-weight: 600; overflow-wrap: anywhere; }
 .cera-panel-card__actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.cera-panel-card__tools { display: flex; align-items: center; gap: 2px; }
+@media (max-width: 600px) { .cera-panel-card:not(.is-open) .cera-panel-card__tools { display: none; } }
 .cera-panel-card__chevron { color: var(--ink); }
 .cera-panel-card__chevron .cera-icon { transition: transform 150ms; }
 .cera-panel-card__chevron[aria-expanded='true'] .cera-icon { transform: rotate(180deg); }

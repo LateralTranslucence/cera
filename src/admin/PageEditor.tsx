@@ -982,12 +982,13 @@ const Card = ({ ref, style, dragging, ...props }: CardProps & { ref?: (el: HTMLE
       <div className="cera-panel-card__head">
         {grip ?? <span className="cera-grip-spacer" aria-hidden="true" />}
         <div className="cera-panel-card__label">
-          {badge && <span className={`cera-badge${open ? ' cera-badge--open' : ''}`}>{badge}</span>}
+          {badge && <span className="cera-badge cera-badge--type">{badge}</span>}
           <span className="cera-panel-card__name">{name}</span>
           {hidden && <span className="cera-tag">Hidden</span>}
         </div>
         <div className="cera-panel-card__actions">
-          {actions}
+          {/* The panel's tools (show/hide, duplicate, delete); at 600px and narrower they show only once the card is open (admin.css). */}
+          {actions && <span className="cera-panel-card__tools">{actions}</span>}
           <button
             type="button"
             className="cera-icon-button cera-panel-card__chevron"
