@@ -63,12 +63,21 @@ test('quotes: empty quotes are skipped; two or more become a slider', async () =
 });
 
 test('featured media: image with size and link; video with controls; full width', async () => {
-  const imageHtml = await render('cera/featured-media', { media: image, imageLink: 'https://mars.test', fullWidth: true });
+  const imageHtml = await render('cera/featured-media', { media: image, imageLink: { url: 'https://mars.test' }, fullWidth: true });
   assert.match(imageHtml, /class="panel panel--featured-media is-full-width"/);
   assert.match(imageHtml, /<figure class="featured-media"><a href="https:\/\/mars\.test"><img src="[^"]*abc-mars\.png" alt="Mars" width="800" height="500" loading="lazy"\/><\/a><\/figure>/);
-  const videoHtml = await render('cera/featured-media', { media: { ...image, kind: 'video' }, imageLink: 'https://ignored.test' });
+  const videoHtml = await render('cera/featured-media', { media: { ...image, kind: 'video' }, imageLink: { url: 'https://ignored.test', modal: true } });
   assert.match(videoHtml, /<figure class="featured-media"><video [^>]*controls=""/);
   assert.doesNotMatch(videoHtml, /ignored\.test/);
+});
+
+test('text + media: the theme’s crops (cinema by default) and an image link, internal paths made absolute', async () => {
+  const plain = await render('cera/text-media', { media: image });
+  assert.match(plain, /<figure class="text-media__media size-cinema"><img /);
+  const linked = await render('cera/text-media', { media: image, imageSize: 'vertical', imageLink: { url: 'mars', modal: true } });
+  assert.match(linked, /<figure class="text-media__media size-vertical"><a href="\/mars"><img /);
+  // An empty link draws no anchor.
+  assert.doesNotMatch(await render('cera/text-media', { media: image, imageLink: { url: '' } }), /<a /);
 });
 
 test('tabs: accessible markup, every tab in the HTML, the first one open, ids from labels', async () => {
@@ -129,7 +138,7 @@ test('accordion: items without a title are skipped; all closed, text in the HTML
 test('stats: the HTML has each final number, formatted, with screen readers reading the final value', async () => {
   const html = await render('cera/stats', {
     stats: [
-      { _id: 'a', before: '$', number: 1250000, after: '+', description: 'Raised' },
+      { _id: 'a', before: '$', number: 1250000, after: '+', description: '<p>Raised <strong>this year</strong></p>' },
       { _id: 'b', number: 4.46, decimal: true, description: 'Rating' },
       { _id: 'c', number: 10, countDown: true, description: 'Days left' },
       { _id: 'd', description: 'Nothing to show' },
@@ -140,6 +149,8 @@ test('stats: the HTML has each final number, formatted, with screen readers read
   // Counting down ends at zero.
   assert.match(html, /aria-label="0"><span aria-hidden="true">0</);
   assert.doesNotMatch(html, /Nothing to show/);
+  // The description is rich text, as in the theme.
+  assert.match(html, /<div class="stats__description"><p>Raised <strong>this year<\/strong><\/p><\/div>/);
 });
 
 test('gallery: images only, each a button that opens it; the dialog is closed until then', async () => {

@@ -208,6 +208,17 @@ test/
       - `comments`, `comment_status_callback`, `pre_form_callback`: WordPress features Cera doesn't have.
       - `is_landing_page`, `menu_position`, `icon`, `show_in_menu`, `show_in_admin_bar`: the site's admin layout (its Shell) decides these.
 
+37. **The last field types** (decided 2026-11-21, type by type).
+    - **Image Link** → `field.imageLink()`, `{ url, modal }` as in the theme, on Text + Media and Featured Media. Cera has no modals yet, so a modal link opens normally, like a CTA's Modal target.
+    - **Image Size** → the theme's crops (functions.php): Vertical 600×750, Cinema 600×404 from the top (the default) and Square. Text + Media draws them with `aspect-ratio` and `object-fit: cover`. Cera's earlier Small/Medium/Large guess is gone.
+    - **Override Type** (`post_type_labels`) → not ported. The theme's Featured Post never reads it: its pretitle comes from Override Pretitle or the page type's name.
+    - **Date and time, time zone** → `field.dateTime()` (ISO 8601 in UTC, edited in the editor's own time zone) and `field.timezone()` (an IANA name, picked from the browser's list). The theme's types don't use either; they're for sites' own types, such as events.
+    - **Email, phone** → `field.email()` and `field.phone()`, checked with the same patterns as the form builder's fields (`EMAIL_PATTERN`, `PHONE_PATTERN`).
+    - **Background** → the theme's Color picks from a palette (api/fields/colors.php). A site passes its palette to the editor (`PageEditor`'s `colors`, read as `OptionsContext.colors`), and editors pick a color by name. Sites without one type any CSS color. The example's palette is the theme's five colors plus the demo pages' three. The `overlay` checkbox stays as a Cera addition: the theme's only Overlay is the Text panel's, ported separately.
+    - **Stats** → the panel's repeater already matched the theme. Description is now rich text (limited toolbar), as in the theme, and the import keeps its HTML. The unused `stats()` helper is gone.
+    - **Panel ID** → confirmed as the section's anchor id: the imported Documentation page uses ids like `getting-started` for in-page links.
+    - **Covered elsewhere:** accordion (a repeater), form (a relation to forms), the form field types (the form builder's panels), read-only fields (the Submissions screen) and the icon's Preview (the icon editor).
+
 ## Pattern: keep fields in their own file
 
 A component that imports its own panel's type through `component: () => import('./X.tsx')` creates a circular type reference. Avoid it like this:
@@ -225,7 +236,7 @@ export const blocks = defineCorePanel({ type: 'cera/blocks', label: 'Blocks', fi
 
 Builders choose `ZodOptional<Schema>` / `ZodDefault<Schema>` / `Schema` from the options through a conditional type (`Finalize`). Zod 4's `ZodType` constraint rejects that deferred conditional inside a generic builder, so TypeScript widened the schema to `ZodType<unknown>` and every value inferred as `unknown`. The fix: `Schema` is unconstrained, value types come from `ValueOf<Schema>` (the schema's `_zod.output`), and `InferFields` is computed directly rather than through `z.ZodObject`. Builders pass explicit type arguments to `buildField<…>()`. Keep that pattern when adding builders. `test/types.test.ts` catches any regression.
 
-## Field type mapping (PHP theme → `f.*`)
+## Field type mapping (PHP theme → `field.*`)
 
 | Theme type | New | Status |
 |---|---|---|
@@ -240,17 +251,27 @@ Builders choose `ZodOptional<Schema>` / `ZodDefault<Schema>` / `Schema` from the
 | `select` / `select_multiple` with a callback | `field.selectFrom({ options: context => … , multiple })` | ✅ (needs a real `OptionsContext`) |
 | `media` | `field.media({ accept })` | ✅ |
 | `gallery` | `field.gallery()` | ✅ |
-| `background` | `field.background()` | ⚠️ verify shape |
+| `background` | `field.background()`: `{ color?, media?, overlay }` | ✅ color from the site's palette when it has one (decision 37); `overlay` is Cera's own |
 | `cta` / `ctas` | `field.cta()` / `field.ctas()` | ✅ |
 | `icon` | `field.icon()` | ✅ with a picker over every icon set (decision 33) |
 | icon post type's File (`media`, SVG) | `field.svg()` | ✅ cleaned on save (decision 33) |
 | `multi_array` (+ `limit`) | `field.repeater({ fields, limit })` | ✅ |
 | `post_browser` (+ `post_types_field`) | `field.relation({ to: [...] \| { field } , limit })` | ✅ with a page picker in the admin (search, filtered by `to`) |
-| `stats` | `stats()` | ⚠️ verify sub-fields |
+| `stats` | the Stats panel's repeater | ✅ Description is rich text, as in the theme |
+| `image_link` | `field.imageLink()`: `{ url, modal }` | ✅ Modal opens normally until Cera has modals, as for a CTA |
+| `image_size` | `field.select()` on Text + Media: `vertical`, `cinema` (default), `square` | ✅ the theme's crops, drawn with CSS `aspect-ratio` |
+| `email`, `phone` | `field.email()`, `field.phone()` | ✅ same checks as the form builder's fields |
+| `date_time` | `field.dateTime()`: ISO 8601 in UTC | ✅ edited in the editor's time zone; unused by the theme's types |
+| `timezone` | `field.timezone()`: an IANA name | ✅ unused by the theme's types |
+| `accordion` | the Accordion panel's repeater | ✅ |
+| `form` | `field.relation({ to: ['cera_form'] })` | ✅ |
+| `radio`, `checkbox`, `button_select`, `range_slider`, `hidden` (and form `email`, `phone`) | the form builder's field panels (decision 31) | ✅ |
+| `read_only`, `read_only_json` | the Submissions screen (decision 31) | ✅ |
+| `hidden` (the icon's Preview) | the icon editor's preview (decision 33) | ✅ |
+| `post_type_labels` | — | Not ported: Featured Post's Override Type, which the theme's front end never reads |
 | `*_callback` types | `custom(kind, schema)` | ✅ escape hatch |
-| `accordion`, `image_link`, `image_size`, `post_type_labels`, `email`, `phone`, `radio`, `checkbox`, `button_select`, `range_slider`, `date_time`, `timezone`, `read_only`, `read_only_json`, `hidden`, `form` (relation to forms) | — | ❌ to port |
 
-Look for `TODO(verify)` comments in the code. Those are guesses about the theme's field shapes that need checking against `class-form-field-*.php`.
+Every theme field type is accounted for, and no `TODO(verify)` notes are left (decision 37).
 
 ## Next tasks, in order
 
@@ -266,6 +287,7 @@ B. ✅ **Minimal admin** (`examples/next-site/app/admin`, editor in `src/admin`)
    Rich text: done (decision 27).
    Redesign and drag-to-reorder: done (decision 28). Scheduling: done (decision 29).
    Deleting pages and history with restore: done (decision 30).
+   The sidebar lists each content type's pages under Content, with "+ New" for those who may add one (Pages, Simple Pages, Forms).
    Still to do for the admin: client-side validation before save, previewing an old version, and pruning old draft revisions.
    Caching: done (decision 25).
 C. ✅ **Panel data loading** (decision 19), proven with Featured Post: fields, `featured-post.load.ts` and a component ported from the theme (image optional, unlike the theme). The admin's page picker replaces pasted ids for `relation` fields: it searches pages as the signed-in user, respects `to` (fixed or a sibling field like Post Type), shows "Not published" on picks the live site won't show, and replaces the pick when `limit` is 1. Checked in a browser: the home page features About; picking Our Services and saving a draft changed only the preview.
@@ -277,7 +299,7 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
 
 **Then the original list:**
 
-1. **Finish the field set.** Port the ❌ types above and resolve every `TODO(verify)`. Add a type assertion and a runtime test for each new builder.
+1. ✅ **Finish the field set** (decision 37).
 2. **Port all panels.** The 15 types in `class-landing-page.php` → `set_panel_fields()`, plus the full Hero, SEO and Admin boxes. They go in `src/panels/` as `cera/<theme key>` with `defineCorePanel` (decision 20); three are there already. Use the `.fields.ts` pattern. Port components from `app/components/panels/`.
    *Done when:* every theme panel has a definition, `PanelData` types match what the existing React components consume, and `npm run check` passes.
    **Batch 1 done** (2026-11-20): `PanelFrame` (the theme's Panel + PanelWrapper: anchor id, background color/image/video with overlay, title, copy) and six panels: text, cta, quotes, featured-media, tabs, decision-tree. Blocks, Text + Media and Featured Post moved onto the frame, so they now draw their backgrounds. The example site's `/panels` page shows one of each. Differences from the theme: Quotes scrolls with CSS scroll snap instead of a slider script; CTA renders all its CTAs (the theme read one from a `ctas` field); Decision Tree's “CTA Text” + “CTA URL” are one `cta` field; Featured Media's `image_link` modal option isn't ported (no modals yet); a panel's anchor id isn't generated from its title.

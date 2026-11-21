@@ -10,8 +10,13 @@ export const textMediaFields = {
     options: { left: 'Left', right: 'Right', alternate: 'Alternate' },
     default: 'left',
   }),
-  // TODO(verify): theme's `image_size` and `image_link` field types.
-  imageSize: field.select({ label: 'Image Size', options: { small: 'Small', medium: 'Medium', large: 'Large' } }),
-  imageLink: field.url({ label: 'Image Link' }),
+  // The theme's image_size crops (functions.php): vertical_600 600×750,
+  // cinema_600 600×404 (from the top) and square_600.
+  imageSize: field.select({
+    label: 'Image Size',
+    options: { vertical: 'Vertical', cinema: 'Cinema (wide)', square: 'Square' },
+    default: 'cinema',
+  }),
+  imageLink: field.imageLink({ label: 'Image Link', note: 'Makes the image a link.' }),
   ctas: field.ctas({ label: 'CTA' }),
 };

@@ -1,6 +1,7 @@
 // Ported from set_panel_fields()['featured-post']:
 // drops Title/Background/Copy ($unset), dynamic options, post_browser → relation.
-// Not ported yet: 'Override Type' (post_type_labels).
+// Not ported: 'Override Type' (post_type_labels). The theme's front end never
+// reads it; the pretitle comes from Override Pretitle or the type's name.
 import { field } from '../fields.ts';
 import { omit, panelDefaults } from '../defaults.ts';
 

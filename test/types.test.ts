@@ -1,6 +1,8 @@
 // Compile-time assertions (checked by `npm run typecheck`) + a trivial runtime test so node --test picks it up.
 import { test } from 'node:test';
-import type { CTA, LinkedPage, MediaRef, PageOf, PanelData, PanelDefinition, PanelPropsOf } from '../src/index.ts';
+import type { CTA, ImageLink, InferFields, LinkedPage, MediaRef, PageOf, PanelData, PanelDefinition, PanelPropsOf } from '../src/index.ts';
+import { field } from '../src/index.ts';
+import type { textMedia } from '../src/panels/text-media.ts';
 import type { blocksFields } from '../src/panels/blocks.fields.ts';
 import type { blocks } from '../src/panels/blocks.ts';
 import type { featuredPost } from '../src/panels/featured-post.ts';
@@ -14,11 +16,23 @@ type Blocks = PanelData<typeof blocks>;
 type Featured = PanelData<typeof featuredPost>;
 type DecisionTree = PanelData<typeof decisionTree>;
 type Page = PageOf<typeof landingPage>;
+type TextMedia = PanelData<typeof textMedia>;
+const newFields = { email: field.email(), phone: field.phone({ required: true }), when: field.dateTime(), zone: field.timezone({ default: 'UTC' }), link: field.imageLink() };
+type NewFields = InferFields<typeof newFields>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LoadedOf<Definition> = Definition extends PanelDefinition<any, any, infer Loaded> ? Loaded : never;
 
 export type _tests = [
+  // the last field types (decision 37)
+  Expect<Equal<NewFields['email'], string | undefined>>,
+  Expect<Equal<NewFields['phone'], string>>,
+  Expect<Equal<NewFields['when'], string | undefined>>,
+  Expect<Equal<NewFields['zone'], string>>,
+  Expect<Equal<NewFields['link'], ImageLink | undefined>>,
+  Expect<Equal<ImageLink, { url: string; modal: boolean }>>,
+  Expect<Equal<TextMedia['imageSize'], 'vertical' | 'cinema' | 'square'>>,
+  Expect<Equal<TextMedia['imageLink'], ImageLink | undefined>>,
   // optional text
   Expect<Equal<Blocks['title'], string | undefined>>,
   // toggle / perRow / select-with-default are always present

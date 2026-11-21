@@ -13,7 +13,7 @@ import type { PageIssue } from '../document.ts';
 import { GalleryInput, MediaInput, type MediaContext } from './media.tsx';
 import { IconPicker, SvgInput, type IconsContext } from './icon-inputs.tsx';
 import { RichTextInput } from './RichTextInput.tsx';
-import { fieldDefault, getIn, humanize, issuesAt, moveItem, newId, newRepeaterItem, removeItem, setIn, type Path } from './state.ts';
+import { dateTimeInput, dateTimeValue, fieldDefault, getIn, humanize, issuesAt, moveItem, newId, newRepeaterItem, removeItem, setIn, type Path } from './state.ts';
 
 /** What the page picker asks for: by ids (to show picked pages), or a search within content types. */
 export interface PageQuery {
@@ -202,6 +202,49 @@ function Control({ field, value, onChange, path, siblings, context, id }: FieldP
         />
       );
 
+    case 'email':
+    case 'phone':
+      return (
+        <input
+          id={id}
+          type={field.kind === 'email' ? 'email' : 'tel'}
+          value={asString(value)}
+          readOnly={readOnly}
+          autoComplete="off"
+          placeholder={field.kind === 'email' ? 'name@example.com' : undefined}
+          onChange={(event) => onChange(emptyToUndefined(event.target.value))}
+        />
+      );
+
+    case 'dateTime':
+      return <DateTimeInput id={id} value={value} onChange={onChange} readOnly={readOnly} />;
+
+    case 'timezone':
+      return <TimeZoneSelect id={id} value={value} onChange={onChange} readOnly={readOnly} />;
+
+    case 'imageLink': {
+      const link = isObject(value) ? value : {};
+      // An empty link with Modal off is no link at all.
+      const update = (next: Record<string, unknown>) => onChange(asString(next.url) === '' && next.modal !== true ? undefined : { url: '', ...next });
+      return (
+        <div className="cera-group">
+          <input
+            id={id}
+            type="text"
+            value={asString(link.url)}
+            readOnly={readOnly}
+            inputMode="url"
+            placeholder="/path or https://…"
+            onChange={(event) => update(setIn(link, ['url'], event.target.value))}
+          />
+          <label className="cera-check">
+            <input type="checkbox" checked={link.modal === true} disabled={readOnly} onChange={(event) => update(setIn(link, ['modal'], event.target.checked))} />
+            Open in a modal
+          </label>
+        </div>
+      );
+    }
+
     case 'svg':
       return <SvgInput value={value} onChange={onChange} readOnly={readOnly} id={id} />;
 
@@ -240,7 +283,8 @@ function Control({ field, value, onChange, path, siblings, context, id }: FieldP
     case 'select': {
       const options = (field.config as { options: Record<string, string> }).options;
       return (
-        <select id={id} value={asString(value)} disabled={readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
+        // Nothing stored yet: show the default the page will use, not the first option.
+        <select id={id} value={asString(value ?? fieldDefault(field))} disabled={readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
           {fieldDefault(field) === undefined && <option value="">—</option>}
           {value !== undefined && !(asString(value) in options) && <option value={asString(value)}>{asString(value)} (not an option)</option>}
           {Object.entries(options).map(([key, label]) => (
@@ -262,10 +306,7 @@ function Control({ field, value, onChange, path, siblings, context, id }: FieldP
       const background = isObject(value) ? value : {};
       return (
         <div className="cera-group">
-          <label className="cera-inline">
-            Color
-            <input type="text" value={asString(background.color)} placeholder="#2b2118" readOnly={readOnly} onChange={(event) => onChange(setIn(background, ['color'], emptyToUndefined(event.target.value)))} />
-          </label>
+          <ColorInput value={background.color} colors={context.options.colors} readOnly={readOnly} onChange={(color) => onChange(setIn(background, ['color'], color))} />
           <MediaInput value={background.media} onChange={(media) => onChange(setIn(background, ['media'], media))} readOnly={readOnly} media={context.media} accept={['image', 'video']} />
           <label className="cera-check">
             <input type="checkbox" checked={background.overlay === true} disabled={readOnly} onChange={(event) => onChange(setIn(background, ['overlay'], event.target.checked))} />
@@ -348,6 +389,94 @@ function Control({ field, value, onChange, path, siblings, context, id }: FieldP
 /* ------------------------------------------------------------------ */
 /* Compound controls                                                   */
 /* ------------------------------------------------------------------ */
+
+/** The browser's time zone, e.g. "America/Chicago". */
+function timeZoneName(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Every IANA time zone the browser knows, with UTC first. */
+function timeZones(): string[] {
+  const known = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+  return ['UTC', ...known.filter((name) => name !== 'UTC')];
+}
+
+/** True once in the browser. The server knows neither the editor's time zone nor the browser's list of zones. */
+function useMounted(): boolean {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted;
+}
+
+function DateTimeInput({ id, value, onChange, readOnly }: { id: string; value: unknown; onChange: Change; readOnly: boolean }) {
+  const mounted = useMounted();
+  const zone = mounted ? timeZoneName() : undefined;
+  return (
+    <span className="cera-date-time">
+      <input id={id} type="datetime-local" value={mounted ? dateTimeInput(value) : ''} readOnly={readOnly || !mounted} onChange={(event) => onChange(dateTimeValue(event.target.value))} />
+      <span className="cera-note">In your time zone{zone ? ` (${zone.replace(/_/g, ' ')})` : ''}</span>
+    </span>
+  );
+}
+
+function TimeZoneSelect({ id, value, onChange, readOnly }: { id: string; value: unknown; onChange: Change; readOnly: boolean }) {
+  const mounted = useMounted();
+  const zones = mounted ? timeZones() : [];
+  const current = asString(value);
+  return (
+    <select id={id} value={current} disabled={readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
+      <option value="">—</option>
+      {current && !zones.includes(current) && <option value={current}>{mounted ? `${current} (unknown)` : current.replace(/_/g, ' ')}</option>}
+      {zones.map((zone) => (
+        <option key={zone} value={zone}>
+          {zone.replace(/_/g, ' ')}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * A background's color: picked from the site's palette when it has one
+ * (FormContext.options.colors), typed otherwise.
+ */
+function ColorInput({ value, colors, onChange, readOnly }: { value: unknown; colors?: Option[]; onChange: (color: string | undefined) => void; readOnly: boolean }) {
+  const current = asString(value);
+  const swatch = current && <span className="cera-swatch" style={{ background: current }} aria-hidden="true" />;
+  if (!colors?.length) {
+    return (
+      <label className="cera-inline">
+        Color
+        <span className="cera-color">
+          {swatch}
+          <input type="text" value={current} placeholder="#2b2118" readOnly={readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))} />
+        </span>
+      </label>
+    );
+  }
+  const known = colors.some((color) => color.value.toLowerCase() === current.toLowerCase());
+  return (
+    <label className="cera-inline">
+      Color
+      <span className="cera-color">
+        {swatch}
+        <select value={known ? colors.find((color) => color.value.toLowerCase() === current.toLowerCase())!.value : current} disabled={readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
+          <option value="">None</option>
+          {current && !known && <option value={current}>{current} (not in the palette)</option>}
+          {colors.map((color) => (
+            <option key={color.value} value={color.value}>
+              {color.label}
+            </option>
+          ))}
+        </select>
+      </span>
+    </label>
+  );
+}
 
 function CtaInput({
   value,

@@ -9,7 +9,8 @@ export const panelDefaults = {
   title: field.text({ label: 'Title' }),
   background: field.background({ label: 'Background', note: 'Can be an image or video (.mp4).' }),
   copy: field.html({ label: 'Copy' }),
-  // TODO(verify): the theme's 'ID' (varchar) — assumed to be an anchor id for in-page links.
+  // The theme's 'ID' (varchar): the section's id, for in-page links such as
+  // the Documentation page's #getting-started.
   anchorId: field.text({ label: 'ID', note: 'Anchor id for in-page links (no #).' }),
 };
 

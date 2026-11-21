@@ -17,3 +17,19 @@ export { adminPage, formType, iconType, landingPage, simplePage };
 export const contentTypes = [landingPage, simplePage, formType, iconType, adminPage] as const;
 /** The types the site's /[slug] route serves. */
 export const routedTypes = [landingPage, simplePage] as const;
+
+/**
+ * The colors editors pick a panel background from. The first five are the
+ * Developers Only theme's (api/fields/colors.php), which the import maps its
+ * color names to; the last three are the demo pages' own (scripts/seed.ts).
+ */
+export const backgroundColors = [
+  { label: 'Blue', value: '#2C25AB' },
+  { label: 'Navy', value: '#0D0B33' },
+  { label: 'Teal', value: '#17D6CA' },
+  { label: 'White', value: '#FFFFFF' },
+  { label: 'Yellow', value: '#FFB400' },
+  { label: 'Espresso', value: '#2b2118' },
+  { label: 'Slate', value: '#1d2a3a' },
+  { label: 'Rust', value: '#5b3412' },
+];

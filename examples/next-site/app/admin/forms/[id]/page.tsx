@@ -19,7 +19,7 @@ export default async function EditForm({ params }: { params: Promise<{ id: strin
   if (!editable) notFound();
 
   return (
-    <Shell staff={staff} active="forms">
+    <Shell staff={staff} active="forms" currentPageId={id}>
       <EditorClient
         page={editable.page}
         version={editable.version}

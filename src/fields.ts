@@ -121,7 +121,12 @@ export const mediaRef = z.object({
 });
 export type MediaRef = z.output<typeof mediaRef>;
 
-/** TODO(verify): match the theme's `background` buildField (image or .mp4 video, color, overlay?). */
+/**
+ * Section background (theme: `background`, a multi of Color and Media). The
+ * theme's Color picks from a fixed palette (api/fields/colors.php); here it is
+ * any CSS color, picked from `OptionsContext.colors` when the site has one.
+ * `overlay` is Cera's own: a dark layer over an image or video background.
+ */
 export const background = z.object({
   media: mediaRef.optional(),
   color: z.string().optional(),
@@ -138,11 +143,40 @@ export const cta = z.object({
 });
 export type CTA = z.output<typeof cta>;
 
+/** Makes an image a link (theme: `image_link`, a multi of URL and Modal). */
+export const imageLink = z.object({
+  url: z.string(),
+  /** Theme: open the link in a modal. Cera has no modals yet, so it opens normally (as with a CTA's Modal target). */
+  modal: z.boolean().default(false),
+});
+export type ImageLink = z.output<typeof imageLink>;
+
+/** An email address, loosely: something@domain.tld with no spaces or brackets (also used by form fields). */
+export const EMAIL_PATTERN = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]+$/;
+/** A phone number: digits with spaces and + ( ) - . (also used by form fields). */
+export const PHONE_PATTERN = /^[0-9+().\-\s]*[0-9][0-9+().\-\s]*$/;
+
+/** Whether the runtime knows this IANA time zone (e.g. "America/Chicago"). */
+export function isTimeZone(name: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: name });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface Option { label: string; value: string }
 
 /** Context passed to dynamic option sources (replaces callbacks like devo_get_public_post_types). */
 export interface OptionsContext {
   contentTypes: { name: string; label: string; public: boolean }[];
+  /**
+   * The site's background colors (theme: api/fields/colors.php), as a label and
+   * a CSS color each. With them, a background's color is picked from this list;
+   * without them, it is typed.
+   */
+  colors?: Option[];
   // TODO: add a typed DB/query handle once the Supabase layer exists.
 }
 export type OptionsSource = (context: OptionsContext) => Option[] | Promise<Option[]>;
@@ -236,6 +270,44 @@ export const field = {
   background: (options: FieldMeta = {}) =>
     buildField('background', background.default({ overlay: false }), options),
 
+  /** An email address (theme: `email`). */
+  email: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'email', Finalize<z.ZodString, Options>>(
+      'email',
+      finalize(z.string().max(254).refine((value) => EMAIL_PATTERN.test(value), 'Enter an email address like name@example.com.'), options),
+      options,
+    ),
+
+  /** A phone number (theme: `phone`). Stored as typed; tel: links strip everything but digits and +. */
+  phone: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'phone', Finalize<z.ZodString, Options>>(
+      'phone',
+      finalize(z.string().max(40).refine((value) => PHONE_PATTERN.test(value), 'Enter a phone number using digits, spaces and + ( ) - .'), options),
+      options,
+    ),
+
+  /** Makes an image a link, optionally in a modal (theme: `image_link`). */
+  imageLink: <const Options extends BaseOptions<ImageLink> = {}>(options: Options = {} as Options) =>
+    buildField<'imageLink', Finalize<typeof imageLink, Options>>('imageLink', finalize(imageLink, options), options),
+
+  /**
+   * A moment in time (theme: `date_time`), stored as an ISO 8601 string in UTC,
+   * e.g. "2026-11-20T15:30:00.000Z". The admin shows it in the editor's own time zone.
+   */
+  dateTime: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'dateTime', Finalize<z.ZodString, Options>>(
+      'dateTime',
+      finalize(
+        z.string().refine((value) => /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value)), 'Use an ISO 8601 date and time, e.g. 2026-11-20T15:30:00Z.'),
+        options,
+      ),
+      options,
+    ),
+
+  /** An IANA time zone name, e.g. "America/Chicago" (theme: `timezone`). */
+  timezone: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
+    buildField<'timezone', Finalize<z.ZodString, Options>>('timezone', finalize(z.string().refine(isTimeZone, 'Not a time zone this server knows.'), options), options),
+
   /** One call to action (theme: `cta`). */
   cta: <const Options extends BaseOptions<CTA> = {}>(options: Options = {} as Options) =>
     buildField<'cta', Finalize<typeof cta, Options>>('cta', finalize(cta, options), options),
@@ -278,22 +350,6 @@ export const field = {
     return buildField('relation', schema.default([]), options, { to: options.to, limit: options.limit });
   },
 } as const;
-
-/**
- * Stats list (theme: `stats`). Theme note: "Number Field: can ONLY be a number."
- * TODO(verify): confirm sub-fields against the theme's stats field definition.
- */
-export const stats = (options: FieldMeta = {}) =>
-  field.repeater({
-    ...options,
-    itemTitle: 'label',
-    fields: {
-      number: field.number({ required: true }),
-      prefix: field.text(),
-      suffix: field.text(),
-      label: field.text({ required: true }),
-    },
-  });
 
 /** Escape hatch for one-off field kinds (theme: `*_callback` field types). */
 export function custom<Kind extends string, Schema extends z.ZodType, Config = undefined>(

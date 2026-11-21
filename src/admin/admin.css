@@ -147,7 +147,7 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 /* ------------------------------------------------------------------ */
 
 .cera-app { display: flex; flex-wrap: wrap; min-height: 100vh; }
-.cera-sidebar { flex: 1 1 232px; display: flex; flex-direction: column; gap: 24px; padding: 24px 16px; border-right: 1px solid var(--line); background: var(--surface); }
+.cera-sidebar { flex: 1 1 260px; display: flex; flex-direction: column; gap: 24px; padding: 24px 16px; border-right: 1px solid var(--line); background: var(--surface); }
 /* Sections and the person: the part that becomes the menu when the rail is too short (AdminSidebar). */
 .cera-sidebar__body { flex: 1; display: flex; flex-direction: column; gap: 24px; min-height: 0; }
 .cera-app__main { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; }
@@ -263,7 +263,7 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 /* Forms                                                               */
 /* ------------------------------------------------------------------ */
 
-.cera-admin :is(input[type='text'], input[type='number'], input[type='password'], input[type='email'], input[type='search'], input[type='url'], input[type='datetime-local'], input:not([type])),
+.cera-admin :is(input[type='text'], input[type='number'], input[type='password'], input[type='email'], input[type='tel'], input[type='search'], input[type='url'], input[type='datetime-local'], input:not([type])),
 .cera-admin select, .cera-admin textarea {
   width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-md);
   background: var(--surface-raised); color: var(--ink); font: 400 15px/22px var(--font-sans);
@@ -302,6 +302,11 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
   .cera-field--toggle > :not(input):not(label) { grid-column: 1 / -1; }
 }
 .cera-group { display: grid; gap: 8px; }
+/* A background color: a swatch of the picked color beside the select or text box. */
+.cera-color { display: flex; gap: 8px; align-items: center; }
+.cera-swatch { flex: none; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.cera-date-time { display: grid; gap: 4px; }
+.cera-date-time input { max-width: 16rem; }
 .cera-inline { display: grid; gap: 4px; font-size: 13px; line-height: 18px; color: var(--ink-muted); }
 .cera-cta { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); align-items: end; padding: 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); }
 .cera-cta > .cera-item-buttons { justify-self: end; }

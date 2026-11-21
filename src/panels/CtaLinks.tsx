@@ -1,7 +1,7 @@
 import type { CTA } from '../fields.ts';
 
 /** Theme note on CTA: "For internal links, only include the path." */
-function href(url: string): string {
+export function linkHref(url: string): string {
   return /^([a-z]+:|\/|#)/i.test(url) ? url : `/${url}`;
 }
 
@@ -9,7 +9,7 @@ export function CtaLink({ cta }: { cta: CTA }) {
   // TODO: target 'modal' needs a client component; it opens normally for now.
   const external = cta.target === '_blank';
   return (
-    <a className={`cta${cta.style ? ` cta--${cta.style}` : ''}`} href={href(cta.url)} {...(external && { target: '_blank', rel: 'noopener noreferrer' })}>
+    <a className={`cta${cta.style ? ` cta--${cta.style}` : ''}`} href={linkHref(cta.url)} {...(external && { target: '_blank', rel: 'noopener noreferrer' })}>
       {cta.text}
     </a>
   );
