@@ -8,6 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { checkSubmission, formType, publicForm, submissionsCsv, type FormField, type FormResponse, type PublicForm } from '../src/forms/index.ts';
 import { checkFormToken, issueFormToken, MAX_AGE_MILLISECONDS } from '../src/forms/server.ts';
 import { createFormHandler } from '../src/next/forms.ts';
+import { createSubmissionsExportHandler } from '../src/next/submissions.ts';
 import { readPage, type StoredPage } from '../src/index.ts';
 import { deletePage, deleteSubmissions, listSubmissions, savePage, submissionCounts, unpublishPage } from '../src/supabase/index.ts';
 import { addUser, createTestDb, fakeSupabase } from './support/db.ts';
@@ -437,4 +438,29 @@ test('the form shown on the live site is the published version', async () => {
   const draft = (await getDraftForm(server, stored.id)) as PublicForm;
   assert.deepEqual([draft.title, draft.version, draft.items.length], ['Changed', 2, 0]);
   assert.equal(await getDraftForm(anonymous, stored.id), null);
+});
+
+test('the CSV export: one form’s submissions, oldest first, read as the signed-in user', async () => {
+  const stored = contact('export-me');
+  await publish(stored);
+  const formHandler = handler({ max: 5, minutes: 10 }, '203.0.113.99');
+  assert.equal((await post(formHandler, stored.id, { ...valid, 'your-name': 'First' })).status, 200);
+  assert.equal((await post(formHandler, stored.id, { ...valid, 'your-name': 'Second' })).status, 200);
+
+  const exportFor = (client: SupabaseClient) => createSubmissionsExportHandler({ client: () => client, now: () => new Date('2026-11-21T12:00:00Z') });
+  const response = await exportFor(staffEditor).GET(new Request(`http://localhost/admin/submissions/export?form=${stored.id}`));
+  assert.equal(response.headers.get('Content-Type'), 'text/csv; charset=utf-8');
+  assert.equal(response.headers.get('Content-Disposition'), 'attachment; filename="export-me-submissions-2026-11-21.csv"');
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  // The byte order mark, so Excel reads it as UTF-8 (text() would drop it).
+  assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf]);
+  const csv = new TextDecoder().decode(bytes);
+  assert.ok(csv.indexOf('First') > 0 && csv.indexOf('First') < csv.indexOf('Second'), csv);
+
+  // Viewers can't read submissions: row-level security leaves the file empty but for its header.
+  const viewerCsv = await (await exportFor(staffViewer).GET(new Request(`http://localhost/admin/submissions/export?form=${stored.id}`))).text();
+  assert.doesNotMatch(viewerCsv, /First|Second/);
+  // A malformed form id means every form's.
+  const all = await exportFor(staffEditor).GET(new Request('http://localhost/admin/submissions/export?form=nope'));
+  assert.match(all.headers.get('Content-Disposition') ?? '', /all-forms-submissions/);
 });

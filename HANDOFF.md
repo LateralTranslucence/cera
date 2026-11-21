@@ -65,7 +65,7 @@ src/
                     quotes, tabs, text, text-media v2, accordion, stats, gallery, posts, form, search; `corePanels` lists them), PanelFrame (the shared section,
                     background, title and copy), Html and CtaLink(s); Tabs and Decision Tree have small client parts
   next/cache.ts     the `/next/cache` entry: cacheLive (Next data cache, tag cera:pages) and pagesChanged (call after publishing)
-  next/             the `/next` entry: async <Panels> Server Component, pageMetadata, jsonLdString, createFormHandler
+  next/             the `/next` entry: async <Panels> Server Component (each panel in a PanelBoundary), pageMetadata, jsonLdString, and route handlers: createFormHandler, createSearchHandler, createPreviewHandler, createExitPreviewHandler, createSubmissionsExportHandler
                     (the forms endpoint: token, honeypot, checks, rate limit), createSearchHandler (the Search panel's
                     endpoint: reads the live panel's settings, then searches within them); React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
@@ -218,6 +218,14 @@ test/
     - **Stats** → the panel's repeater already matched the theme. Description is now rich text (limited toolbar), as in the theme, and the import keeps its HTML. The unused `stats()` helper is gone.
     - **Panel ID** → confirmed as the section's anchor id: the imported Documentation page uses ids like `getting-started` for in-page links.
     - **Covered elsewhere:** accordion (a repeater), form (a relation to forms), the form field types (the form builder's panels), read-only fields (the Submissions screen) and the icon's Preview (the icon editor).
+38. **One broken panel doesn't break the page; the site's route handlers come from the package** (decided 2026-11-21).
+    - **Error boundaries:** `<Panels>` wraps each panel in `PanelBoundary` (a client error boundary) with a `Suspense` boundary inside it. A panel that throws while rendering, in the Server Component render or in the browser, is left out of the server HTML and replaced in the browser. Visitors see nothing in its place. In draft preview and in development, a note names the panel ("The Quotes panel couldn't be shown…"), and `showErrors` overrides that. The error is logged to the browser console (production hides the server's message, as React does) and on the server by Next. A panel whose component or `load` fails is still skipped before rendering, through `onError`, as before.
+    - Checked against a real Next server: with Quotes throwing, `/panels` returned 200 with every other panel in its HTML. Development showed the note; a production build showed nothing.
+    - **Route handlers** in `./next`, so a site's route files are one line each:
+      - `createPreviewHandler({ authorize, pathFor? })` turns on draft mode for `?slug=` and redirects to the page. `authorize` returns true, false (401) or a Response, and Next's `redirect()` works too. The admin uses the signed-in session; outside tools use `previewSecret(() => process.env.CERA_PREVIEW_SECRET)`, compared in constant time.
+      - `createExitPreviewHandler()` turns preview off and returns to `?path=`, but only to a path on the same site.
+      - `createSubmissionsExportHandler({ client })` serves the submissions CSV with the signed-in user's client, so row-level security decides who gets it.
+      - These join `createFormHandler` and `createSearchHandler`.
 
 ## Pattern: keep fields in their own file
 
@@ -309,7 +317,7 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
 3. **Content-type parity.** ✅ Forms and submissions (decision 31), simple pages (decision 32), icons (decision 33), admin pages and the `settings()` review (decision 36) are done. Left for later: private fields, with form email (decision 36). Not yet for icons: Font Awesome on Developers Only itself (needs the Pro packages and token), and showing the save's "SVG cleaned" warning on a brand-new icon (the editor reloads at its new address after the first save, which drops save notes, as it does for rich text).
 4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). "Restore revision" is done (decision 30). Still to do: pruning old draft revisions.
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.
-6. **Next.js integration.** Started in A and B above. Still to do after them: per-panel error boundaries (a client component) and admin route handlers packaged in `./next`.
+6. ✅ **Next.js integration** (decision 38). Still to do: the admin's Server Actions (the example's `app/admin/actions.ts`) are still the site's own.
 7. **Packaging.** The package is `@lateraltranslucence/cera` with `.`, `./next`, `./panels`, `./supabase`, `./admin` and `./admin.css` entry points (already set up in `package.json`, currently pointing at source). Add a build step that emits JS and `.d.ts`, point `exports` at the output, and keep `.` free of React and Next imports. Then add the `create-cera` installer.
 
 ## Open questions for the project owner
