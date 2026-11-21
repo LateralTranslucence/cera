@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { breadcrumbsFor, canEditContentType, defineContentType, field, readPage, type StoredPage } from '../src/index.ts';
-import { savePage } from '../src/supabase/index.ts';
+import { getPageForEditing, getPrivateBoxes, getPublishedPage, restoreRevision, savePage } from '../src/supabase/index.ts';
 import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import { simplePage } from '../examples/next-site/cera/content-types/simple-page.ts';
 import { adminPage } from '../examples/next-site/cera/content-types/admin-page.ts';
@@ -66,4 +66,44 @@ test('a type that is never published saves working copies but refuses to publish
   }
   const live = await db.query<{ n: number }>(`select count(*)::int as n from public.cera_page_revisions where page_id = $1 and is_published`, [page.id]);
   assert.equal(live.rows[0]?.n, 0);
+});
+
+test('private boxes: saved with history, never readable by visitors, read back by the server', async () => {
+  const db = await createTestDb();
+  const editor = await addUser(db, 'editor');
+  const server = fakeSupabase(db, 'service_role');
+  const anonymous = fakeSupabase(db, 'anon');
+  const notes = defineContentType({
+    name: 'notice',
+    label: 'Notice',
+    route: '/notices/[slug]',
+    boxes: { main: { body: field.text() }, routing: { recipients: field.textarea() } },
+    privateBoxes: ['routing'],
+  });
+  const page: StoredPage = { id: crypto.randomUUID(), contentType: 'notice', slug: 'storm', title: 'Storm', boxes: { main: { body: 'Dust storm ahead' }, routing: { recipients: 'ops@example.test' } }, panels: [] };
+  const first = await savePage(server, notes, page, { mode: 'publish', expectedVersion: 0, userId: editor });
+  assert.equal(first.ok, true, JSON.stringify(first));
+
+  // Visitors get the page without the private box, and can't ask for it.
+  const live = await getPublishedPage(anonymous, notes, 'storm');
+  assert.equal(live?.page.boxes.main.body, 'Dust storm ahead');
+  assert.equal(live?.page.boxes.routing.recipients, undefined);
+  const { error } = await anonymous.from('cera_page_revisions').select('private_boxes').eq('page_id', page.id).maybeSingle();
+  assert.equal(error?.code, '42501');
+  const raw = await db.query<{ boxes: Record<string, unknown> }>('select boxes from public.cera_page_revisions where page_id = $1', [page.id]);
+  assert.deepEqual(Object.keys(raw.rows[0]!.boxes), ['main']);
+
+  // The editor and the server see it.
+  assert.equal((await getPageForEditing(server, notes, page.id))?.page.boxes.routing?.recipients, 'ops@example.test');
+  assert.deepEqual(await getPrivateBoxes(server, page.id), { routing: { recipients: 'ops@example.test' } });
+
+  // A draft changes the working copy's, not the live version's; restoring brings an old one back.
+  const second = await savePage(server, notes, { ...page, boxes: { ...page.boxes, routing: { recipients: 'new@example.test' } } }, { mode: 'draft', expectedVersion: 1, userId: editor });
+  assert.equal(second.ok, true);
+  assert.deepEqual(await getPrivateBoxes(server, page.id), { routing: { recipients: 'ops@example.test' } });
+  assert.deepEqual(await getPrivateBoxes(server, page.id, { from: 'working' }), { routing: { recipients: 'new@example.test' } });
+  const restored = await restoreRevision(server, notes, page.id, 1, { expectedVersion: 2, userId: editor });
+  assert.equal(restored.ok, true, JSON.stringify(restored));
+  assert.deepEqual(await getPrivateBoxes(server, page.id, { from: 'working' }), { routing: { recipients: 'ops@example.test' } });
+  assert.equal(await getPrivateBoxes(server, crypto.randomUUID()), null);
 });

@@ -239,6 +239,15 @@ export function readPage<Type extends AnyContentType>(contentType: Type, raw: un
 /* Save                                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The checks a save runs, without the cleanup (sanitizing) or the content
+ * type's beforeSave hook: what the admin runs in the browser before sending a
+ * save, so errors show at once. The server checks again.
+ */
+export function checkPage(contentType: AnyContentType, raw: unknown, mode: SaveMode): PrepareResult {
+  return validateForSave(contentType, raw, mode);
+}
+
 function validateForSave(contentType: AnyContentType, raw: unknown, mode: SaveMode): PrepareResult {
   const envelope = envelopeSchema(contentType.name).safeParse(raw);
   if (!envelope.success) return { ok: false, issues: envelopeIssues(envelope.error) };

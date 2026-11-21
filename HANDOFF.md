@@ -30,7 +30,11 @@ Read these before changing the design:
 ```bash
 npm install
 npm run check      # tsc --noEmit + node --test (via tsx); no Docker needed
+npm run build      # the package into dist/ (scripts/build.mjs: tsc with tsconfig.build.json, admin.css copied)
+npm run dev        # rebuilds dist/ on change and runs the example site (scripts/dev.mjs)
 ```
+
+Inside this repository the package resolves to `src/` through the `source` export condition (tsconfig `customConditions`, `node --conditions=source` in the test and script commands); Next and everyone else get `dist/` (decision 39).
 
 The example site runs against a local Supabase stack; see [examples/next-site/README.md](examples/next-site/README.md). Its ports (56320–56329) are chosen to avoid the other local Supabase projects (Supabase's default is 543xx).
 
@@ -48,7 +52,7 @@ src/
   content-type.ts   defineContentType, PageDocument, PageOf, runtime pageSchema
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish; sanitizes rich text)
-  roles.ts          CERA_ROLES, their labels, CeraUser
+  roles.ts          CERA_ROLES, their labels, roleAtLeast, canEditContentType, CeraUser
   color.ts          isLightColor: dark text beats light on a background color (WCAG contrast); PanelFrame adds
                     has-light-background for a light color with no image, video or overlay
   media.ts          uploadable types (MEDIA_TYPES), size limits, formatBytes, MediaItem, the upload/update/delete types, MediaUse, toMediaRef
@@ -61,11 +65,16 @@ src/
   forms/            the `/forms` entry: formType (the cera_form content type), its 13 field types as panels (cera/field-*),
                     publicForm (what visitors see), checkSubmission (server-side checks), submissionsCsv; server.ts holds
                     the anti-spam token and sender key (node:crypto, server only)
-  panels/           the `/panels` entry: the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
+  panels/           the `/panels` entry (definitions in <name>.panel.ts, fields in .fields.ts, loads in .load.ts, components in
+                    PascalCase .tsx): the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
                     quotes, tabs, text, text-media v2, accordion, stats, gallery, posts, form, search; `corePanels` lists them), PanelFrame (the shared section,
                     background, title and copy), Html and CtaLink(s); Tabs and Decision Tree have small client parts
-  next/cache.ts     the `/next/cache` entry: cacheLive (Next data cache, tag cera:pages) and pagesChanged (call after publishing)
-  next/             the `/next` entry: async <Panels> Server Component (each panel in a PanelBoundary), pageMetadata, jsonLdString, and route handlers: createFormHandler, createSearchHandler, createPreviewHandler, createExitPreviewHandler, createSubmissionsExportHandler
+  next/cache.ts     the `/next/cache` entry: cacheLive (Next data cache, tag cera:pages), pagesChanged (call after publishing),
+                    createLoadContexts (what panels' load reads through: cached live, working copies in preview)
+  next/             the `/next` entry: async <Panels> Server Component (each panel in a PanelBoundary), pageMetadata, jsonLdString,
+                    createStaffAuth (auth.ts: userClient, requireStaff), createAdminActions (admin-actions.ts: the admin's
+                    Server Actions), previewedVersion, and route handlers: createFormHandler, createSearchHandler,
+                    createPreviewHandler, createExitPreviewHandler, createSubmissionsExportHandler, createCleanupHandler
                     (the forms endpoint: token, honeypot, checks, rate limit), createSearchHandler (the Search panel's
                     endpoint: reads the live panel's settings, then searches within them); React lives only here
   supabase/         the `/supabase` entry: getPublishedPage, getDraftPage, getPageForEditing, listPages, savePage, unpublishPage,
@@ -96,6 +105,14 @@ supabase/
   migrations/…_cera_forms.sql         cera_form_submissions (admins and editors read), cera_add_submission (with the rate limit),
                                       cera_list_submissions, cera_submission_counts, cera_delete_submissions
   migrations/…_cera_slug_scopes.sql   slug_scope on pages and revisions: slugs unique per scope (types sharing a route share one)
+  migrations/…_cera_prune_revisions.sql   cera_prune_revisions (old drafts; daily pg_cron job)
+  migrations/…_cera_media_maintenance.sql cera_media_in_use, cera_media_orphans, cera_unused_media, cera_replace_media (with cera_swap_media)
+  migrations/…_cera_private_boxes.sql     private_boxes on pages and revisions (split from "$private" by triggers), anon column grants
+scripts/
+  build.mjs         the package build (and --watch); dev.mjs: build --watch plus the example's dev server
+packages/
+  create-cera/      `npm create cera my-site`: index.mjs copies template/ (synced from the example by scripts/sync-template.mjs
+                    before packing; not committed) and names the site, its Supabase project and its Cera version
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
     cera/           the landing_page and simple_page content types (both at /[slug], one slug scope), admin_page (team
@@ -120,6 +137,8 @@ test/
   search.test.ts    Search: settings, URL queries, the resolver (words, A–Z, types, select lists, sort, paging, preview), the handler, the panel
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
   icons.test.ts     SVG cleaning, cleaning on save, Lucide search, Font Awesome packs, the library, custom icons, Blocks' icons
+  field-types.test.ts  email, phone, date and time, time zone, image link; custom controls
+  next-integration.test.ts  panel error boundaries, preview handlers
   content-type-settings.test.ts  editRoles (canEditContentType), breadcrumbsFor, types that are never published
   simple-page.test.ts  slug scopes across types, findPublishedPage / findDraftPage, a simple page's metadata
   support/db.ts     PGlite (Postgres in-process, no Docker) with Supabase's roles stubbed, and a fake supabase-js client
@@ -226,6 +245,13 @@ test/
       - `createExitPreviewHandler()` turns preview off and returns to `?path=`, but only to a path on the same site.
       - `createSubmissionsExportHandler({ client })` serves the submissions CSV with the signed-in user's client, so row-level security decides who gets it.
       - These join `createFormHandler` and `createSearchHandler`.
+39. **Finishing the list** (decided 2026-11-21; the owner chose private boxes, build only, and to apply migrations to the hosted project after a clean dry run).
+    - **Admin actions and sign-in in the package:** `createStaffAuth` (userClient, requireStaff) and `createAdminActions` (every admin Server Action: role checks, editRoles, writes with the secret key and the verified user, reads as the user). A 'use server' file may only export async functions, so the site keeps one-line wrappers.
+    - **Admin gaps:** `checkPage` runs a save's checks in the browser before Publish or Schedule; History's Preview opens an old version (`?page=&version=` on the preview handler, kept in a cookie, read by `previewedVersion` and `getRevisionPage`); `cera_prune_revisions` keeps each page's newest 50 drafts and anything under 30 days, never a published, scheduled, live or current version, daily via pg_cron (and the cleanup route); `PageEditor`'s `controls` draws a site's `custom()` kinds.
+    - **Media:** "used" means a working copy, live version or pending schedule mentions the path. `cleanUpUploads` removes bucket objects with no library row that nothing uses, after 24 hours (unfinished uploads, replaced files), from `createCleanupHandler` (Vercel Cron, `CRON_SECRET`). The library lists only unused files on request, and pages with Load more. Replace uploads a new file and rewrites every working copy, live version and pending schedule in place (references get the new path, type and size, keep their alt; rich-text images get the new path); page versions don't change, so nothing needs publishing again. Older revisions keep the old path, as after a delete. The old object stays until cleanup.
+    - **Panel data:** `createLoadContexts` (in `/next/cache`) caches every live `load` read. Unpublish lists the live pages that feature the page, as Delete already did.
+    - **Private boxes** (theme: private_fields): a content type's `privateBoxes` are saved in the reserved `boxes.$private`, which triggers move into `private_boxes` on the working copy, and each revision copies it. Visitors' role can read every column but that one (column grants: a column added later must be granted to anon on purpose). The editor and restore merge them back; the server reads them with `getPrivateBoxes(service, id, { from })`. Pages read for the live site get the boxes' defaults.
+    - **Packaging:** `npm run build` emits `dist/` with tsc 7 (`rewriteRelativeImportExtensions`; the build also rewrites `.ts` imports in the `.d.ts` files to `.js`, so any consumer resolves them). Exports have `source` (src, this repo only), `types` and `default`. Panel definitions became `<name>.panel.ts`: `accordion.ts` and `Accordion.tsx` would both build to `accordion.js` on a case-insensitive disk. The example builds the package before dev, build and typecheck; `npm run dev` at the root watches. The tarball holds `dist`, the migrations and the README. `create-cera` copies a template synced from the example (minus the Developers Only import and the workspace build steps), with Supabase's config and every migration; CI scaffolds one and typechecks it. A trial site built with `next build --webpack` (Turbopack refuses a node_modules symlinked from outside the project, which a real install doesn't have).
 
 ## Pattern: keep fields in their own file
 
@@ -296,14 +322,14 @@ B. ✅ **Minimal admin** (`examples/next-site/app/admin`, editor in `src/admin`)
    Redesign and drag-to-reorder: done (decision 28). Scheduling: done (decision 29).
    Deleting pages and history with restore: done (decision 30).
    The sidebar lists each content type's pages under Content, with "+ New" for those who may add one (Pages, Simple Pages, Forms).
-   Still to do for the admin: client-side validation before save, previewing an old version, and pruning old draft revisions.
+   Checked in the browser on 2026-11-21: Unpublish (it now lists the live pages that feature the page), before-save checks, previewing an old version. Not checked in a browser: a viewer's read-only view (needs a viewer sign-in; the test account couldn't be used from here).
    Caching: done (decision 25).
 C. ✅ **Panel data loading** (decision 19), proven with Featured Post: fields, `featured-post.load.ts` and a component ported from the theme (image optional, unlike the theme). The admin's page picker replaces pasted ids for `relation` fields: it searches pages as the signed-in user, respects `to` (fixed or a sibling field like Post Type), shows "Not published" on picks the live site won't show, and replaces the pick when `limit` is 1. Checked in a browser: the home page features About; picking Our Services and saving a draft changed only the preview.
-   Not yet: `load` results aren't cached across requests, and a linked page doesn't know which pages feature it (so unpublishing it silently empties those panels).
+   Live `load` reads go through cached resolvers (createLoadContexts), and Unpublish and Delete list the pages that feature a page before it goes (decision 39).
 D. ✅ **Sanitize `field.html()` on save** (decision 18). Checked in the admin: a script, an `onclick` and a `javascript:` link were removed on save, the editor showed the cleaned HTML with a warning under the field, and the preview rendered only the clean version. `savePage` now returns the stored page, and the editor switches to it after a save.
 E. ✅ **Media uploads** (decision 23). Checked in the admin against the local stack: uploading a PNG (stored, recorded, measured 800 × 500), adding alt text, picking it from the library for the SEO image, saving a draft, and the preview rendering it with width, height and alt, plus `og:image`. A dropped SVG was refused with a message, and Storage itself refused a `text/html` upload made with a valid signed URL.
    Library editing (decision 26) is done: the admin's Media page. Checked in a browser against the local stack: an image used on `/developers-only` listed that page as live and couldn't be deleted; saving its alt text updated the library; a new upload showed "No pages use this file", and deleting it removed the row and the Storage object. Both the two-column and narrow layouts work.
-   Not yet: cleaning up files that were uploaded but never finished or never used, image resizing (Supabase image transformations need a paid plan), paging past the newest 60 files in the library, and replacing a file in place.
+   Done (decision 39): cleanup of unfinished and replaced uploads, the "Only files no page uses" filter, Load more past 60, and Replace file. Not done: image resizing (Supabase image transformations need a paid plan).
 
 **Then the original list:**
 
@@ -314,11 +340,12 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
    **Batch 2 done** (2026-11-20): accordion (WAI-ARIA accordion, one item open at a time), stats (numbers in the HTML, counted up on the client only when off screen at load and not for reduced motion) and gallery (a grid that opens images in a modal `<dialog>`, arrow keys between them), plus the admin's gallery picker (`GalleryInput`: upload several or drop them, pick several from the library, reorder, alt text per image). The theme's `accordion` and `stats` field types became repeaters. Differences: a gallery image's alt text doubles as its title (the theme had a separate title).
    **Posts done** (2026-11-20): cards for picked pages via `load` (like Featured Post: published, visible pages only on the live site, in the picked order), a per-row grid, and with Slider on and more pages than fit in a row, a scroll-snap row with Previous/Next buttons (`PostsSlider`). Not ported: “Modal”. The theme turned on its slider for more than three posts whatever the Slider field said; here the field decides.
    **Form done** (decision 31). **Search done** (decision 35): every theme panel now has a Cera panel.
-3. **Content-type parity.** ✅ Forms and submissions (decision 31), simple pages (decision 32), icons (decision 33), admin pages and the `settings()` review (decision 36) are done. Left for later: private fields, with form email (decision 36). Not yet for icons: Font Awesome on Developers Only itself (needs the Pro packages and token), and showing the save's "SVG cleaned" warning on a brand-new icon (the editor reloads at its new address after the first save, which drops save notes, as it does for rich text).
-4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). "Restore revision" is done (decision 30). Still to do: pruning old draft revisions.
-5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Still to do: see B above, plus a way for sites to register their own controls for `custom()` kinds.
-6. ✅ **Next.js integration** (decision 38). Still to do: the admin's Server Actions (the example's `app/admin/actions.ts`) are still the site's own.
-7. **Packaging.** The package is `@lateraltranslucence/cera` with `.`, `./next`, `./panels`, `./supabase`, `./admin` and `./admin.css` entry points (already set up in `package.json`, currently pointing at source). Add a build step that emits JS and `.d.ts`, point `exports` at the output, and keep `.` free of React and Next imports. Then add the `create-cera` installer.
+3. **Content-type parity.** ✅ Forms and submissions (decision 31), simple pages (decision 32), icons (decision 33), admin pages and the `settings()` review (decision 36) are done. Left for later: private fields, with form email (decision 36). Font Awesome on Developers Only isn't wanted (2026-11-21); the adapter stays for other sites. Not yet for icons: showing the save's "SVG cleaned" warning on a brand-new icon (the editor reloads at its new address after the first save, which drops save notes, as it does for rich text).
+4. **Supabase layer.** ✅ Pages, revisions, media, RLS and the save function are done. Media uploads are done (E above). "Restore revision" is done (decision 30). Pruning old draft revisions: done (decision 39).
+5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Sites register controls for their `custom()` kinds with PageEditor's `controls` (decision 39).
+6. ✅ **Next.js integration** (decisions 38 and 39). The admin's Server Actions and sign-in are in the package; a site wraps them in one-line functions.
+7. ✅ **Packaging** (decision 39). The package builds to `dist/`; `create-cera` makes new sites. Not published: both packages are `private` until the first release.
+8. **Form email** (with private boxes, decision 39): the alert to staff and the confirmation to the sender, from the form's private Submissions box. How to send needs discussing first.
 
 ## Open questions for the project owner
 

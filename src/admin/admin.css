@@ -610,7 +610,9 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 .cera-media-details__alt { display: grid; gap: 6px; }
 .cera-media-details__alt label { display: grid; gap: 4px; font-weight: 600; }
 .cera-media-details__alt textarea { font: inherit; font-weight: 400; padding: 6px 8px; border: 1px solid var(--cera-line); border-radius: 6px; background: var(--cera-surface); color: var(--cera-fg); resize: vertical; }
-.cera-media-details__alt .cera-note, .cera-media-details__delete .cera-note { margin: 0; font-size: 0.85em; }
+.cera-media-details__alt .cera-note, .cera-media-details__delete .cera-note, .cera-media-details__replace .cera-note { margin: 0; font-size: 0.85em; }
+.cera-media-details__replace { display: grid; gap: 6px; justify-items: start; }
+.cera-media__more { justify-self: center; margin-top: 12px; }
 .cera-media-details__alt button { justify-self: start; }
 .cera-media-details__uses { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .cera-media-details__delete { display: grid; gap: 6px; justify-items: start; padding-top: 12px; border-top: 1px solid var(--cera-line); }

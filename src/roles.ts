@@ -25,6 +25,13 @@ export function canEditContentType(role: CeraRole | null | undefined, contentTyp
   return !contentType.editRoles || contentType.editRoles.includes(role);
 }
 
+const ROLE_RANK: Record<CeraRole, number> = { viewer: 1, editor: 2, admin: 3 };
+
+/** Whether a role is at least `minimum`: admin > editor > viewer. */
+export function roleAtLeast(role: CeraRole | null | undefined, minimum: CeraRole): boolean {
+  return Boolean(role) && ROLE_RANK[role!] >= ROLE_RANK[minimum];
+}
+
 /** An account as the Users page shows it. */
 export interface CeraUser {
   id: string;

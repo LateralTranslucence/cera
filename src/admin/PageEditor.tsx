@@ -14,7 +14,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import type { AnyContentType, BoxMap } from '../content-type.ts';
 import type { FieldMap, OptionsContext } from '../fields.ts';
-import type { PageIssue, SaveMode, StoredPage } from '../document.ts';
+import { checkPage, type PageIssue, type SaveMode, type StoredPage } from '../document.ts';
 import { upgradePanel, type StoredPanel } from '../migrate.ts';
 import type { AnyPanel } from '../panel.ts';
 import type { DeletePageResult, PageLink, PageRevision, PageSchedule, SaveResult } from '../supabase/index.ts';
@@ -51,8 +51,11 @@ export interface PageEditorProps {
   onCancelSchedule?: () => Promise<void>;
   /** Called after a successful save, e.g. to move from /new to the page's URL. */
   onSaved?: (result: Extract<SaveResult, { ok: true }>, mode: SaveInput['mode']) => void;
-  /** Link that opens the page in draft-mode preview. */
-  previewHref?: (slug: string) => string;
+  /**
+   * Link that opens the page in draft-mode preview; with `version`, that saved
+   * version (History's Preview links, opened in a new tab).
+   */
+  previewHref?: (slug: string, version?: { pageId: string; version: number }) => string;
   /** The back link in the top bar. */
   backHref?: string;
   /** Its text. Default "Pages". */
@@ -67,6 +70,8 @@ export interface PageEditorProps {
   media?: FormContext['media'];
   /** The site's icon sets (server actions), for the icon picker. */
   icons?: FormContext['icons'];
+  /** The site's controls for its `custom()` field kinds, by kind. */
+  controls?: FormContext['controls'];
   /** Viewers can look but not save. */
   readOnly?: boolean;
   /** Loads saved versions, newest first (older than `before` when given). Shows History in Page settings. */
@@ -137,6 +142,7 @@ export function PageEditor({
   findPages,
   media,
   icons,
+  controls,
   readOnly = false,
   loadHistory,
   onRestore,
@@ -192,7 +198,7 @@ export function PageEditor({
 
   const definitions = useMemo(() => new Map<string, AnyPanel>(contentType.panels.map((definition: AnyPanel) => [definition.type, definition])), [contentType]);
   const options = useMemo<OptionsContext>(() => ({ contentTypes: contentTypes ?? [{ name: contentType.name, label: contentType.label, public: true }], colors }), [contentTypes, contentType, colors]);
-  const context: FormContext = { issues, options, readOnly, findPages, media, icons };
+  const context: FormContext = { issues, options, readOnly, findPages, media, icons, controls };
 
   // Warn before leaving with unsaved changes.
   useEffect(() => {
@@ -220,6 +226,14 @@ export function PageEditor({
   pageRef.current = page;
 
   const save = (mode: SaveInput['mode'], publishAt?: string) => {
+    // The same checks the server runs, first, so errors show without a round trip. The server checks again.
+    const check = checkPage(contentType, page, mode === 'draft' ? 'draft' : 'publish');
+    if (!check.ok) {
+      setIssues(check.issues);
+      setStatus({ tone: 'error', text: `Not ${mode === 'publish' ? 'published' : mode === 'schedule' ? 'scheduled' : 'saved'}. Fix the errors below.` });
+      setOpen((previous) => new Set(previous).add(SETTINGS));
+      return;
+    }
     // Outside the transition, so it shows immediately (updates inside a transition are held back until it finishes).
     setStatus({ tone: 'info', text: mode === 'publish' ? 'Publishing…' : mode === 'schedule' ? 'Scheduling…' : 'Saving…' });
     const sent = page;
@@ -376,9 +390,8 @@ export function PageEditor({
     });
   };
 
-  const openDelete = () => {
-    setDialog('delete');
-    if (published) return;
+  /** Loads the pages that link to this one, for the Unpublish and Delete dialogs. */
+  const loadLinks = () => {
     if (!findLinks) {
       setLinks([]);
       return;
@@ -387,6 +400,16 @@ export function PageEditor({
     findLinks()
       .then(setLinks)
       .catch(() => setLinks([]));
+  };
+
+  const openDelete = () => {
+    setDialog('delete');
+    if (!published) loadLinks();
+  };
+
+  const openUnpublish = () => {
+    setDialog('unpublish');
+    loadLinks();
   };
 
   const removePage = () => {
@@ -490,7 +513,7 @@ export function PageEditor({
           )}
           {!readOnly && published && onUnpublish && (
             <>
-              <button type="button" className="cera-button cera-button--lg cera-button--danger cera-topbar__wide" disabled={saving} onClick={() => setDialog('unpublish')}>
+              <button type="button" className="cera-button cera-button--lg cera-button--danger cera-topbar__wide" disabled={saving} onClick={openUnpublish}>
                 Unpublish
               </button>
               <span className="cera-divider cera-topbar__wide" aria-hidden="true" />
@@ -527,7 +550,7 @@ export function PageEditor({
                 ...(!readOnly ? [{ label: 'Save draft', disabled: saving || (!dirty && version > 0), onSelect: () => save('draft') }] : []),
                 ...(!readOnly && onCancelSchedule ? [{ label: 'Schedule', disabled: saving, onSelect: openSchedule }] : []),
                 ...(previewUrl ? [{ label: 'Preview', href: previewUrl }] : []),
-                ...(!readOnly && published && onUnpublish ? [{ label: 'Unpublish', danger: true, disabled: saving, onSelect: () => setDialog('unpublish') }] : []),
+                ...(!readOnly && published && onUnpublish ? [{ label: 'Unpublish', danger: true, disabled: saving, onSelect: openUnpublish }] : []),
               ]}
             />
           )}
@@ -731,11 +754,21 @@ export function PageEditor({
         <p>
           It comes off the live site{schedule ? ', and its scheduled publish is canceled' : ''}. Its content and history are kept, and you can publish it again at any time.
         </p>
+        {links === null ? (
+          <p className="cera-note">Checking which pages feature it…</p>
+        ) : (
+          links.some((link) => link.live) && (
+            <div>
+              <p>{links.filter((link) => link.live).length === 1 ? 'This live page features it and will stop showing it:' : 'These live pages feature it and will stop showing it:'}</p>
+              <LinkList links={links.filter((link) => link.live)} />
+            </div>
+          )
+        )}
         <div className="cera-dialog__buttons">
           <button type="button" className="cera-button" onClick={() => setDialog(null)}>
             Keep it live
           </button>
-          <button type="button" className="cera-button cera-button--danger" onClick={unpublish}>
+          <button type="button" className="cera-button cera-button--danger" disabled={links === null} onClick={unpublish}>
             Unpublish
           </button>
         </div>
@@ -803,6 +836,11 @@ export function PageEditor({
                     </p>
                   )}
                 </div>
+                {previewHref && (
+                  <a className="cera-button cera-button--small" href={previewHref(page.slug, { pageId: page.id, version: revision.version })} target="_blank" rel="noopener">
+                    Preview
+                  </a>
+                )}
                 {!readOnly && onRestore && revision.version !== version && (
                   <button type="button" className="cera-button cera-button--small" disabled={saving} onClick={() => restore(revision.version)}>
                     Restore
@@ -847,13 +885,7 @@ export function PageEditor({
               links.length > 0 && (
                 <div>
                   <p>{links.length === 1 ? 'This page links to it and will stop showing it:' : 'These pages link to it and will stop showing it:'}</p>
-                  <ul className="cera-link-list">
-                    {links.map((link) => (
-                      <li key={link.id}>
-                        {link.title || 'Untitled'} <span className="cera-mono">/{link.slug}</span> {link.live ? <span className="cera-pill">Live</span> : <span className="cera-pill cera-pill--draft">Draft</span>}
-                      </li>
-                    ))}
-                  </ul>
+                  <LinkList links={links} />
                 </div>
               )
             )}
@@ -1127,5 +1159,18 @@ function ActionsMenu({ actions }: { actions: MenuAction[] }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Pages that link to this one, with whether each link is live or only in a draft. */
+function LinkList({ links }: { links: PageLink[] }) {
+  return (
+    <ul className="cera-link-list">
+      {links.map((link) => (
+        <li key={link.id}>
+          {link.title || 'Untitled'} <span className="cera-mono">/{link.slug}</span> {link.live ? <span className="cera-pill">Live</span> : <span className="cera-pill cera-pill--draft">Draft</span>}
+        </li>
+      ))}
+    </ul>
   );
 }

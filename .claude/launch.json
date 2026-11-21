@@ -4,7 +4,10 @@
     {
       "name": "next-site",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "-w", "cera-next-site"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3100
     }
   ]

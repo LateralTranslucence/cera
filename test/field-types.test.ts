@@ -2,7 +2,11 @@
 // link, and the background palette's admin helpers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { field, isTimeZone, objectSchema } from '../src/index.ts';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { z } from 'zod';
+import { custom, field, isTimeZone, objectSchema } from '../src/index.ts';
+import { FieldMapForm, type CustomControlProps } from '../src/admin/fields.tsx';
 import { dateTimeInput, dateTimeValue, toLocalInput } from '../src/admin/state.ts';
 
 const schema = objectSchema({
@@ -48,4 +52,20 @@ test('the date and time control: stored in UTC, edited in the browser’s time z
   assert.equal(dateTimeInput('not a date'), '');
   assert.equal(dateTimeInput(undefined), '');
   assert.equal(dateTimeValue(''), undefined);
+});
+
+test('a site’s own control draws its custom() kind; a kind without one is shown read-only', () => {
+  const fields = { tone: custom('tone', z.string().optional(), { label: 'Tone' }), other: custom('other', z.number().optional(), { label: 'Other' }) };
+  const ToneControl = ({ id, value, readOnly }: CustomControlProps) => createElement('output', { id, 'data-read-only': String(readOnly) }, `tone: ${String(value)}`);
+  const html = renderToStaticMarkup(
+    createElement(FieldMapForm, {
+      fields,
+      value: { tone: 'warm', other: 3 },
+      onChange: () => {},
+      path: [],
+      context: { issues: [], options: { contentTypes: [] }, readOnly: false, controls: { tone: ToneControl } },
+    }),
+  );
+  assert.match(html, /<output id="[^"]+" data-read-only="false">tone: warm<\/output>/);
+  assert.match(html, /No editor for “other” fields yet/);
 });

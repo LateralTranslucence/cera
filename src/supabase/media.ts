@@ -28,6 +28,8 @@ import {
   type MediaItem,
   type MediaKind,
   type MediaQuery,
+  type MediaReplace,
+  type MediaReplaceResult,
   type MediaUploadDone,
   type MediaUploadPrepared,
   type MediaUploadRequest,
@@ -135,10 +137,26 @@ export async function finishMediaUpload(
 
 const ROW_COLUMNS = 'id, path, kind, mime_type, alt, width, height, size_bytes, created_at';
 
-/** The media library, newest first. Any client can read it (the files are public). */
+/**
+ * The media library, newest first, a page at a time (`before`: the last
+ * file's `createdAt`). Any client can read it (the files are public), but
+ * `unused` checks pages, so it needs a staff member's client.
+ */
 export async function listMedia(client: SupabaseClient, query: MediaQuery = {}): Promise<MediaItem[]> {
   const limit = Math.min(Math.max(Math.trunc(query.limit ?? 60), 1), 200);
+  const before = query.before && !Number.isNaN(Date.parse(query.before)) ? new Date(query.before).toISOString() : undefined;
+  if (query.unused) {
+    const { data, error } = await client.rpc('cera_unused_media', { p_limit: 200, p_before: before ?? null });
+    if (error) fail(error);
+    const search = (query.search ?? '').trim().toLowerCase();
+    return ((data as Array<Record<string, unknown>> | null) ?? [])
+      .map(toItem)
+      .filter((item) => !query.kinds?.length || query.kinds.includes(item.kind))
+      .filter((item) => !search || `${item.path} ${item.alt ?? ''}`.toLowerCase().includes(search))
+      .slice(0, limit);
+  }
   let request = client.from('cera_media').select(ROW_COLUMNS);
+  if (before) request = request.lt('created_at', before);
   if (query.kinds?.length) request = request.in('kind', query.kinds);
   const search = (query.search ?? '').trim().toLowerCase();
   if (search) request = request.ilike('search', `%${search.replace(/[\\%_]/g, (character) => `\\${character}`)}%`);
@@ -213,6 +231,69 @@ export async function deleteMedia(service: SupabaseClient, id: string, options: 
   return { ok: true };
 }
 
+/**
+ * Removes files in the bucket that have no library row and that no page uses,
+ * once they're `olderThanHours` old (default 24): uploads that never
+ * finished, and old files after a replace. Run it daily (see
+ * createCleanupHandler in ./next). `service` must use the secret key.
+ * Returns the paths removed.
+ */
+export async function cleanUpUploads(service: SupabaseClient, options: { olderThanHours?: number } = {}): Promise<string[]> {
+  const { data, error } = await service.rpc('cera_media_orphans', { p_older_than: `${options.olderThanHours ?? 24} hours`, p_limit: 500 });
+  if (error) fail(error);
+  const paths = ((data as string[] | null) ?? []).filter((path) => PATH.test(path));
+  const removed: string[] = [];
+  for (let i = 0; i < paths.length; i += 100) {
+    const batch = paths.slice(i, i + 100);
+    const result = await service.storage.from(MEDIA_BUCKET).remove(batch);
+    if (result.error) fail(result.error);
+    removed.push(...batch);
+  }
+  return removed;
+}
+
+/**
+ * Replaces a library file with a new upload (prepareMediaUpload, then the
+ * browser uploads, then this). Checks what arrived like finishMediaUpload;
+ * an image must be replaced with an image and a video with a video. Every
+ * page that uses the file, live versions included, shows the new one at
+ * once: call the site's cache invalidation afterward. The old file is left
+ * for cleanUpUploads. `service` must use the secret key; `userId` must come
+ * from a verified session.
+ */
+export async function replaceMedia(service: SupabaseClient, replace: MediaReplace, options: { userId: string }): Promise<MediaReplaceResult> {
+  const id = String(replace?.id ?? '');
+  const path = String(replace?.path ?? '');
+  if (!UUID.test(id)) return { ok: false, message: 'That file isn’t in the library.' };
+  if (!PATH.test(path) || path.includes('..')) return { ok: false, message: 'That upload path isn’t valid.' };
+
+  const bucket = service.storage.from(MEDIA_BUCKET);
+  const details = await bucket.info(path);
+  if (details.error || !details.data) return { ok: false, message: 'The upload didn’t arrive. Try again.' };
+  const type = String(details.data.contentType ?? '').split(';')[0]!.trim();
+  const size = Number(details.data.size ?? 0);
+  const problem = !isMediaMimeType(type) ? `That file type can’t be uploaded. Use ${TYPE_LIST}.` : tooLarge(MEDIA_TYPES[type].kind, size);
+  if (problem) {
+    await bucket.remove([path]);
+    return { ok: false, message: problem };
+  }
+
+  const { data, error } = await service.rpc('cera_replace_media', {
+    p_id: id,
+    p_media: { path, kind: MEDIA_TYPES[type as keyof typeof MEDIA_TYPES].kind, mimeType: type, width: dimension(replace.width), height: dimension(replace.height), sizeBytes: size },
+    p_user: options.userId,
+  });
+  if (error) {
+    await bucket.remove([path]);
+    if (error.code === '42501') return { ok: false, message: 'Your account can’t change media.' };
+    if (error.code === 'CE404') return { ok: false, message: 'That file isn’t in the library any more.' };
+    if (error.code === 'CE409') return { ok: false, message: 'Replace an image with an image, and a video with a video.' };
+    fail(error);
+  }
+  const result = data as { item: Record<string, unknown>; pages: number };
+  return { ok: true, item: toItem(result.item), pages: Number(result.pages) };
+}
+
 function toItem(row: Record<string, unknown>): MediaItem {
   const asText = (value: unknown) => (typeof value === 'string' && value !== '' ? value : undefined);
   const asNumber = (value: unknown) => (value === null || value === undefined || value === '' ? undefined : Number(value));
@@ -225,6 +306,7 @@ function toItem(row: Record<string, unknown>): MediaItem {
     width: asNumber(row.width),
     height: asNumber(row.height),
     sizeBytes: asNumber(row.sizeBytes ?? row.size_bytes),
-    createdAt: asText(row.createdAt ?? row.created_at),
+    // PostgREST sends ISO strings; a direct Postgres client may send a Date.
+    createdAt: (row.createdAt ?? row.created_at) instanceof Date ? ((row.createdAt ?? row.created_at) as Date).toISOString() : asText(row.createdAt ?? row.created_at),
   };
 }

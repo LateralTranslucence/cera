@@ -1,14 +1,16 @@
 'use client';
 /**
- * The Media page: browse and search the library, upload files, change a
- * file's alt text, see which pages use it, and delete it when none do.
+ * The Media page: browse and search the library (a page at a time, or only
+ * the files no page uses), upload files, change a file's alt text, replace
+ * the file everywhere it's used, see which pages use it, and delete it when
+ * none do.
  *
- * Sites pass server actions wrapping `updateMedia`, `deleteMedia` and
- * `mediaUsage` from ./supabase (plus the picker's `MediaContext`), each
- * checking the user's role.
+ * Sites pass server actions wrapping `updateMedia`, `deleteMedia`,
+ * `mediaUsage` and (through mediaReplacer) `replaceMedia` from ./supabase,
+ * plus the picker's `MediaContext`, each checking the user's role.
  */
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react';
-import type { MediaDeleteResult, MediaItem, MediaKind, MediaUpdate, MediaUploadResult, MediaUse } from '../media.ts';
+import type { MediaDeleteResult, MediaItem, MediaKind, MediaReplaceResult, MediaUpdate, MediaUploadResult, MediaUse } from '../media.ts';
 import { formatBytes, mediaAccept } from '../media.ts';
 import { mediaUrl } from '../media-url.ts';
 import { MediaLibrary, type MediaContext } from './media.tsx';
@@ -20,6 +22,8 @@ export interface MediaManagerProps {
   canEdit: boolean;
   onUpdate: (update: MediaUpdate) => Promise<MediaUploadResult>;
   onDelete: (id: string) => Promise<MediaDeleteResult>;
+  /** Replaces a file with a new upload (see mediaReplacer). Without it, files can't be replaced. */
+  onReplace?: (id: string, file: File) => Promise<MediaReplaceResult>;
   findUsage: (path: string) => Promise<MediaUse[]>;
   /** Where to edit a page that uses a file. */
   pageHref: (use: MediaUse) => string;
@@ -31,8 +35,9 @@ const KINDS: Record<string, MediaKind[]> = { all: ['image', 'video'], image: ['i
 const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 const fileName = (path: string) => path.split('/').pop() ?? path;
 
-export function MediaManager({ media, canEdit, onUpdate, onDelete, findUsage, pageHref }: MediaManagerProps) {
+export function MediaManager({ media, canEdit, onUpdate, onDelete, onReplace, findUsage, pageHref }: MediaManagerProps) {
   const [kind, setKind] = useState<keyof typeof KINDS>('all');
+  const [unused, setUnused] = useState(false);
   const [version, setVersion] = useState(0);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -87,6 +92,10 @@ export function MediaManager({ media, canEdit, onUpdate, onDelete, findUsage, pa
             <option value="video">Videos</option>
           </select>
         </label>
+        <label className="cera-check">
+          <input type="checkbox" checked={unused} onChange={(event) => setUnused(event.target.checked)} />
+          Only files no page uses
+        </label>
         {canEdit && (
           <>
             <input
@@ -120,7 +129,7 @@ export function MediaManager({ media, canEdit, onUpdate, onDelete, findUsage, pa
       )}
 
       <div className="cera-media-manager__layout">
-        <MediaLibrary find={media.find} kinds={KINDS[kind]!} version={version} isSelected={(id) => id === selected?.id} onPick={(item) => (setSelected(item), setStatus(null))} />
+        <MediaLibrary find={media.find} kinds={KINDS[kind]!} unused={unused} version={version} isSelected={(id) => id === selected?.id} onPick={(item) => (setSelected(item), setStatus(null))} />
         {selected ? (
           <MediaDetails
             key={selected.id}
@@ -128,6 +137,7 @@ export function MediaManager({ media, canEdit, onUpdate, onDelete, findUsage, pa
             canEdit={canEdit}
             onUpdate={onUpdate}
             onDelete={onDelete}
+            onReplace={onReplace}
             findUsage={findUsage}
             pageHref={pageHref}
             onSaved={(item) => {
@@ -154,6 +164,7 @@ function MediaDetails({
   canEdit,
   onUpdate,
   onDelete,
+  onReplace,
   findUsage,
   pageHref,
   onSaved,
@@ -171,6 +182,7 @@ function MediaDetails({
   const [status, setStatus] = useState<Status>(null);
   const [pending, startTransition] = useTransition();
   const section = useRef<HTMLElement>(null);
+  const replaceInput = useRef<HTMLInputElement>(null);
   const url = mediaUrl(item);
 
   // On narrow screens the details sit above the grid, so bring them into view.
@@ -198,6 +210,27 @@ function MediaDetails({
         onSaved(result.item);
       } else {
         setStatus({ kind: 'error', text: result.message });
+      }
+    });
+  }
+
+  function replace(file: File) {
+    if (!onReplace) return;
+    setStatus(null);
+    startTransition(async () => {
+      try {
+        const result = await onReplace(item.id, file);
+        if (result.ok) {
+          setStatus({
+            kind: 'success',
+            text: result.pages ? `Replaced. ${result.pages === 1 ? 'The page that uses it shows' : `All ${result.pages} pages that use it show`} the new file, live versions included.` : 'Replaced.',
+          });
+          onSaved(result.item);
+        } else setStatus({ kind: 'error', text: result.message });
+      } catch {
+        setStatus({ kind: 'error', text: 'The file couldn’t be replaced. Try again.' });
+      } finally {
+        if (replaceInput.current) replaceInput.current.value = '';
       }
     });
   }
@@ -295,6 +328,26 @@ function MediaDetails({
         <p className={`cera-status cera-status--${status.kind}`} role={status.kind === 'error' ? 'alert' : 'status'}>
           {status.text}
         </p>
+      )}
+
+      {canEdit && onReplace && (
+        <div className="cera-media-details__replace">
+          <input
+            ref={replaceInput}
+            type="file"
+            className="cera-visually-hidden"
+            accept={mediaAccept([item.kind === 'video' ? 'video' : 'image'])}
+            disabled={pending}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) replace(file);
+            }}
+          />
+          <button type="button" className="cera-button cera-button--small" disabled={pending} onClick={() => replaceInput.current?.click()}>
+            Replace file…
+          </button>
+          <p className="cera-note">Upload a new {item.kind === 'video' ? 'video' : 'image'} in its place. Every page that uses this file shows the new one at once, live pages included. Each page keeps its own alt text.</p>
+        </div>
       )}
 
       {canEdit && (

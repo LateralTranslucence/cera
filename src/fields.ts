@@ -190,6 +190,9 @@ type StrOpts = BaseOptions<string>;
 /** Longest `field.svg()` value, in characters. */
 export const MAX_SVG_LENGTH = 100_000;
 
+/** One item of a `field.repeater()`: a stable `_id` and the sub-fields' values. */
+export type RepeaterItem<Fields extends FieldMap> = { _id: string } & InferFields<Fields>;
+
 export const field = {
   /** Single-line text (theme: `text`, `varchar`). */
   text: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
@@ -329,8 +332,7 @@ export const field = {
     let schema = z.array(item);
     if (options.limit) schema = schema.max(options.limit);
     if (options.min) schema = schema.min(options.min);
-    type Item = { _id: string } & InferFields<Fields>;
-    return buildField<'repeater', z.ZodDefault<z.ZodType<Item[]>>, { fields: Fields; limit?: number; min?: number; itemTitle?: keyof Fields & string }>('repeater', schema.default([]) as never, options, {
+    return buildField<'repeater', z.ZodDefault<z.ZodType<Array<RepeaterItem<Fields>>>>, { fields: Fields; limit?: number; min?: number; itemTitle?: keyof Fields & string }>('repeater', schema.default([]) as never, options, {
       fields: options.fields,
       limit: options.limit,
       min: options.min,
