@@ -2,6 +2,7 @@
  * Forms as visitors see them, and checking what they send. Safe for the
  * browser: no secrets here (see server.ts for the anti-spam token).
  */
+import { EMAIL_PATTERN, PHONE_PATTERN } from '../fields.ts';
 import { slugForId } from '../panels/slug.ts';
 import type { PageOf } from '../content-type.ts';
 import { DEFAULT_SUBMIT_TEXT, DEFAULT_THANK_YOU, type FormType } from './form-type.ts';
@@ -197,8 +198,6 @@ export type SubmissionCheck =
   | { ok: true; values: SubmissionValue[]; /** The first valid email address, for the submissions list. */ email?: string }
   | { ok: false; /** By field name. */ errors: Record<string, string> };
 
-const EMAIL = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]+$/;
-const PHONE = /^[0-9+().\-\s]*[0-9][0-9+().\-\s]*$/;
 
 /** Plain text: no control characters (tabs and, in a text area, line breaks are kept). */
 function plain(value: string, multiline: boolean): string {
@@ -236,13 +235,13 @@ export function checkSubmission(form: Pick<PublicForm, 'items'>, get: (name: str
       case 'email':
         if (!first) {
           if (field.required) missing();
-        } else if (!EMAIL.test(first) || first.length > 254) fail('Enter an email address like name@example.com.');
+        } else if (!EMAIL_PATTERN.test(first) || first.length > 254) fail('Enter an email address like name@example.com.');
         else email ??= first;
         break;
       case 'phone':
         if (!first) {
           if (field.required) missing();
-        } else if (!PHONE.test(first)) fail('Enter a phone number using digits, spaces and + ( ) - .');
+        } else if (!PHONE_PATTERN.test(first)) fail('Enter a phone number using digits, spaces and + ( ) - .');
         break;
       case 'select':
       case 'radio':

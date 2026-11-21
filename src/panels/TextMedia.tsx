@@ -1,5 +1,5 @@
 import type { PanelPropsOf } from '../panel.ts';
-import { CtaLinks } from './CtaLinks.tsx';
+import { CtaLinks, linkHref } from './CtaLinks.tsx';
 import { Html } from './Html.tsx';
 import { PanelFrame } from './PanelFrame.tsx';
 import { mediaUrl } from '../media-url.ts';
@@ -17,8 +17,9 @@ export default function TextMedia({ data, panel }: PanelPropsOf<typeof textMedia
     <PanelFrame name="text-media" data={{ background: data.background, anchorId: data.anchorId }} panel={panel} className={`media-${side}`}>
       <div className="text-media">
         {data.media && (
-          <figure className={`text-media__media size-${data.imageSize ?? 'medium'}`}>
-            {data.imageLink ? <a href={data.imageLink}>{image}</a> : image}
+          <figure className={`text-media__media size-${data.imageSize}`}>
+            {/* TODO: imageLink.modal needs a client component, as with a CTA's Modal target; it opens normally for now. */}
+            {data.imageLink?.url ? <a href={linkHref(data.imageLink.url)}>{image}</a> : image}
           </figure>
         )}
         <div className="text-media__text">

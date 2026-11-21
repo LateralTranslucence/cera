@@ -25,7 +25,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { AnyContentType, MediaRef, StoredPage } from '@lateraltranslucence/cera';
 import { toMediaRef } from '@lateraltranslucence/cera';
 import { finishMediaUpload, listCeraUsers, MEDIA_BUCKET, mediaPathFor, mediaUrl, prepareMediaUpload, savePage } from '@lateraltranslucence/cera/supabase';
-import { formType, landingPage, simplePage } from '../cera/index.ts';
+import { backgroundColors, formType, landingPage, simplePage } from '../cera/index.ts';
 
 const argument = (name: string) => {
   const index = process.argv.indexOf(name);
@@ -62,7 +62,8 @@ async function wordpress(path: string): Promise<WordPressPost[]> {
 /** The theme's post types, as Cera content types. */
 const TYPES: Record<string, string> = { devo_landing_page: landingPage.name, devo_simple_page: simplePage.name, devo_form: formType.name };
 /** The theme's background colors (api/fields/colors.php). */
-const COLORS: Record<string, string> = { blue: '#2C25AB', navy: '#0D0B33', teal: '#17D6CA', white: '#FFFFFF', yellow: '#FFB400' };
+/** The theme's color names (blue, navy…) → the site palette's colors. */
+const COLORS: Record<string, string> = Object.fromEntries(backgroundColors.map((color) => [color.label.toLowerCase(), color.value]));
 
 const text = (value: unknown) => (typeof value === 'string' ? value : value === null || value === undefined ? '' : String(value));
 const optional = (value: unknown) => text(value).trim() || undefined;
@@ -207,6 +208,19 @@ async function background(value: unknown) {
   };
 }
 
+/** The theme's image_link: { url, modal }, or false when empty. */
+function imageLink(value: unknown) {
+  const fields = (value && typeof value === 'object' ? value : {}) as Fields;
+  const url = optional(fields.url);
+  return url ? { url: rewriteUrl(url), modal: fields.modal === true || fields.modal === 1 || fields.modal === '1' } : undefined;
+}
+
+/** The theme's image_size: a crop such as "cinema_600" → "cinema". Empty: the default (cinema). */
+function imageSize(value: unknown) {
+  const crop = text(value).replace(/_\d+$/, '');
+  return crop === 'vertical' || crop === 'cinema' || crop === 'square' ? crop : undefined;
+}
+
 function cta(item: Fields | undefined) {
   if (!item || !optional(item.text)) return undefined;
   return { text: text(item.text).trim(), url: rewriteUrl(text(item.url).trim() || '#'), target: item.modal === true ? ('modal' as const) : ('_self' as const), ...(optional(item.button_style) && { style: text(item.button_style) }) };
@@ -263,7 +277,7 @@ async function panelData(type: string, field: (key: string) => unknown) {
         ),
       };
     case 'featured-media':
-      return { ...frame, media: await media(field('media')), imageLink: typeof field('image_link') === 'string' ? optional(field('image_link')) : undefined, fullWidth: field('fullwidth_svg') === true };
+      return { ...frame, media: await media(field('media')), imageLink: imageLink(field('image_link')), fullWidth: field('fullwidth_svg') === true };
     case 'featured-post':
       return {
         anchorId: frame.anchorId,
@@ -313,15 +327,17 @@ async function panelData(type: string, field: (key: string) => unknown) {
     case 'stats':
       return {
         ...frame,
-        stats: list(field('stats')).map((entry) =>
-          item({
-            before: optional(plain(text(entry.before_number))),
-            number: Number(entry.number) || 0,
-            after: optional(plain(text(entry.after_number))),
-            decimal: entry.decimal === true,
-            countDown: entry.count_down === true,
-            description: optional(plain(text(entry.description))),
-          }),
+        stats: await Promise.all(
+          list(field('stats')).map(async (entry) =>
+            item({
+              before: optional(plain(text(entry.before_number))),
+              number: Number(entry.number) || 0,
+              after: optional(plain(text(entry.after_number))),
+              decimal: entry.decimal === true,
+              countDown: entry.count_down === true,
+              description: optional(await html(entry.description)),
+            }),
+          ),
         ),
       };
     case 'tabs':
@@ -336,8 +352,8 @@ async function panelData(type: string, field: (key: string) => unknown) {
         ...frame,
         media: await media(field('media')),
         alignment: ['left', 'right', 'alternate'].includes(text(field('media_alignment'))) ? text(field('media_alignment')) : 'left',
-        imageSize: ['small', 'medium', 'large'].includes(text(field('image_size'))) ? text(field('image_size')) : undefined,
-        imageLink: typeof field('image_link') === 'string' ? optional(field('image_link')) : undefined,
+        imageSize: imageSize(field('image_size')),
+        imageLink: imageLink(field('image_link')),
         ctas: ctas(field('cta')),
       };
     default:

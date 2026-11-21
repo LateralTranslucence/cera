@@ -73,7 +73,7 @@ export async function EditScreen({ contentType, id, minimum = 'viewer' }: { cont
   const editable = await getPageForEditing(staff.client, contentType, id);
   if (!editable) notFound();
   return (
-    <Shell staff={staff} active={placeOf(contentType.name).section as ShellSection}>
+    <Shell staff={staff} active={placeOf(contentType.name).section as ShellSection} currentPageId={id}>
       <EditorClient
         page={editable.page}
         version={editable.version}

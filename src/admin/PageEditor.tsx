@@ -22,7 +22,7 @@ import { Dialog } from './Dialog.tsx';
 import { FieldMapForm, IssueList, type FormContext } from './fields.tsx';
 import { GripIcon, Icon } from './icons.tsx';
 import { formatScheduled, formatWhen } from './PageList.tsx';
-import { duplicatePanel, humanize, issuesAt, moveItem, newPanel, panelName, removeItem, setIn, slugify } from './state.ts';
+import { duplicatePanel, humanize, issuesAt, moveItem, newPanel, panelName, removeItem, setIn, slugify, toLocalInput } from './state.ts';
 
 export interface SaveInput {
   page: StoredPage;
@@ -59,6 +59,8 @@ export interface PageEditorProps {
   backLabel?: string;
   /** Content types offered to `selectFrom` option sources. */
   contentTypes?: OptionsContext['contentTypes'];
+  /** The site's background colors. Without them, background colors are typed. */
+  colors?: OptionsContext['colors'];
   /** Finds pages for `relation` fields' page picker (a server action). Without it, relations take pasted ids. */
   findPages?: FormContext['findPages'];
   /** Uploads and the media library (see `mediaUploader`). Without it, media fields take typed paths and URLs. */
@@ -115,11 +117,6 @@ function defaultScheduleTime(): string {
   return toLocalInput(date);
 }
 
-function toLocalInput(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 export function PageEditor({
   contentType,
   page: initialPage,
@@ -136,6 +133,7 @@ export function PageEditor({
   backHref,
   backLabel = 'Pages',
   contentTypes,
+  colors,
   findPages,
   media,
   icons,
@@ -193,7 +191,7 @@ export function PageEditor({
   }, [scrollTo]);
 
   const definitions = useMemo(() => new Map<string, AnyPanel>(contentType.panels.map((definition: AnyPanel) => [definition.type, definition])), [contentType]);
-  const options = useMemo<OptionsContext>(() => ({ contentTypes: contentTypes ?? [{ name: contentType.name, label: contentType.label, public: true }] }), [contentTypes, contentType]);
+  const options = useMemo<OptionsContext>(() => ({ contentTypes: contentTypes ?? [{ name: contentType.name, label: contentType.label, public: true }], colors }), [contentTypes, contentType, colors]);
   const context: FormContext = { issues, options, readOnly, findPages, media, icons };
 
   // Warn before leaving with unsaved changes.

@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import type { StoredPage } from '@lateraltranslucence/cera';
 import { mediaUploader, PageEditor } from '@lateraltranslucence/cera/admin';
 import type { PageSchedule } from '@lateraltranslucence/cera/supabase';
-import { contentTypes } from '@/cera';
+import { backgroundColors, contentTypes } from '@/cera';
 import { placeOf } from '../content.ts';
 import {
   cancelScheduleAction,
@@ -59,6 +59,7 @@ export function EditorClient({
     <PageEditor
       contentType={contentType}
       contentTypes={contentTypes.map((type) => ({ name: type.name, label: type.label, public: Boolean(type.route) }))}
+      colors={backgroundColors}
       page={page}
       version={version}
       published={published}

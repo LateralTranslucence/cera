@@ -142,3 +142,23 @@ export function duplicatePanel(list: readonly StoredPanel[], index: number, id =
   copy.splice(index + 1, 0, { ...structuredClone(original), id });
   return copy;
 }
+
+/** A moment as a datetime-local input's value, in the browser's time zone. */
+export function toLocalInput(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** A `field.dateTime()` value (ISO 8601) as a datetime-local value; empty when it isn't a date. */
+export function dateTimeInput(value: unknown): string {
+  if (typeof value !== 'string' || !value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : toLocalInput(date);
+}
+
+/** A datetime-local value (the browser's time zone) as a `field.dateTime()` value in UTC. */
+export function dateTimeValue(input: string): string | undefined {
+  if (!input) return undefined;
+  const date = new Date(input);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}

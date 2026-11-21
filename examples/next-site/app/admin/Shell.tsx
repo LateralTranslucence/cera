@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import { AdminSidebar, type NavSection } from '@lateraltranslucence/cera/admin';
 import { listPages } from '@lateraltranslucence/cera/supabase';
-import { canEditContentType } from '@lateraltranslucence/cera';
+import { canEditContentType, type AnyContentType } from '@lateraltranslucence/cera';
 import { formType, iconType, landingPage, simplePage } from '@/cera';
 import { readableAdminPages } from '@/lib/admin-pages.ts';
 import { canEdit, canManagePeople, type Staff } from '@/lib/auth.ts';
 import { signOutAction } from './actions.ts';
+import { placeOf } from './content.ts';
 
 export type ShellSection = 'pages' | 'simple-pages' | 'forms' | 'submissions' | 'media' | 'icons' | 'admin-pages' | 'team' | 'people' | 'account';
 
@@ -14,7 +15,8 @@ const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' } as con
 /**
  * The admin's frame: the sidebar (only what exists: Pages, Simple Pages,
  * Forms, Submissions for editors, Media, Icons, and People for admins) and the
- * main column. The lists and counts in the sidebar are read as the signed-in
+ * main column. Each content type under Content lists its pages, with "+ New"
+ * for those who may add one. The lists and counts in the sidebar are read as the signed-in
  * user, like the screens they link to.
  */
 export async function Shell({
@@ -36,6 +38,18 @@ export async function Shell({
     readableAdminPages(staff),
   ]);
   const team = teamPages.filter((page) => page.boxes.settings.showInMenu);
+  /** A content type's item: its pages listed under it, with "+ New" for those who may add one. */
+  const listed = (contentType: AnyContentType, list: Array<{ id: string; title: string }>, defaultOpen = false) => {
+    const place = placeOf(contentType.name);
+    return {
+      count: list.length,
+      expand: {
+        defaultOpen,
+        ...(canEditContentType(staff.role, contentType) && { newHref: `${place.base}/new`, newLabel: `New ${place.noun}` }),
+        items: list.map((page) => ({ label: page.title || 'Untitled', href: `${place.base}/${page.id}`, current: page.id === currentPageId })),
+      },
+    };
+  };
   const sections: NavSection[] = [
     {
       label: 'Content',
@@ -45,15 +59,10 @@ export async function Shell({
           href: '/admin',
           icon: 'pages',
           active: active === 'pages',
-          count: pages!.length,
-          expand: {
-            defaultOpen: true,
-            ...(canEditContentType(staff.role, landingPage) && { newHref: '/admin/pages/new', newLabel: 'New page' }),
-            items: pages!.map((page) => ({ label: page.title || 'Untitled', href: `/admin/pages/${page.id}`, current: page.id === currentPageId })),
-          },
+          ...listed(landingPage, pages!, true),
         },
-        { label: 'Simple Pages', href: '/admin/simple-pages', icon: 'article', active: active === 'simple-pages', count: simplePages!.length },
-        { label: 'Forms', href: '/admin/forms', icon: 'form', active: active === 'forms', count: forms!.length },
+        { label: 'Simple Pages', href: '/admin/simple-pages', icon: 'article', active: active === 'simple-pages', ...listed(simplePage, simplePages!) },
+        { label: 'Forms', href: '/admin/forms', icon: 'form', active: active === 'forms', ...listed(formType, forms!) },
         // Submissions are personal data: admins and editors only.
         ...(canEdit(staff.role) ? [{ label: 'Submissions', href: '/admin/submissions', icon: 'inbox' as const, active: active === 'submissions' }] : []),
       ],

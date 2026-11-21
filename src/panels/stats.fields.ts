@@ -14,7 +14,7 @@ export const statsFields = {
       after: field.text({ label: 'After Number', note: 'E.g. “%”, “+” or “million”.' }),
       decimal: field.toggle({ label: 'One decimal place', note: 'Shows 4.5 instead of rounding to 5.' }),
       countDown: field.toggle({ label: 'Count down', note: 'Counts down to zero from the number, instead of up to it.' }),
-      description: field.text({ label: 'Description' }),
+      description: field.html({ label: 'Description', toolbar: 'limited' }),
     },
   }),
 };

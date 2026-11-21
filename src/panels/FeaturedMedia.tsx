@@ -1,5 +1,6 @@
 // Ports app/components/panels/FeaturedMedia.tsx.
 import type { PanelPropsOf } from '../panel.ts';
+import { linkHref } from './CtaLinks.tsx';
 import { PanelFrame } from './PanelFrame.tsx';
 import { mediaUrl } from '../media-url.ts';
 import type { featuredMediaFields } from './featured-media.fields.ts';
@@ -17,7 +18,7 @@ export default function FeaturedMedia({ data, panel }: PanelPropsOf<typeof featu
 
   return (
     <PanelFrame name="featured-media" data={data} panel={panel} className={data.fullWidth ? 'is-full-width' : undefined}>
-      {media && <figure className="featured-media">{data.imageLink && mediaItem?.kind === 'image' ? <a href={data.imageLink}>{media}</a> : media}</figure>}
+      {media && <figure className="featured-media">{data.imageLink?.url && mediaItem?.kind === 'image' ? <a href={linkHref(data.imageLink.url)}>{media}</a> : media}</figure>}
     </PanelFrame>
   );
 }
