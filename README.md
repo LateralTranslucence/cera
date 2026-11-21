@@ -8,9 +8,9 @@ const blocks = definePanel({
   label: 'Blocks',
   fields: {
     ...panelDefaults,
-    blocks: f.repeater({ fields: { title: f.text(), cta: f.cta() } }),
-    perRow: f.perRow(),
-    style: f.select({ options: { card: 'Card', plain: 'Plain' }, default: 'card' }),
+    blocks: field.repeater({ fields: { title: field.text(), cta: field.cta() } }),
+    perRow: field.perRow(),
+    style: field.select({ options: { card: 'Card', plain: 'Plain' }, default: 'card' }),
   },
   component: () => import('./Blocks.tsx'), // props are inferred from `fields`
 });

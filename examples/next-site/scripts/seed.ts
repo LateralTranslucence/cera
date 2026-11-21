@@ -39,7 +39,7 @@ async function passwordWorks(email: string, password: string): Promise<boolean> 
 async function ensureUser(email: string, password: string, role: 'admin' | 'editor', keepPassword = false): Promise<string> {
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw error;
-  const existing = data.users.find((u) => u.email === email);
+  const existing = data.users.find((user) => user.email === email);
   if (existing) {
     const reset = !keepPassword && !(await passwordWorks(email, password));
     const updated = await admin.auth.admin.updateUserById(existing.id, { app_metadata: { cera_role: role }, ...(reset && { password }) });
@@ -287,13 +287,13 @@ const pages: StoredPage[] = [
 const onlyArg = process.argv.indexOf('--only');
 const only = onlyArg > -1 ? new Set((process.argv[onlyArg + 1] ?? '').split(',').filter(Boolean)) : null;
 if (only) {
-  const unknown = [...only].filter((slug) => !pages.some((p) => p.slug === slug));
-  if (only.size === 0 || unknown.length) throw new Error(`--only takes page slugs from this script: ${pages.map((p) => p.slug).join(', ')}.`);
+  const unknown = [...only].filter((slug) => !pages.some((page) => page.slug === slug));
+  if (only.size === 0 || unknown.length) throw new Error(`--only takes page slugs from this script: ${pages.map((page) => page.slug).join(', ')}.`);
 } else {
   await seedAdmin();
 }
 const userId = await seedEditor();
-for (const page of pages.filter((p) => !only || only.has(p.slug))) {
+for (const page of pages.filter((pageToSeed) => !only || only.has(pageToSeed.slug))) {
   const existing = await getPageForEditing(admin, landingPage, page.id);
   const result = await savePage(admin, landingPage, page, { mode: 'publish', expectedVersion: existing?.version ?? 0, userId });
   if (!result.ok) {

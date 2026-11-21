@@ -15,10 +15,10 @@ interface FakeUser {
 
 /** Supabase's auth admin API, in memory. app_metadata merges on update and a null value removes a key, as in GoTrue. */
 function fakeAuth(seed: Array<Pick<FakeUser, 'email'> & { role?: string }> = []) {
-  const users: FakeUser[] = seed.map((u, i) => ({
+  const users: FakeUser[] = seed.map((seedUser, i) => ({
     id: `u${i}`,
-    email: u.email,
-    app_metadata: u.role ? { provider: 'email', cera_role: u.role } : { provider: 'email' },
+    email: seedUser.email,
+    app_metadata: seedUser.role ? { provider: 'email', cera_role: seedUser.role } : { provider: 'email' },
     created_at: '2026-11-01T00:00:00Z',
   }));
   const admin = {
@@ -26,11 +26,11 @@ function fakeAuth(seed: Array<Pick<FakeUser, 'email'> & { role?: string }> = [])
       return { data: { users: users.slice((page - 1) * perPage, page * perPage) }, error: null };
     },
     async getUserById(id: string) {
-      const user = users.find((u) => u.id === id);
+      const user = users.find((existingUser) => existingUser.id === id);
       return user ? { data: { user }, error: null } : { data: { user: null }, error: { message: 'User not found', code: 'user_not_found' } };
     },
     async createUser(attrs: { email: string; password: string; email_confirm: boolean; app_metadata: Record<string, unknown> }) {
-      if (users.some((u) => u.email === attrs.email)) {
+      if (users.some((existingUser) => existingUser.email === attrs.email)) {
         return { data: { user: null }, error: { message: 'A user with this email address has already been registered', code: 'email_exists' } };
       }
       const user: FakeUser = { id: `u${users.length}`, email: attrs.email, password: attrs.password, app_metadata: { provider: 'email', ...attrs.app_metadata }, created_at: '2026-11-20T00:00:00Z' };
@@ -38,10 +38,10 @@ function fakeAuth(seed: Array<Pick<FakeUser, 'email'> & { role?: string }> = [])
       return { data: { user }, error: null };
     },
     async updateUserById(id: string, attrs: { app_metadata?: Record<string, unknown> }) {
-      const user = users.find((u) => u.id === id)!;
-      for (const [k, v] of Object.entries(attrs.app_metadata ?? {})) {
-        if (v === null) delete user.app_metadata[k];
-        else user.app_metadata[k] = v;
+      const user = users.find((existingUser) => existingUser.id === id)!;
+      for (const [key, value] of Object.entries(attrs.app_metadata ?? {})) {
+        if (value === null) delete user.app_metadata[key];
+        else user.app_metadata[key] = value;
       }
       return { data: { user }, error: null };
     },
@@ -50,17 +50,17 @@ function fakeAuth(seed: Array<Pick<FakeUser, 'email'> & { role?: string }> = [])
 }
 
 test('temporary passwords: long, unambiguous characters, different every time', () => {
-  const a = temporaryPassword();
-  assert.equal(a.length, 20);
-  assert.match(a, /^[a-km-zA-HJ-NP-Z2-9]+$/);
-  assert.notEqual(a, temporaryPassword());
+  const password = temporaryPassword();
+  assert.equal(password.length, 20);
+  assert.match(password, /^[a-km-zA-HJ-NP-Z2-9]+$/);
+  assert.notEqual(password, temporaryPassword());
 });
 
 test('the list puts people with access first, by role, then everyone else', async () => {
   const { client } = fakeAuth([{ email: 'zed@cera.test' }, { email: 'eve@cera.test', role: 'editor' }, { email: 'amy@cera.test', role: 'admin' }, { email: 'bob@cera.test', role: 'viewer' }, { email: 'odd@cera.test', role: 'owner' }]);
   const list = await listCeraUsers(client);
   assert.deepEqual(
-    list.map((u) => [u.email, u.role]),
+    list.map((user) => [user.email, user.role]),
     [
       ['amy@cera.test', 'admin'],
       ['eve@cera.test', 'editor'],

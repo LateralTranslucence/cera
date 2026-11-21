@@ -1,17 +1,17 @@
 // Ported from set_panel_fields()['text-media'].
-import { f } from '../fields.ts';
+import { field } from '../fields.ts';
 import { panelDefaults } from '../defaults.ts';
 
 export const textMediaFields = {
   ...panelDefaults,
-  media: f.media({ label: 'Media', note: 'Supports images or Vimeo videos.' }),
-  alignment: f.select({
+  media: field.media({ label: 'Media', note: 'Supports images or Vimeo videos.' }),
+  alignment: field.select({
     label: 'Media Alignment',
     options: { left: 'Left', right: 'Right', alternate: 'Alternate' },
     default: 'left',
   }),
   // TODO(verify): theme's `image_size` and `image_link` field types.
-  imageSize: f.select({ label: 'Image Size', options: { small: 'Small', medium: 'Medium', large: 'Large' } }),
-  imageLink: f.url({ label: 'Image Link' }),
-  ctas: f.ctas({ label: 'CTA' }),
+  imageSize: field.select({ label: 'Image Size', options: { small: 'Small', medium: 'Medium', large: 'Large' } }),
+  imageLink: field.url({ label: 'Image Link' }),
+  ctas: field.ctas({ label: 'CTA' }),
 };

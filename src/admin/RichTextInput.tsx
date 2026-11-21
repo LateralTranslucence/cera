@@ -1,6 +1,6 @@
 'use client';
 /**
- * The control for `f.html()` fields: a visual editor (Tiptap) with a
+ * The control for `field.html()` fields: a visual editor (Tiptap) with a
  * toolbar matching the field's `toolbar` option, and an HTML view.
  *
  * Stored HTML is never rewritten just by opening it. Text the visual editor
@@ -131,9 +131,9 @@ export function RichTextInput({
           value={html}
           readOnly={readOnly}
           aria-labelledby={labelledBy}
-          onChange={(e) => {
+          onChange={(event) => {
             written.current = null;
-            onChange(e.target.value === '' ? undefined : e.target.value);
+            onChange(event.target.value === '' ? undefined : event.target.value);
           }}
         />
       ) : (
@@ -157,7 +157,7 @@ function Button({ label, title, active, disabled, onClick, children }: { label: 
       aria-pressed={active === undefined ? undefined : active}
       disabled={disabled}
       // Keep the selection in the editor.
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
     >
       {children}
@@ -184,13 +184,13 @@ function Buttons({
   editor: Editor;
   toolbar: HtmlToolbar;
   panel: Panel;
-  setPanel: (p: Panel) => void;
+  setPanel: (panel: Panel) => void;
   canInsertImages: boolean;
 }) {
   const full = toolbar === 'full';
   const chain = () => editor.chain().focus();
-  const level = ([2, 3, 4, 5, 6] as const).find((l) => editor.isActive('heading', { level: l }));
-  const toggle = (p: Panel) => setPanel(panel === p ? null : p);
+  const level = ([2, 3, 4, 5, 6] as const).find((headingLevel) => editor.isActive('heading', { level: headingLevel }));
+  const toggle = (targetPanel: Panel) => setPanel(panel === targetPanel ? null : targetPanel);
 
   return (
     <>
@@ -199,15 +199,15 @@ function Buttons({
           className="cera-rich__block"
           aria-label="Text style"
           value={level ? String(level) : 'p'}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === 'p') chain().setParagraph().run();
-            else chain().setHeading({ level: Number(v) as 2 | 3 | 4 | 5 | 6 }).run();
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value === 'p') chain().setParagraph().run();
+            else chain().setHeading({ level: Number(value) as 2 | 3 | 4 | 5 | 6 }).run();
           }}
         >
-          {BLOCKS.map((b) => (
-            <option key={b.value} value={b.value}>
-              {b.label}
+          {BLOCKS.map((block) => (
+            <option key={block.value} value={block.value}>
+              {block.label}
             </option>
           ))}
         </select>
@@ -299,13 +299,13 @@ function LinkPanel({ editor, onClose }: { editor: Editor; onClose: () => void })
           value={href}
           autoFocus
           placeholder="/page, https://…, mailto:…"
-          onChange={(e) => setHref(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
+          onChange={(event) => setHref(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
               apply();
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
               onClose();
               editor.commands.focus();
             }
@@ -313,7 +313,7 @@ function LinkPanel({ editor, onClose }: { editor: Editor; onClose: () => void })
         />
       </label>
       <label className="cera-rich__check">
-        <input type="checkbox" checked={newTab} onChange={(e) => setNewTab(e.target.checked)} /> Open in a new tab
+        <input type="checkbox" checked={newTab} onChange={(event) => setNewTab(event.target.checked)} /> Open in a new tab
       </label>
       <button type="button" className="cera-button cera-button--small cera-button--primary" onClick={apply}>
         {active ? 'Update link' : 'Add link'}
@@ -371,8 +371,8 @@ function ImagePanel({ editor, media, onClose }: { editor: Editor; media: MediaCo
           type="file"
           accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
           className="cera-visually-hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
+          onChange={(event) => {
+            const file = event.target.files?.[0];
             if (file) void upload(file);
           }}
         />
@@ -411,10 +411,10 @@ function ImageAlt({ editor }: { editor: Editor }) {
           type="text"
           value={alt}
           placeholder="Describe the image for people who can’t see it"
-          onChange={(e) => {
+          onChange={(event) => {
             // Changing an attribute replaces the image node, which drops the selection; select it again so this box stays.
             const pos = editor.state.selection.from;
-            editor.chain().updateAttributes('image', { alt: e.target.value }).setNodeSelection(pos).run();
+            editor.chain().updateAttributes('image', { alt: event.target.value }).setNodeSelection(pos).run();
           }}
         />
       </label>

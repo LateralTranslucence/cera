@@ -22,7 +22,7 @@ export interface MetadataOptions {
   mediaUrl?: (ref: MediaRef) => string;
 }
 
-export function pageMetadata<CT extends AnyContentType>(ct: CT, page: PageOf<CT>, opts: MetadataOptions = {}): PageMetadata {
+export function pageMetadata<Type extends AnyContentType>(ct: Type, page: PageOf<Type>, opts: MetadataOptions = {}): PageMetadata {
   const title = ct.seo?.title?.(page) || page.title;
   const description = ct.seo?.description?.(page) || undefined;
   const image = ct.seo?.image?.(page);
@@ -45,7 +45,7 @@ export function pageMetadata<CT extends AnyContentType>(ct: CT, page: PageOf<CT>
  * `<script type="application/ld+json">` (`<` is escaped, so content can't
  * close the script tag). `undefined` if the content type defines none.
  */
-export function jsonLdString<CT extends AnyContentType>(ct: CT, page: PageOf<CT>): string | undefined {
+export function jsonLdString<Type extends AnyContentType>(ct: Type, page: PageOf<Type>): string | undefined {
   const data = ct.jsonLd?.(page);
   if (!data) return undefined;
   return JSON.stringify(data).replace(/</g, '\\u003c');

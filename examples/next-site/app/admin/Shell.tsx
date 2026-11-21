@@ -32,7 +32,7 @@ export async function Shell({ staff, active, currentPageId, children }: { staff:
           expand: {
             defaultOpen: true,
             ...(canEdit(staff.role) && { newHref: '/admin/pages/new', newLabel: 'New page' }),
-            items: pages!.map((p) => ({ label: p.title || 'Untitled', href: `/admin/pages/${p.id}`, current: p.id === currentPageId })),
+            items: pages!.map((page) => ({ label: page.title || 'Untitled', href: `/admin/pages/${page.id}`, current: page.id === currentPageId })),
           },
         },
         { label: 'Simple Pages', href: '/admin/simple-pages', icon: 'article', active: active === 'simple-pages', count: simplePages!.length },

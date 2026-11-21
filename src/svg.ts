@@ -1,5 +1,5 @@
 /**
- * SVG cleaning for `f.svg()` fields (custom icons). Runs on save (see
+ * SVG cleaning for `field.svg()` fields (custom icons). Runs on save (see
  * `preparePageForSave`) and again when icons are read for rendering, so
  * stored markup is always safe to put in a page.
  *
@@ -38,7 +38,7 @@ const GEOMETRY = ['x', 'y', 'width', 'height', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy
 /** A CSS value with no `url(` except `url(#id)`, no `expression(` and nothing that ends the declaration. */
 const SAFE_VALUE = /^(?!.*(?:url\s*\((?!\s*['"]?#)|expression\s*\(|[;{}<>\\])).*$/is;
 
-const STYLE_PROPERTIES = Object.fromEntries(PRESENTATION.filter((p) => p !== 'transform').map((p) => [p, [SAFE_VALUE]]));
+const STYLE_PROPERTIES = Object.fromEntries(PRESENTATION.filter((property) => property !== 'transform').map((property) => [property, [SAFE_VALUE]]));
 
 const OPTIONS: IOptions = {
   allowedTags: TAGS,
@@ -86,14 +86,14 @@ function finish(svg: string): string {
     .replace(new RegExp(String.raw`\b(fill|stroke)="${BLACK}"`, 'gi'), '$1="currentColor"')
     .replace(new RegExp(String.raw`\b(fill|stroke)\s*:\s*${BLACK}`, 'gi'), '$1:currentColor');
   out = out.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
-    let a = attrs;
-    const width = /\swidth="([\d.]+)(?:px)?"/.exec(a)?.[1];
-    const height = /\sheight="([\d.]+)(?:px)?"/.exec(a)?.[1];
-    a = a.replace(/\s(?:width|height)="[^"]*"/g, '');
-    if (!/\sviewBox="/.test(a) && width && height) a += ` viewBox="0 0 ${width} ${height}"`;
-    if (!/\sxmlns="/.test(a)) a += ' xmlns="http://www.w3.org/2000/svg"';
-    if (!/\sfill="/.test(a)) a += ' fill="currentColor"';
-    return `<svg${a}>`;
+    let attributes = attrs;
+    const width = /\swidth="([\d.]+)(?:px)?"/.exec(attributes)?.[1];
+    const height = /\sheight="([\d.]+)(?:px)?"/.exec(attributes)?.[1];
+    attributes = attributes.replace(/\s(?:width|height)="[^"]*"/g, '');
+    if (!/\sviewBox="/.test(attributes) && width && height) attributes += ` viewBox="0 0 ${width} ${height}"`;
+    if (!/\sxmlns="/.test(attributes)) attributes += ' xmlns="http://www.w3.org/2000/svg"';
+    if (!/\sfill="/.test(attributes)) attributes += ' fill="currentColor"';
+    return `<svg${attributes}>`;
   });
   return out.trim();
 }

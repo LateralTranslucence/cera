@@ -28,11 +28,11 @@ const HOUR = 60 * 60 * 1000;
 const later = (ms = HOUR) => new Date(Date.now() + ms).toISOString();
 
 function newPage(slug: string, title = slug): StoredPage {
-  const p = structuredClone(sample) as unknown as StoredPage;
-  p.id = crypto.randomUUID();
-  p.slug = slug;
-  p.title = title;
-  return p;
+  const page = structuredClone(sample) as unknown as StoredPage;
+  page.id = crypto.randomUUID();
+  page.slug = slug;
+  page.title = title;
+  return page;
 }
 
 async function save(page: StoredPage, mode: 'draft' | 'publish' | 'schedule', expectedVersion: number, publishAt?: string) {
@@ -47,7 +47,7 @@ async function makeDue() {
   await queryAs(db, 'service_role', `update public.cera_page_revisions set scheduled_for = now() - interval '1 second' where schedule_status = 'pending'`);
 }
 
-const summary = async (id: string) => (await listPages(server)).find((p) => p.id === id)!;
+const summary = async (id: string) => (await listPages(server)).find((listedPage) => listedPage.id === id)!;
 
 test('a scheduled version goes live when due, and edits made after it stay unpublished', async () => {
   const page = newPage('sched-a', 'Version 1');
@@ -56,9 +56,9 @@ test('a scheduled version goes live when due, and edits made after it stay unpub
   const scheduled = await save({ ...page, title: 'Version 2' }, 'schedule', 1, at);
   assert.equal(scheduled.version, 2);
 
-  let s = await summary(page.id);
-  assert.deepEqual([s.published, s.unpublishedChanges, s.schedule?.version], [true, true, 2]);
-  assert.equal(new Date(s.schedule!.at).toISOString(), at);
+  let pageSummary = await summary(page.id);
+  assert.deepEqual([pageSummary.published, pageSummary.unpublishedChanges, pageSummary.schedule?.version], [true, true, 2]);
+  assert.equal(new Date(pageSummary.schedule!.at).toISOString(), at);
   const editing = await getPageForEditing(server, landingPage, page.id);
   assert.deepEqual([editing?.liveVersion, editing?.schedule?.version], [1, 2]);
 
@@ -70,21 +70,21 @@ test('a scheduled version goes live when due, and edits made after it stay unpub
   await makeDue();
   assert.equal(await publishDuePages(server), 1);
   assert.equal((await getPublishedPage(server, landingPage, 'sched-a'))?.page.title, 'Version 2');
-  s = await summary(page.id);
-  assert.deepEqual([s.published, s.unpublishedChanges, s.schedule], [true, true, undefined]);
+  pageSummary = await summary(page.id);
+  assert.deepEqual([pageSummary.published, pageSummary.unpublishedChanges, pageSummary.schedule], [true, true, undefined]);
   assert.equal(await publishDuePages(server), 0); // nothing runs twice
 });
 
 test('a page that was never published can be scheduled', async () => {
   const page = newPage('sched-new');
   await save(page, 'schedule', 0, later());
-  let s = await summary(page.id);
-  assert.deepEqual([s.published, s.unpublishedChanges, Boolean(s.schedule)], [false, false, true]);
+  let pageSummary = await summary(page.id);
+  assert.deepEqual([pageSummary.published, pageSummary.unpublishedChanges, Boolean(pageSummary.schedule)], [false, false, true]);
   assert.equal(await getPublishedPage(server, landingPage, 'sched-new'), null);
   await makeDue();
   await publishDuePages(server);
-  s = await summary(page.id);
-  assert.deepEqual([s.published, s.unpublishedChanges, s.schedule], [true, false, undefined]);
+  pageSummary = await summary(page.id);
+  assert.deepEqual([pageSummary.published, pageSummary.unpublishedChanges, pageSummary.schedule], [true, false, undefined]);
 });
 
 test('scheduling again replaces the schedule; publishing now, unpublishing and cancelling end it', async () => {
@@ -92,8 +92,8 @@ test('scheduling again replaces the schedule; publishing now, unpublishing and c
   await save(page, 'publish', 0);
   await save({ ...page, title: 'First plan' }, 'schedule', 1, later());
   await save({ ...page, title: 'Second plan' }, 'schedule', 2, later(2 * HOUR));
-  const [{ n } = { n: -1 }] = await queryAs<{ n: number }>(db, 'service_role', `select count(*)::int as n from public.cera_page_revisions where page_id = $1 and schedule_status = 'pending'`, [page.id]);
-  assert.equal(n, 1);
+  const [{ n: pendingCount } = { n: -1 }] = await queryAs<{ n: number }>(db, 'service_role', `select count(*)::int as n from public.cera_page_revisions where page_id = $1 and schedule_status = 'pending'`, [page.id]);
+  assert.equal(pendingCount, 1);
   assert.equal((await summary(page.id)).schedule?.version, 3);
 
   // Publishing now: a pending schedule would put older content back later, so it's cancelled.
@@ -155,8 +155,8 @@ test('a schedule whose address went live elsewhere fails without stopping the ot
 
   await makeDue();
   assert.equal(await publishDuePages(server), 1);
-  const s = await summary(first.id);
-  assert.deepEqual([s.published, s.schedule, s.scheduleFailed], [false, undefined, 'Another page went live at this address first.']);
+  const pageSummary = await summary(first.id);
+  assert.deepEqual([pageSummary.published, pageSummary.schedule, pageSummary.scheduleFailed], [false, undefined, 'Another page went live at this address first.']);
   assert.equal((await summary(other.id)).published, true);
   assert.equal((await getPublishedPage(server, landingPage, 'sched-clash'))?.page.title, 'Rival');
 
@@ -170,10 +170,10 @@ test('the page list: who saved last, panel counts, and who may read it', async (
   await save(page, 'draft', 0);
   await db.query(`update auth.users set email = 'ed@example.test' where id = $1`, [editor]);
 
-  const s = (await listPages(staff)).find((p) => p.id === page.id);
-  assert.ok(s);
-  assert.deepEqual([s.updatedBy, s.panelCount, s.published], ['ed@example.test', 2, false]);
-  assert.ok((await listPages(staff, { contentType: 'landing_page' })).some((p) => p.id === page.id));
+  const pageSummary = (await listPages(staff)).find((listedPage) => listedPage.id === page.id);
+  assert.ok(pageSummary);
+  assert.deepEqual([pageSummary.updatedBy, pageSummary.panelCount, pageSummary.published], ['ed@example.test', 2, false]);
+  assert.ok((await listPages(staff, { contentType: 'landing_page' })).some((listedPage) => listedPage.id === page.id));
   assert.equal((await listPages(staff, { contentType: 'other' })).length, 0);
 
   // Someone signed in without a Cera role sees no pages and no emails.

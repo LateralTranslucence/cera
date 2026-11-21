@@ -33,9 +33,9 @@ export function Dialog({
       className={`cera-dialog${wide ? ' cera-dialog--wide' : ''}`}
       aria-labelledby="cera-dialog-title"
       onClose={onClose}
-      onClick={(e) => {
+      onClick={(event) => {
         // A click on the backdrop (the dialog element itself, outside its body) closes it.
-        if (e.target === e.currentTarget) onClose();
+        if (event.target === event.currentTarget) onClose();
       }}
     >
       {open && (

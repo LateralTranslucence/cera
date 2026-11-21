@@ -36,9 +36,9 @@ async function upload(name: string, type: string, size: number, extra: { alt?: s
 
 test('paths: dated, unique, slugged, extension from the type (never the file name)', () => {
   const now = new Date(Date.UTC(2026, 10, 19));
-  const a = mediaPathFor('Sunset over Mars (final).PNG', 'image/png', now);
-  assert.match(a, /^2026\/11\/[0-9a-f]{8}-sunset-over-mars-final\.png$/);
-  assert.notEqual(a, mediaPathFor('Sunset over Mars (final).PNG', 'image/png', now));
+  const mediaPath = mediaPathFor('Sunset over Mars (final).PNG', 'image/png', now);
+  assert.match(mediaPath, /^2026\/11\/[0-9a-f]{8}-sunset-over-mars-final\.png$/);
+  assert.notEqual(mediaPath, mediaPathFor('Sunset over Mars (final).PNG', 'image/png', now));
   assert.match(mediaPathFor('evil.html', 'image/jpeg', now), /-evil\.jpg$/);
   assert.match(mediaPathFor('Été à Paris.jpeg', 'image/jpeg', now), /-ete-a-paris\.jpg$/);
   assert.match(mediaPathFor('🚀.webp', 'image/webp', now), /-file\.webp$/);
@@ -80,10 +80,10 @@ test('upload records the file with what Storage reports, and the library lists i
   const video = await upload('Rover clip.mp4', 'video/mp4', 5 * MB);
   assert.equal(video.result.ok, true);
   const all = await listMedia(anon);
-  assert.deepEqual(all.slice(0, 2).map((m) => m.path), [video.path, path]);
-  assert.deepEqual((await listMedia(anon, { kinds: ['video'] })).map((m) => m.path), [video.path]);
-  assert.deepEqual((await listMedia(anon, { search: 'ORBIT' })).map((m) => m.path), [path]);
-  assert.deepEqual((await listMedia(anon, { search: 'olympus mons' })).map((m) => m.path), [path]);
+  assert.deepEqual(all.slice(0, 2).map((media) => media.path), [video.path, path]);
+  assert.deepEqual((await listMedia(anon, { kinds: ['video'] })).map((media) => media.path), [video.path]);
+  assert.deepEqual((await listMedia(anon, { search: 'ORBIT' })).map((media) => media.path), [path]);
+  assert.deepEqual((await listMedia(anon, { search: 'olympus mons' })).map((media) => media.path), [path]);
   // LIKE wildcards in a search are literal.
   assert.deepEqual(await listMedia(anon, { search: '%' }), []);
   assert.equal((await listMedia(anon, { limit: 1 })).length, 1);
@@ -166,7 +166,7 @@ test('update changes only the library alt text, and checks the role', async () =
   const changed = await updateMedia(server, { id: item.id, alt: '  Gale crater  ' }, { userId: editor });
   assert.equal(changed.ok, true, JSON.stringify(changed));
   if (changed.ok) assert.deepEqual(changed.item, { ...item, alt: 'Gale crater' });
-  assert.deepEqual((await listMedia(anon, { search: 'gale crater' })).map((m) => m.id), [item.id]);
+  assert.deepEqual((await listMedia(anon, { search: 'gale crater' })).map((media) => media.id), [item.id]);
 
   const cleared = await updateMedia(server, { id: item.id, alt: '   ' }, { userId: editor });
   assert.equal(cleared.ok && cleared.item.alt, undefined);
@@ -195,13 +195,13 @@ test('usage finds a file in working copies and live versions, fields and rich te
 
   // Published: live too. Then a draft without it: live only.
   await savePanels(pageA, 'usage-a', [{ id: 'p1', type: 'cera/featured-media', v: 1, data: { media: { id: item.id, path: item.path, kind: 'image' } } }], { publish: true, version: 1 });
-  assert.deepEqual((await mediaUsage(staff, item.path)).map((u) => [u.draft, u.live]), [[true, true]]);
+  assert.deepEqual((await mediaUsage(staff, item.path)).map((usage) => [usage.draft, usage.live]), [[true, true]]);
   await savePanels(pageA, 'usage-a', [], { publish: false, version: 2 });
-  assert.deepEqual((await mediaUsage(staff, item.path)).map((u) => [u.draft, u.live]), [[false, true]]);
+  assert.deepEqual((await mediaUsage(staff, item.path)).map((usage) => [usage.draft, usage.live]), [[false, true]]);
 
   // An image in rich text counts.
   await savePanels(pageB, 'usage-b', [{ id: 'p1', type: 'cera/text', v: 1, data: { copy: `<p><img src="https://x.supabase.co/storage/v1/object/public/cera-media/${item.path}"></p>` } }], { publish: false, version: 0 });
-  assert.deepEqual((await mediaUsage(staff, item.path)).map((u) => u.slug), ['usage-a', 'usage-b']);
+  assert.deepEqual((await mediaUsage(staff, item.path)).map((usage) => usage.slug), ['usage-a', 'usage-b']);
   assert.deepEqual(await mediaUsage(staff, ''), []);
 });
 
@@ -214,7 +214,7 @@ test('delete refuses a file a page uses, and removes an unused one from the libr
   assert.equal(refused.ok, false);
   if (!refused.ok) {
     assert.match(refused.message, /A page uses this file/);
-    assert.deepEqual(refused.usedBy?.map((u) => [u.slug, u.draft, u.live]), [['delete-test', true, true]]);
+    assert.deepEqual(refused.usedBy?.map((usage) => [usage.slug, usage.draft, usage.live]), [['delete-test', true, true]]);
   }
   assert.equal(objects.has(used.path), true);
 
@@ -223,7 +223,7 @@ test('delete refuses a file a page uses, and removes an unused one from the libr
   assert.equal(objects.has(unused.path), true);
   assert.deepEqual(await deleteMedia(server, unused.id, { userId: editor }), { ok: true });
   assert.equal(objects.has(unused.path), false);
-  assert.deepEqual((await listMedia(anon, { search: 'unused' })).map((m) => m.id), []);
+  assert.deepEqual((await listMedia(anon, { search: 'unused' })).map((media) => media.id), []);
   const again = await deleteMedia(server, unused.id, { userId: editor });
   assert.equal(again.ok, false);
   if (!again.ok) assert.match(again.message, /isn’t in the library/);

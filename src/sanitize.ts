@@ -1,5 +1,5 @@
 /**
- * Rich-text sanitizing for `f.html()` fields. Runs on save (see
+ * Rich-text sanitizing for `field.html()` fields. Runs on save (see
  * `preparePageForSave`), so stored HTML is always safe to render.
  *
  * The allowlists follow the Developers Only theme: its `wp_editor` field was

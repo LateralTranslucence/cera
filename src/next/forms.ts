@@ -62,8 +62,8 @@ export function createFormHandler(opts: FormHandlerOptions) {
       return bad('The form couldn’t be read. Reload the page and try again.');
     }
     const text = (name: string) => {
-      const v = body.get(name);
-      return typeof v === 'string' ? v : '';
+      const value = body.get(name);
+      return typeof value === 'string' ? value : '';
     };
     const formId = text(FORM_ID_FIELD);
     if (!UUID.test(formId)) return bad('The form couldn’t be read. Reload the page and try again.');
@@ -83,7 +83,7 @@ export function createFormHandler(opts: FormHandlerOptions) {
     const form = await getLiveForm(client, formId);
     if (!form) return json({ ok: false, reason: 'not-live', message: 'This form isn’t taking submissions right now.' }, 404);
 
-    const check = checkSubmission(form, (name) => body.getAll(name).filter((v): v is string => typeof v === 'string'));
+    const check = checkSubmission(form, (name) => body.getAll(name).filter((value): value is string => typeof value === 'string'));
     if (!check.ok) {
       const count = Object.keys(check.errors).length;
       return json({ ok: false, reason: 'invalid', message: count === 1 ? 'One answer needs fixing.' : `${count} answers need fixing.`, errors: check.errors }, 422);
@@ -104,8 +104,8 @@ export function createFormHandler(opts: FormHandlerOptions) {
     if (opts.afterSubmit) {
       try {
         await opts.afterSubmit({ id: stored.id, form, values: check.values, email: check.email });
-      } catch (e) {
-        console.error(`cera: afterSubmit failed for submission ${stored.id}`, e);
+      } catch (error) {
+        console.error(`cera: afterSubmit failed for submission ${stored.id}`, error);
       }
     }
     return json({ ok: true });

@@ -25,12 +25,12 @@ const page = (id: string, slug: string, title: string) => ({
   panels: [{ id: 'p1', type: 'cera/blocks', v: 1, hidden: false, data: { title: 'x' } }],
 });
 
-async function save(p: object, expected: number, publish: boolean, user = editor) {
+async function save(storedPage: object, expected: number, publish: boolean, user = editor) {
   const rows = await queryAs<{ r: { id: string; version: number; revisionId: string } }>(
     db,
     'service_role',
     'select public.cera_save_page($1, $2, $3, $4) as r',
-    [JSON.stringify(p), expected, publish, user],
+    [JSON.stringify(storedPage), expected, publish, user],
   );
   return rows[0]!.r;
 }
@@ -40,8 +40,8 @@ const publicLookup = (slug: string) =>
 
 test('a draft save creates the page and a revision, but nothing is public', async () => {
   const id = crypto.randomUUID();
-  const r = await save(page(id, 'draft-only', 'Draft'), 0, false);
-  assert.equal(r.version, 1);
+  const result = await save(page(id, 'draft-only', 'Draft'), 0, false);
+  assert.equal(result.version, 1);
   assert.deepEqual(await publicLookup('draft-only'), []);
   const revs = await queryAs(db, 'service_role', 'select kind, is_published from public.cera_page_revisions where page_id = $1', [id]);
   assert.deepEqual(revs, [{ kind: 'draft', is_published: false }]);
@@ -52,8 +52,8 @@ test('publishing makes a revision live; later drafts do not change the live page
   await save(page(id, 'about', 'About v1'), 0, true);
   assert.deepEqual(await publicLookup('about'), [{ title: 'About v1' }]);
 
-  const r = await save(page(id, 'about', 'About v2 (draft)'), 1, false);
-  assert.equal(r.version, 2);
+  const result = await save(page(id, 'about', 'About v2 (draft)'), 1, false);
+  assert.equal(result.version, 2);
   assert.deepEqual(await publicLookup('about'), [{ title: 'About v1' }]);
 
   await save(page(id, 'about-us', 'About v3'), 2, true);
@@ -65,16 +65,16 @@ test('a stale version is rejected with CE409', async () => {
   const id = crypto.randomUUID();
   await save(page(id, 'race', 'A'), 0, false);
   await save(page(id, 'race', 'B'), 1, false);
-  await assert.rejects(save(page(id, 'race', 'C'), 1, false), (e: { code?: string }) => e.code === 'CE409');
+  await assert.rejects(save(page(id, 'race', 'C'), 1, false), (error: { code?: string }) => error.code === 'CE409');
 });
 
 test('updating a page that does not exist is CE404', async () => {
-  await assert.rejects(save(page(crypto.randomUUID(), 'ghost', 'G'), 3, false), (e: { code?: string }) => e.code === 'CE404');
+  await assert.rejects(save(page(crypto.randomUUID(), 'ghost', 'G'), 3, false), (error: { code?: string }) => error.code === 'CE404');
 });
 
 test('only admins and editors can save', async () => {
   for (const user of [viewer, nobody, crypto.randomUUID()]) {
-    await assert.rejects(save(page(crypto.randomUUID(), 'nope', 'N'), 0, false, user), (e: { code?: string }) => e.code === '42501');
+    await assert.rejects(save(page(crypto.randomUUID(), 'nope', 'N'), 0, false, user), (error: { code?: string }) => error.code === '42501');
   }
 });
 

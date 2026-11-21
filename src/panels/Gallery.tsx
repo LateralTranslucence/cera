@@ -8,8 +8,8 @@ import type { galleryFields } from './gallery.fields.ts';
 
 export default function Gallery({ data, panel }: PanelPropsOf<typeof galleryFields>) {
   const images: GalleryImage[] = data.gallery
-    .filter((m) => m.kind === 'image')
-    .map((m, i) => ({ key: `${m.id}-${i}`, src: mediaUrl(m), alt: m.alt ?? '', width: m.width, height: m.height }));
+    .filter((mediaItem) => mediaItem.kind === 'image')
+    .map((mediaItem, i) => ({ key: `${mediaItem.id}-${i}`, src: mediaUrl(mediaItem), alt: mediaItem.alt ?? '', width: mediaItem.width, height: mediaItem.height }));
   return (
     <PanelFrame name="gallery" data={data} panel={panel}>
       {images.length > 0 && <GalleryClient images={images} />}

@@ -11,14 +11,14 @@
 import { type FieldMap, type InferFields, objectSchema } from './fields.ts';
 import type { ComponentLoader, Migration, PanelDefinition, PanelLoad, PanelPropsOf } from './panel.ts';
 
-export interface PanelInput<T extends string, M extends FieldMap, L> {
-  type: T;
+export interface PanelInput<TypeName extends string, Fields extends FieldMap, Loaded> {
+  type: TypeName;
   label: string;
   description?: string;
   version?: number;
-  fields: M;
-  load?: PanelLoad<InferFields<M>, L>;
-  component: ComponentLoader<PanelPropsOf<M, Awaited<L>>>;
+  fields: Fields;
+  load?: PanelLoad<InferFields<Fields>, Loaded>;
+  component: ComponentLoader<PanelPropsOf<Fields, Awaited<Loaded>>>;
   /** Keyed by the version being upgraded FROM. */
   migrations?: Record<number, Migration>;
 }
@@ -36,9 +36,9 @@ const CORE_NAMESPACE = 'cera';
  *
  * The type can't start with `cera/`; that namespace is for Cera's own panels.
  */
-export function definePanel<const T extends string, const M extends FieldMap, L = undefined>(
-  def: PanelInput<T, M, L>,
-): PanelDefinition<T, M, Awaited<L>> {
+export function definePanel<const TypeName extends string, const Fields extends FieldMap, Loaded = undefined>(
+  def: PanelInput<TypeName, Fields, Loaded>,
+): PanelDefinition<TypeName, Fields, Awaited<Loaded>> {
   const namespace = namespaceOf(def.type);
   if (namespace === CORE_NAMESPACE) {
     const name = def.type.slice(CORE_NAMESPACE.length + 1);
@@ -50,9 +50,9 @@ export function definePanel<const T extends string, const M extends FieldMap, L 
 }
 
 /** Defines one of Cera's own panels. Its type must start with `cera/`. */
-export function defineCorePanel<const T extends `${typeof CORE_NAMESPACE}/${string}`, const M extends FieldMap, L = undefined>(
-  def: PanelInput<T, M, L>,
-): PanelDefinition<T, M, Awaited<L>> {
+export function defineCorePanel<const TypeName extends `${typeof CORE_NAMESPACE}/${string}`, const Fields extends FieldMap, Loaded = undefined>(
+  def: PanelInput<TypeName, Fields, Loaded>,
+): PanelDefinition<TypeName, Fields, Awaited<Loaded>> {
   if (namespaceOf(def.type) !== CORE_NAMESPACE) throw new Error(`Core panel type "${def.type}" must start with "${CORE_NAMESPACE}/".`);
   return build(def);
 }
@@ -65,7 +65,7 @@ function namespaceOf(type: string): string | undefined {
   return match[1];
 }
 
-function build<T extends string, M extends FieldMap, L>(def: PanelInput<T, M, L>): PanelDefinition<T, M, Awaited<L>> {
+function build<TypeName extends string, Fields extends FieldMap, Loaded>(def: PanelInput<TypeName, Fields, Loaded>): PanelDefinition<TypeName, Fields, Awaited<Loaded>> {
   const version = def.version ?? 1;
   for (let v = 1; v < version; v++) {
     if (!def.migrations?.[v]) throw new Error(`Panel "${def.type}" is v${version} but has no migration from v${v}.`);
@@ -77,7 +77,7 @@ function build<T extends string, M extends FieldMap, L>(def: PanelInput<T, M, L>
     version,
     fields: def.fields,
     schema: objectSchema(def.fields),
-    load: def.load as PanelLoad<InferFields<M>, Awaited<L>> | undefined,
+    load: def.load as PanelLoad<InferFields<Fields>, Awaited<Loaded>> | undefined,
     component: def.component,
     migrations: def.migrations ?? {},
   };

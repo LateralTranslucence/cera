@@ -17,22 +17,22 @@ import { addUser, createTestDb, fakeSupabase } from './support/db.ts';
 const ROCKET = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M1 1h14v14H1z" fill="#000"/></svg>';
 
 test('cleanSvg keeps drawing only, points color at the text, and sizes by viewBox', () => {
-  const r = cleanSvg(
+  const result = cleanSvg(
     `<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" onload="alert(1)">` +
       `<script>alert(1)</script><foreignObject><div>x</div></foreignObject><image href="https://evil.example/x.png"/>` +
       `<a href="javascript:alert(1)"><circle r="2" fill="url(https://evil.example/#g)"/></a>` +
       `<defs><linearGradient id="g"><stop offset="0" stop-color="red"/></linearGradient></defs>` +
       `<rect width="4" height="4" fill="url(#g)" style="stroke: black"/><path d="M0 0h1" stroke="black"/></svg>`,
   );
-  assert.ok(!('error' in r));
-  assert.equal(r.removed, true);
-  assert.doesNotMatch(r.svg, /script|onload|foreignObject|image|href|evil|javascript/i);
-  assert.match(r.svg, /^<svg[^>]* viewBox="0 0 24 24"[^>]* fill="currentColor">/);
-  assert.doesNotMatch(r.svg, /<svg[^>]*\swidth=/);
-  assert.match(r.svg, /<circle r="2"><\/circle>/); // the outside url() fill went, the circle stayed
-  assert.match(r.svg, /fill="url\(#g\)"/); // gradients inside the file stay
-  assert.match(r.svg, /style="stroke:currentColor"/);
-  assert.match(r.svg, /stroke="currentColor"/);
+  assert.ok(!('error' in result));
+  assert.equal(result.removed, true);
+  assert.doesNotMatch(result.svg, /script|onload|foreignObject|image|href|evil|javascript/i);
+  assert.match(result.svg, /^<svg[^>]* viewBox="0 0 24 24"[^>]* fill="currentColor">/);
+  assert.doesNotMatch(result.svg, /<svg[^>]*\swidth=/);
+  assert.match(result.svg, /<circle r="2"><\/circle>/); // the outside url() fill went, the circle stayed
+  assert.match(result.svg, /fill="url\(#g\)"/); // gradients inside the file stay
+  assert.match(result.svg, /style="stroke:currentColor"/);
+  assert.match(result.svg, /stroke="currentColor"/);
 
   // Already clean: nothing reported, and cleaning again changes nothing.
   const lucide = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14"></path></svg>';
@@ -52,11 +52,11 @@ test('saving an icon cleans its SVG, warns about what went, and refuses a file t
   const saved = await preparePageForSave(iconType, icon('Rocket', '<svg viewBox="0 0 1 1"><script>x</script><path d="M0 0"/></svg>'), { mode: 'publish' });
   assert.equal(saved.ok, true);
   assert.doesNotMatch(JSON.stringify(saved.page), /script/);
-  assert.deepEqual(saved.issues.map((i) => [i.code, i.severity, i.path.join('.')]), [['svg-cleaned', 'warning', 'boxes.icon.svg']]);
+  assert.deepEqual(saved.issues.map((issue) => [issue.code, issue.severity, issue.path.join('.')]), [['svg-cleaned', 'warning', 'boxes.icon.svg']]);
 
   const bad = await preparePageForSave(iconType, icon('Bad', '<p>not an svg</p>'), { mode: 'draft' });
   assert.equal(bad.ok, false);
-  assert.deepEqual(bad.issues.map((i) => i.code), ['svg-invalid']);
+  assert.deepEqual(bad.issues.map((issue) => issue.code), ['svg-invalid']);
 
   // The file is required to publish.
   const empty = await preparePageForSave(iconType, icon('Empty', undefined), { mode: 'publish' });
@@ -70,14 +70,14 @@ test('Lucide: search by name and keywords, best match first; get leaves unknown 
   assert.match(first!.svg, /^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"[^>]*><path d="M5 12h14"\/>/);
 
   // "boost" is only a keyword (tag) of rocket.
-  assert.ok((await lucideIcons.search('boost', 20)).some((g) => g.value === 'lucide:rocket'));
+  assert.ok((await lucideIcons.search('boost', 20)).some((glyph) => glyph.value === 'lucide:rocket'));
   // Keywords match at the start of a word: "rocket" doesn't find cogs through their keyword "sprocket".
-  assert.ok(!(await lucideIcons.search('rocket', 50)).some((g) => g.value === 'lucide:cog'));
+  assert.ok(!(await lucideIcons.search('rocket', 50)).some((glyph) => glyph.value === 'lucide:cog'));
   assert.equal((await lucideIcons.search('', 10)).length, 10);
   assert.deepEqual((await lucideIcons.search('zzzz-no-such-icon', 10)), []);
 
   const got = await lucideIcons.get(['house', 'not-an-icon', '__proto__']);
-  assert.deepEqual(got.map((g) => g.value), ['lucide:house']);
+  assert.deepEqual(got.map((glyph) => glyph.value), ['lucide:house']);
 });
 
 test('Font Awesome packs: one icon per name, aliases searchable, duotone drawn as two paths', () => {
@@ -86,14 +86,14 @@ test('Font Awesome packs: one icon per name, aliases searchable, duotone drawn a
   const set = fontAwesomeIcons({ name: 'fa-solid', label: 'Font Awesome Solid', icons: { faHouse: house, faHome: house, faStar: duo } });
 
   assert.deepEqual(
-    (set.search('', 10) as Array<{ value: string }>).map((g) => g.value),
+    (set.search('', 10) as Array<{ value: string }>).map((glyph) => glyph.value),
     ['fa-solid:house', 'fa-solid:star'],
   );
-  assert.deepEqual((set.search('home', 10) as Array<{ value: string }>).map((g) => g.value), ['fa-solid:house']);
-  const [h] = set.get(['house']) as Array<{ svg: string }>;
-  assert.equal(h!.svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" fill="currentColor"><path d="M0 0h576v512H0z"/></svg>');
-  const [s] = set.get(['star']) as Array<{ svg: string }>;
-  assert.match(s!.svg, /<path d="M1 1" opacity="0.4"\/><path d="M2 2"\/>/);
+  assert.deepEqual((set.search('home', 10) as Array<{ value: string }>).map((glyph) => glyph.value), ['fa-solid:house']);
+  const [houseGlyph] = set.get(['house']) as Array<{ svg: string }>;
+  assert.equal(houseGlyph!.svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" fill="currentColor"><path d="M0 0h576v512H0z"/></svg>');
+  const [starGlyph] = set.get(['star']) as Array<{ svg: string }>;
+  assert.match(starGlyph!.svg, /<path d="M1 1" opacity="0.4"\/><path d="M2 2"\/>/);
 });
 
 test('the library resolves values across sets and searches each set in order', async () => {
@@ -101,7 +101,7 @@ test('the library resolves values across sets and searches each set in order', a
     name: 'custom',
     label: 'Yours',
     search: () => [{ value: 'custom:1', label: 'One', svg: '<svg/>' }],
-    get: (names) => names.filter((n) => n === '1').map(() => ({ value: 'custom:1', label: 'One', svg: '<svg/>' })),
+    get: (names) => names.filter((name) => name === '1').map(() => ({ value: 'custom:1', label: 'One', svg: '<svg/>' })),
   };
   const library = createIconLibrary([mine, lucideIcons]);
   assert.deepEqual(library.sets, [{ name: 'custom', label: 'Yours' }, { name: 'lucide', label: 'Lucide' }]);
@@ -111,8 +111,8 @@ test('the library resolves values across sets and searches each set in order', a
 
   const results = await library.search('arrow', { limit: 3 });
   assert.equal(results[0]?.value, 'custom:1');
-  assert.equal(results.filter((g) => g.value.startsWith('lucide:')).length, 3);
-  assert.deepEqual((await library.search('rocket', { set: 'custom' })).map((g) => g.value), ['custom:1']);
+  assert.equal(results.filter((glyph) => glyph.value.startsWith('lucide:')).length, 3);
+  assert.deepEqual((await library.search('rocket', { set: 'custom' })).map((glyph) => glyph.value), ['custom:1']);
 
   assert.deepEqual(parseIconValue('fa-solid:house'), { set: 'fa-solid', name: 'house' });
   assert.equal(parseIconValue('Bad Set:x'), null);
@@ -130,8 +130,8 @@ before(async () => {
 });
 
 async function save(page: StoredPage, mode: 'draft' | 'publish') {
-  const r = await savePage(server, iconType, page, { mode, expectedVersion: 0, userId: editor });
-  assert.equal(r.ok, true, JSON.stringify(r));
+  const result = await savePage(server, iconType, page, { mode, expectedVersion: 0, userId: editor });
+  assert.equal(result.ok, true, JSON.stringify(result));
   return page.id;
 }
 
@@ -141,22 +141,22 @@ test('a site’s own icons: live ones for visitors, working copies (marked) for 
   const hidden = await save(icon('Old logo', ROCKET, { hidden: true }), 'publish');
 
   const live = supabaseIcons(fakeSupabase(db, 'anon'), { draft: false });
-  assert.deepEqual((await live.search('', 10)).map((g) => g.label), ['Rocket']);
-  assert.deepEqual((await live.search('space', 10)).map((g) => g.value), [`custom:${rocket}`]);
+  assert.deepEqual((await live.search('', 10)).map((glyph) => glyph.label), ['Rocket']);
+  assert.deepEqual((await live.search('space', 10)).map((glyph) => glyph.value), [`custom:${rocket}`]);
   // The SVG was cleaned on save: black became currentColor.
-  const [r] = await live.get([rocket]);
-  assert.match(r!.svg, /fill="currentColor"/);
-  assert.doesNotMatch(r!.svg, /#000/);
+  const [rocketGlyph] = await live.get([rocket]);
+  assert.match(rocketGlyph!.svg, /fill="currentColor"/);
+  assert.doesNotMatch(rocketGlyph!.svg, /#000/);
   // Hidden icons still draw where they're used; drafts don't, on the live site.
-  assert.deepEqual((await live.get([hidden, draft, 'not-a-uuid'])).map((g) => g.label), ['Old logo']);
+  assert.deepEqual((await live.get([hidden, draft, 'not-a-uuid'])).map((glyph) => glyph.label), ['Old logo']);
 
   const admin = supabaseIcons(server, { draft: true });
-  assert.deepEqual((await admin.search('', 10)).map((g) => [g.label, g.note]), [['Comet', 'Not published'], ['Rocket', undefined]]);
+  assert.deepEqual((await admin.search('', 10)).map((glyph) => [glyph.label, glyph.note]), [['Comet', 'Not published'], ['Rocket', undefined]]);
 });
 
 test('Blocks draws each block’s icon through loadContext.icons', async () => {
   const raw = structuredClone(sample) as unknown as StoredPage;
-  const blocks = raw.panels.find((p) => p.type === 'cera/blocks')!;
+  const blocks = raw.panels.find((panel) => panel.type === 'cera/blocks')!;
   (blocks.data as { blocks: Array<Record<string, unknown>> }).blocks[0]!.icon = 'lucide:rocket';
   (blocks.data as { blocks: Array<Record<string, unknown>> }).blocks[1]!.icon = 'lucide:house'; // a hidden block: not drawn
   const { page } = readPage(landingPage, raw);

@@ -94,14 +94,14 @@ const QUIET = { announcements: { onDragStart: () => undefined, onDragOver: () =>
  * definition. A panel whose migration fails is left as stored; saving reports it.
  */
 function upgradeForEditing(ct: AnyContentType, page: StoredPage): StoredPage {
-  const defs = new Map<string, AnyPanel>(ct.panels.map((p: AnyPanel) => [p.type, p]));
-  const panels = page.panels.map((p) => {
-    const def = defs.get(p.type);
-    if (!def) return p;
+  const defs = new Map<string, AnyPanel>(ct.panels.map((definition: AnyPanel) => [definition.type, definition]));
+  const panels = page.panels.map((panel) => {
+    const def = defs.get(panel.type);
+    if (!def) return panel;
     try {
-      return upgradePanel(def, p);
+      return upgradePanel(def, panel);
     } catch {
-      return p;
+      return panel;
     }
   });
   return { ...page, panels };
@@ -109,15 +109,15 @@ function upgradeForEditing(ct: AnyContentType, page: StoredPage): StoredPage {
 
 /** Tomorrow at 9:00 in the browser's time zone, as a datetime-local value. */
 function defaultScheduleTime(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(9, 0, 0, 0);
-  return toLocalInput(d);
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(9, 0, 0, 0);
+  return toLocalInput(date);
 }
 
-function toLocalInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function toLocalInput(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function PageEditor({
@@ -181,7 +181,7 @@ export function PageEditor({
   // Re-render now and then so "Saved 5 min ago" stays true.
   const [, setTick] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setTick((t) => t + 1), 30_000);
+    const timer = setInterval(() => setTick((tick) => tick + 1), 30_000);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
@@ -190,14 +190,14 @@ export function PageEditor({
     setScrollTo(null);
   }, [scrollTo]);
 
-  const defs = useMemo(() => new Map<string, AnyPanel>(ct.panels.map((p: AnyPanel) => [p.type, p])), [ct]);
+  const defs = useMemo(() => new Map<string, AnyPanel>(ct.panels.map((definition: AnyPanel) => [definition.type, definition])), [ct]);
   const options = useMemo<OptionsContext>(() => ({ contentTypes: contentTypes ?? [{ name: ct.name, label: ct.label, public: true }] }), [contentTypes, ct]);
   const ctx: FormContext = { issues, options, readOnly, findPages, media, icons };
 
   // Warn before leaving with unsaved changes.
   useEffect(() => {
     if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
@@ -208,8 +208,8 @@ export function PageEditor({
   };
   const setPanels = (panels: StoredPanel[]) => update({ ...page, panels });
   const toggle = (key: string) =>
-    setOpen((s) => {
-      const next = new Set(s);
+    setOpen((previous) => {
+      const next = new Set(previous);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
@@ -262,7 +262,7 @@ export function PageEditor({
         switch (result.reason) {
           case 'invalid':
             setStatus({ tone: 'error', text: `Not ${verb}. Fix the errors below.` });
-            setOpen((s) => new Set(s).add(SETTINGS));
+            setOpen((previous) => new Set(previous).add(SETTINGS));
             break;
           case 'conflict':
             setStatus({ tone: 'error', text: `Someone else saved this ${noun} after you opened it. Reload to get their version (your unsaved changes will be lost).`, reload: true });
@@ -272,7 +272,7 @@ export function PageEditor({
             break;
           case 'slug-taken':
             setStatus({ tone: 'error', text: `Another ${noun} already uses the ${slugWord} “${showSlug(page.slug)}”.` });
-            setOpen((s) => new Set(s).add(SETTINGS));
+            setOpen((previous) => new Set(previous).add(SETTINGS));
             break;
           case 'not-found':
             setStatus({ tone: 'error', text: `This ${noun} no longer exists.` });
@@ -281,8 +281,8 @@ export function PageEditor({
             setStatus({ tone: 'error', text: 'Not scheduled. Pick a time in the future.' });
             break;
         }
-      } catch (e) {
-        setStatus({ tone: 'error', text: `Save failed: ${e instanceof Error ? e.message : String(e)}` });
+      } catch (error) {
+        setStatus({ tone: 'error', text: `Save failed: ${error instanceof Error ? error.message : String(error)}` });
       }
     });
   };
@@ -298,8 +298,8 @@ export function PageEditor({
         setUnpublished(false);
         setSchedule(undefined);
         setStatus({ tone: 'success', text: `Unpublished. The ${noun} is no longer on the live site.` });
-      } catch (e) {
-        setStatus({ tone: 'error', text: `Unpublish failed: ${e instanceof Error ? e.message : String(e)}` });
+      } catch (error) {
+        setStatus({ tone: 'error', text: `Unpublish failed: ${error instanceof Error ? error.message : String(error)}` });
       }
     });
   };
@@ -311,20 +311,20 @@ export function PageEditor({
         await onCancelSchedule();
         setSchedule(undefined);
         setStatus({ tone: 'success', text: 'Schedule canceled.' });
-      } catch (e) {
-        setStatus({ tone: 'error', text: `Couldn’t cancel the schedule: ${e instanceof Error ? e.message : String(e)}` });
+      } catch (error) {
+        setStatus({ tone: 'error', text: `Couldn’t cancel the schedule: ${error instanceof Error ? error.message : String(error)}` });
       }
     });
   };
 
   const fetchHistory = (before?: number) => {
     if (!loadHistory) return;
-    setHistory((h) => ({ ...h, loading: true, error: undefined }));
+    setHistory((previous) => ({ ...previous, loading: true, error: undefined }));
     loadHistory(before)
       .then((items) =>
-        setHistory((h) => ({ items: before === undefined ? items : [...h.items, ...items], more: items.length >= HISTORY_PAGE, loading: false })),
+        setHistory((previous) => ({ items: before === undefined ? items : [...previous.items, ...items], more: items.length >= HISTORY_PAGE, loading: false })),
       )
-      .catch((e: unknown) => setHistory((h) => ({ ...h, loading: false, error: e instanceof Error ? e.message : String(e) })));
+      .catch((error: unknown) => setHistory((previous) => ({ ...previous, loading: false, error: error instanceof Error ? error.message : String(error) })));
   };
   const openHistory = () => {
     setHistory({ items: [], more: false, loading: true });
@@ -370,8 +370,8 @@ export function PageEditor({
           default:
             setStatus({ tone: 'error', text: `Not restored. Version ${from} has errors that can’t be saved.` });
         }
-      } catch (e) {
-        setStatus({ tone: 'error', text: `Restore failed: ${e instanceof Error ? e.message : String(e)}` });
+      } catch (error) {
+        setStatus({ tone: 'error', text: `Restore failed: ${error instanceof Error ? error.message : String(error)}` });
       }
     });
   };
@@ -411,8 +411,8 @@ export function PageEditor({
           'in-use': `Not deleted. Other records still depend on this ${noun}${noun === 'form' ? ': delete its submissions first' : ''}.`,
         }[result.reason];
         setStatus({ tone: 'error', text, reload: result.reason === 'conflict' });
-      } catch (e) {
-        setStatus({ tone: 'error', text: `Delete failed: ${e instanceof Error ? e.message : String(e)}` });
+      } catch (error) {
+        setStatus({ tone: 'error', text: `Delete failed: ${error instanceof Error ? error.message : String(error)}` });
       }
     });
   };
@@ -426,7 +426,7 @@ export function PageEditor({
 
   const addPanel = (def: AnyPanel) => {
     const panel = newPanel(def);
-    setOpen((s) => new Set(s).add(panel.id));
+    setOpen((previous) => new Set(previous).add(panel.id));
     setScrollTo(panel.id);
     setPanels([...page.panels, panel]);
     setDialog(null);
@@ -439,26 +439,26 @@ export function PageEditor({
   const settingsBoxes = allBoxes.filter(([name]) => !lead.has(name) || (ct.editor?.pageBoxes ?? []).includes(name));
   const leadBoxes = allBoxes.filter(([name]) => lead.has(name) && !(ct.editor?.pageBoxes ?? []).includes(name));
   const settingsIssues = [...issuesAt(issues, ['title']), ...issuesAt(issues, ['slug']), ...settingsBoxes.flatMap(([name]) => issuesAt(issues, ['boxes', name]))];
-  const errorCount = issues.filter((i) => i.severity === 'error').length;
+  const errorCount = issues.filter((issue) => issue.severity === 'error').length;
   const changes = published && (dirty || unpublished);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
-  const nameAt = (i: number) => {
-    const p = page.panels[i];
-    return p ? panelName(defs.get(p.type), p.data, p.type) : '';
+  const nameAt = (index: number) => {
+    const panel = page.panels[index];
+    return panel ? panelName(defs.get(panel.type), panel.data, panel.type) : '';
   };
   const move = (from: number, to: number) => {
     if (to < 0 || to >= page.panels.length || from === to) return;
     setAnnouncement(`${nameAt(from)} moved to position ${to + 1} of ${page.panels.length}.`);
     setPanels(moveItem(page.panels, from, to));
   };
-  const onDragStart = (e: DragStartEvent) => {
-    const i = page.panels.findIndex((p) => p.id === e.active.id);
-    setAnnouncement(`Picked up ${nameAt(i)}.`);
+  const onDragStart = (event: DragStartEvent) => {
+    const index = page.panels.findIndex((panel) => panel.id === event.active.id);
+    setAnnouncement(`Picked up ${nameAt(index)}.`);
   };
-  const onDragEnd = (e: DragEndEvent) => {
-    const from = page.panels.findIndex((p) => p.id === e.active.id);
-    const to = e.over ? page.panels.findIndex((p) => p.id === e.over!.id) : from;
+  const onDragEnd = (event: DragEndEvent) => {
+    const from = page.panels.findIndex((panel) => panel.id === event.active.id);
+    const to = event.over ? page.panels.findIndex((panel) => panel.id === event.over!.id) : from;
     if (from !== to) move(from, to);
     else setAnnouncement(`${nameAt(from)} dropped.`);
   };
@@ -554,7 +554,7 @@ export function PageEditor({
           summary={<span className="cera-mono">{showSlug(page.slug)}</span>}
           open={open.has(SETTINGS) || settingsIssues.length > 0}
           onToggle={() => toggle(SETTINGS)}
-          hasError={settingsIssues.some((i) => i.severity === 'error')}
+          hasError={settingsIssues.some((issue) => issue.severity === 'error')}
         >
           <div className="cera-panel-card__group">
             <div className="cera-fields">
@@ -567,8 +567,8 @@ export function PageEditor({
                   type="text"
                   value={page.title}
                   readOnly={readOnly}
-                  onChange={(e) => {
-                    const title = e.target.value;
+                  onChange={(event) => {
+                    const title = event.target.value;
                     update({ ...page, title, ...(slugTouched ? {} : { slug: slugify(title) }) });
                   }}
                 />
@@ -584,9 +584,9 @@ export function PageEditor({
                   className="cera-code"
                   value={page.slug}
                   readOnly={readOnly}
-                  onChange={(e) => {
+                  onChange={(event) => {
                     setSlugTouched(true);
-                    update({ ...page, slug: e.target.value });
+                    update({ ...page, slug: event.target.value });
                   }}
                 />
                 <p className="cera-note">{ct.editor?.slugNote ?? 'Lowercase words joined by hyphens. “home” is the front page.'}</p>
@@ -597,7 +597,7 @@ export function PageEditor({
           {settingsBoxes.map(([name, fields]) => (
             <div key={name} className="cera-panel-card__group">
               <h3>{humanize(name)}</h3>
-              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
+              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(boxValue) => update(setIn(page, ['boxes', name], boxValue))} path={['boxes', name]} ctx={ctx} />
             </div>
           ))}
           {version > 0 && (loadHistory || (!readOnly && onDelete)) && (
@@ -632,45 +632,45 @@ export function PageEditor({
               summary={panelSummary(fields as FieldMap, data)}
               open={open.has(name) || boxIssues.length > 0}
               onToggle={() => toggle(name)}
-              hasError={boxIssues.some((i) => i.severity === 'error')}
+              hasError={boxIssues.some((issue) => issue.severity === 'error')}
             >
-              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(v) => update(setIn(page, ['boxes', name], v))} path={['boxes', name]} ctx={ctx} />
+              <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(boxValue) => update(setIn(page, ['boxes', name], boxValue))} path={['boxes', name]} ctx={ctx} />
             </Card>
           );
         })}
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} accessibility={QUIET} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setAnnouncement('Move canceled.')}>
-          <SortableContext items={page.panels.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-            {page.panels.map((p, i) => {
-              const def = defs.get(p.type);
+          <SortableContext items={page.panels.map((panel) => panel.id)} strategy={verticalListSortingStrategy}>
+            {page.panels.map((panel, i) => {
+              const def = defs.get(panel.type);
               const path = ['panels', i];
               const all = issuesAt(issues, path);
               return (
                 <SortableCard
-                  key={p.id}
-                  id={p.id}
+                  key={panel.id}
+                  id={panel.id}
                   index={i}
                   count={page.panels.length}
                   readOnly={readOnly}
                   onMove={move}
-                  badge={def?.label ?? p.type}
-                  name={panelName(def, p.data, p.type)}
-                  summary={panelSummary(def?.fields, p.data)}
-                  hidden={p.hidden}
-                  open={!def || open.has(p.id) || all.length > 0}
-                  onToggle={() => toggle(p.id)}
-                  hasError={all.some((x) => x.severity === 'error')}
+                  badge={def?.label ?? panel.type}
+                  name={panelName(def, panel.data, panel.type)}
+                  summary={panelSummary(def?.fields, panel.data)}
+                  hidden={panel.hidden}
+                  open={!def || open.has(panel.id) || all.length > 0}
+                  onToggle={() => toggle(panel.id)}
+                  hasError={all.some((issue) => issue.severity === 'error')}
                   actions={
                     !readOnly && (
                       <>
                         <button
                           type="button"
                           className="cera-icon-button"
-                          aria-label={p.hidden ? `Show ${item} on the ${noun}` : `Hide ${item} from the ${noun}`}
-                          title={p.hidden ? `Show ${item} on the ${noun}` : `Hide ${item} from the ${noun}`}
-                          onClick={() => setPanels(setIn(page.panels, [i, 'hidden'], !p.hidden))}
+                          aria-label={panel.hidden ? `Show ${item} on the ${noun}` : `Hide ${item} from the ${noun}`}
+                          title={panel.hidden ? `Show ${item} on the ${noun}` : `Hide ${item} from the ${noun}`}
+                          onClick={() => setPanels(setIn(page.panels, [i, 'hidden'], !panel.hidden))}
                         >
-                          <Icon name={p.hidden ? 'eyeOff' : 'eye'} />
+                          <Icon name={panel.hidden ? 'eyeOff' : 'eye'} />
                         </button>
                         <button type="button" className="cera-icon-button" aria-label={`Duplicate ${item}`} title={`Duplicate ${item}`} onClick={() => setPanels(duplicatePanel(page.panels, i))}>
                           <Icon name="duplicate" />
@@ -685,9 +685,9 @@ export function PageEditor({
                 >
                   <IssueList issues={issuesAt(issues, path, true)} />
                   {def ? (
-                    <FieldMapForm fields={def.fields} value={p.data} onChange={(data) => setPanels(setIn(page.panels, [i, 'data'], data))} path={[...path, 'data']} ctx={ctx} />
+                    <FieldMapForm fields={def.fields} value={panel.data} onChange={(data) => setPanels(setIn(page.panels, [i, 'data'], data))} path={[...path, 'data']} ctx={ctx} />
                   ) : (
-                    <p className="cera-note">This site has no definition for “{p.type}” {item}s, so it can’t be edited here. It is kept exactly as stored when you save.</p>
+                    <p className="cera-note">This site has no definition for “{panel.type}” {item}s, so it can’t be edited here. It is kept exactly as stored when you save.</p>
                   )}
                 </SortableCard>
               );
@@ -742,8 +742,8 @@ export function PageEditor({
         <form
           className="cera-dialog__body"
           style={{ padding: 0 }}
-          onSubmit={(e) => {
-            e.preventDefault();
+          onSubmit={(event) => {
+            event.preventDefault();
             const at = new Date(scheduleAt);
             if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) {
               setStatus({ tone: 'error', text: 'Not scheduled. Pick a time in the future.' });
@@ -755,7 +755,7 @@ export function PageEditor({
         >
           <label className="cera-inline">
             Publish on
-            <input type="datetime-local" required value={scheduleAt} min={toLocalInput(new Date())} onChange={(e) => setScheduleAt(e.target.value)} />
+            <input type="datetime-local" required value={scheduleAt} min={toLocalInput(new Date())} onChange={(event) => setScheduleAt(event.target.value)} />
           </label>
           <p className="cera-note">
             This saves the page as it is now and publishes that version at the time you pick (your time zone). Changes you make afterwards wait for the next publish. It goes
@@ -781,27 +781,27 @@ export function PageEditor({
         {history.error && <p className="cera-status cera-status--error">Couldn’t load the history: {history.error}</p>}
         {history.items.length > 0 && (
           <ol className="cera-history">
-            {history.items.map((r) => (
-              <li key={r.version} className="cera-history__row">
+            {history.items.map((revision) => (
+              <li key={revision.version} className="cera-history__row">
                 <div className="cera-history__main">
                   <p className="cera-history__head">
-                    <strong>Version {r.version}</strong>
-                    {r.live && <span className="cera-pill">Live</span>}
-                    {r.version === version && <span className="cera-tag">Current</span>}
+                    <strong>Version {revision.version}</strong>
+                    {revision.live && <span className="cera-pill">Live</span>}
+                    {revision.version === version && <span className="cera-tag">Current</span>}
                   </p>
                   <p className="cera-history__meta" suppressHydrationWarning>
-                    {revisionKind(r)} · {formatWhen(r.createdAt)}
-                    {r.createdBy && ` by ${r.createdBy}`}
+                    {revisionKind(revision)} · {formatWhen(revision.createdAt)}
+                    {revision.createdBy && ` by ${revision.createdBy}`}
                   </p>
-                  {(r.title !== page.title || r.slug !== page.slug) && (
+                  {(revision.title !== page.title || revision.slug !== page.slug) && (
                     <p className="cera-history__diff">
-                      {r.title !== page.title && <span>Title: {r.title || 'Untitled'}</span>}
-                      {r.slug !== page.slug && <span className="cera-mono">/{r.slug}</span>}
+                      {revision.title !== page.title && <span>Title: {revision.title || 'Untitled'}</span>}
+                      {revision.slug !== page.slug && <span className="cera-mono">/{revision.slug}</span>}
                     </p>
                   )}
                 </div>
-                {!readOnly && onRestore && r.version !== version && (
-                  <button type="button" className="cera-button cera-button--small" disabled={saving} onClick={() => restore(r.version)}>
+                {!readOnly && onRestore && revision.version !== version && (
+                  <button type="button" className="cera-button cera-button--small" disabled={saving} onClick={() => restore(revision.version)}>
                     Restore
                   </button>
                 )}
@@ -845,9 +845,9 @@ export function PageEditor({
                 <div>
                   <p>{links.length === 1 ? 'This page links to it and will stop showing it:' : 'These pages link to it and will stop showing it:'}</p>
                   <ul className="cera-link-list">
-                    {links.map((l) => (
-                      <li key={l.id}>
-                        {l.title || 'Untitled'} <span className="cera-mono">/{l.slug}</span> {l.live ? <span className="cera-pill">Live</span> : <span className="cera-pill cera-pill--draft">Draft</span>}
+                    {links.map((link) => (
+                      <li key={link.id}>
+                        {link.title || 'Untitled'} <span className="cera-mono">/{link.slug}</span> {link.live ? <span className="cera-pill">Live</span> : <span className="cera-pill cera-pill--draft">Draft</span>}
                       </li>
                     ))}
                   </ul>
@@ -884,17 +884,17 @@ export function PageEditor({
 }
 
 /** What kind of save a revision was, for the History dialog. */
-function revisionKind(r: PageRevision): string {
-  if (r.restoredFrom !== undefined) return `Restored from version ${r.restoredFrom}`;
-  if (r.kind === 'publish') return 'Published';
-  if (r.kind === 'schedule' && r.schedule) {
-    const when = formatScheduled(r.schedule.at);
+function revisionKind(revision: PageRevision): string {
+  if (revision.restoredFrom !== undefined) return `Restored from version ${revision.restoredFrom}`;
+  if (revision.kind === 'publish') return 'Published';
+  if (revision.kind === 'schedule' && revision.schedule) {
+    const when = formatScheduled(revision.schedule.at);
     return {
       pending: `Scheduled for ${when}`,
       published: `Scheduled, went live ${when}`,
       cancelled: `Scheduled for ${when}, canceled`,
       failed: `Scheduled for ${when}, failed`,
-    }[r.schedule.status];
+    }[revision.schedule.status];
   }
   return 'Draft saved';
 }
@@ -1033,10 +1033,10 @@ function SortableCard({
         aria-label="Drag to reorder"
         aria-describedby={hintId}
         // dnd-kit's own keyboard dragging is off; arrow keys move the panel one place.
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            onMove(index, index + (e.key === 'ArrowUp' ? -1 : 1));
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            onMove(index, index + (event.key === 'ArrowUp' ? -1 : 1));
           }
         }}
       >
@@ -1073,12 +1073,12 @@ function ActionsMenu({ actions }: { actions: MenuAction[] }) {
   // Close on Escape (back to the button) or a click elsewhere.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
       setOpen(false);
       button.current?.focus();
     };
-    const onClick = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    const onClick = (event: MouseEvent) => !root.current?.contains(event.target as Node) && setOpen(false);
     document.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onClick);
     return () => {
@@ -1100,23 +1100,23 @@ function ActionsMenu({ actions }: { actions: MenuAction[] }) {
         <Icon name="chevronDown" size={16} strokeWidth={2} />
       </button>
       <div className="cera-menu cera-menu--down" id={menuId} hidden={!open}>
-        {actions.map((a) =>
-          a.href ? (
-            <a key={a.label} href={a.href} target="_blank" rel="noreferrer" onClick={close}>
-              {a.label}
+        {actions.map((action) =>
+          action.href ? (
+            <a key={action.label} href={action.href} target="_blank" rel="noreferrer" onClick={close}>
+              {action.label}
             </a>
           ) : (
             <button
-              key={a.label}
+              key={action.label}
               type="button"
-              className={a.danger ? 'is-danger' : undefined}
-              disabled={a.disabled}
+              className={action.danger ? 'is-danger' : undefined}
+              disabled={action.disabled}
               onClick={() => {
                 close();
-                a.onSelect?.();
+                action.onSelect?.();
               }}
             >
-              {a.label}
+              {action.label}
             </button>
           ),
         )}

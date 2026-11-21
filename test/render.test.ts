@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { defineContentType, definePanel, f, readPage, type StoredPage } from '../src/index.ts';
+import { defineContentType, definePanel, field, readPage, type StoredPage } from '../src/index.ts';
 import { Panels } from '../src/next/index.ts';
 import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
@@ -31,7 +31,7 @@ test('a panel whose component fails to load is skipped; the rest render', async 
   const broken = definePanel({
     type: 'broken',
     label: 'Broken',
-    fields: { title: f.text() },
+    fields: { title: field.text() },
     component: async () => {
       throw new Error('chunk failed');
     },
@@ -42,7 +42,7 @@ test('a panel whose component fails to load is skipped; the rest render', async 
   const { page } = readPage(ct, raw);
 
   const errors: string[] = [];
-  const html = renderToStaticMarkup(await Panels({ contentType: ct, page, loadContext, onError: (_e, p) => errors.push(p.id) }));
+  const html = renderToStaticMarkup(await Panels({ contentType: ct, page, loadContext, onError: (_e, panel) => errors.push(panel.id) }));
   assert.deepEqual(errors, ['b']);
   assert.match(html, /panel--blocks/);
 });

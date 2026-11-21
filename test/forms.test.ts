@@ -98,7 +98,7 @@ test('publicForm: unique names, sections, options and settings', () => {
       { onSubmit: { thankYouRedirect: '//evil.example/' } },
     ),
   );
-  const names = form.items.map((i) => (i.type === 'section' ? `[${i.legend}: ${i.fields.map((f) => f.name).join(', ')}]` : i.name));
+  const names = form.items.map((item) => (item.type === 'section' ? `[${item.legend}: ${item.fields.map((sectionField) => sectionField.name).join(', ')}]` : item.name));
   // Duplicates and reserved names get a number; the hidden panel is left out;
   // an empty section heading ends the section.
   assert.deepEqual(names, ['name', 'name-2', 'cera-website-2', '[More: pick, size]', 'ref']);
@@ -115,7 +115,7 @@ test('publicForm: unique names, sections, options and settings', () => {
 
 test('checkSubmission: required answers, formats and choices', () => {
   const form = toPublic(contact());
-  const send = (values: Record<string, string | string[]>) => checkSubmission(form, (n) => [values[n] ?? []].flat());
+  const send = (values: Record<string, string | string[]>) => checkSubmission(form, (name) => [values[name] ?? []].flat());
 
   const empty = send({ rating: '1' });
   assert.equal(empty.ok, false);
@@ -158,7 +158,7 @@ test('checkSubmission: required answers, formats and choices', () => {
   if (!good.ok) return;
   assert.equal(good.email, 'ada@example.com');
   assert.deepEqual(
-    good.values.map((v) => [v.name, v.value]),
+    good.values.map((answer) => [answer.name, answer.value]),
     [
       ['your-name', 'Ada  Lovelace'],
       ['email', 'ada@example.com'],
@@ -265,23 +265,23 @@ async function publish(stored: StoredPage, expectedVersion = 0) {
 
 function handler(limit = { max: 5, minutes: 10 }, ip = '203.0.113.7') {
   const submitted: string[] = [];
-  const h = createFormHandler({
+  const formHandler = createFormHandler({
     client: () => server,
     secret: () => SECRET,
     ip: () => ip,
     limit,
     afterSubmit: ({ id }) => void submitted.push(id),
   });
-  return { ...h, submitted };
+  return { ...formHandler, submitted };
 }
 
-async function post(h: ReturnType<typeof handler>, formId: string, values: Record<string, string>, token = issueFormToken(SECRET, formId, Date.now() - 5_000)) {
+async function post(formHandler: ReturnType<typeof handler>, formId: string, values: Record<string, string>, token = issueFormToken(SECRET, formId, Date.now() - 5_000)) {
   const body = new FormData();
   body.set('cera-form', formId);
   body.set('cera-token', token);
   body.set('cera-page', '/contact-us');
-  for (const [k, v] of Object.entries(values)) body.append(k, v);
-  const res = await h.POST(new Request('http://localhost/api/cera/forms', { method: 'POST', body }));
+  for (const [name, value] of Object.entries(values)) body.append(name, value);
+  const res = await formHandler.POST(new Request('http://localhost/api/cera/forms', { method: 'POST', body }));
   return { status: res.status, body: (await res.json()) as FormResponse };
 }
 
@@ -295,37 +295,37 @@ const valid = {
 test('the endpoint stores a valid submission to a live form', async () => {
   const stored = contact();
   await publish(stored);
-  const h = handler();
+  const formHandler = handler();
 
-  const get = await h.GET(new Request(`http://localhost/api/cera/forms?form=${stored.id}`));
+  const get = await formHandler.GET(new Request(`http://localhost/api/cera/forms?form=${stored.id}`));
   const { token } = (await get.json()) as { token: string };
   assert.equal(get.headers.get('cache-control'), 'no-store');
   // Straight away is too fast…
-  assert.deepEqual((await post(h, stored.id, valid, token)).body.ok, false);
+  assert.deepEqual((await post(formHandler, stored.id, valid, token)).body.ok, false);
 
   // …a few seconds later it's fine.
-  const sent = await post(h, stored.id, { ...valid, interests: 'Planets' });
+  const sent = await post(formHandler, stored.id, { ...valid, interests: 'Planets' });
   assert.deepEqual(sent, { status: 200, body: { ok: true } });
-  assert.equal(h.submitted.length, 1);
+  assert.equal(formHandler.submitted.length, 1);
 
   const [row] = await listSubmissions(staffEditor, { formId: stored.id });
   assert.equal(row?.email, 'ada@example.com');
   assert.equal(row?.pagePath, '/contact-us');
   assert.equal(row?.formVersion, 1);
-  assert.deepEqual(row?.values.find((v) => v.name === 'interests')?.value, ['Planets']);
+  assert.deepEqual(row?.values.find((answer) => answer.name === 'interests')?.value, ['Planets']);
   // The sender key is a hash, not the address.
   const keys = await db.query<{ sender_key: string }>('select sender_key from public.cera_form_submissions');
-  assert.ok(keys.rows.every((r) => !r.sender_key.includes('203.0.113.7')));
+  assert.ok(keys.rows.every((senderRow) => !senderRow.sender_key.includes('203.0.113.7')));
 });
 
 test('the endpoint refuses bots, bad answers and forms that aren’t live', async () => {
   const stored = contact('refusals');
   await publish(stored);
-  const h = handler();
+  const formHandler = handler();
 
   // Honeypot: looks like success, stores nothing.
   assert.deepEqual(
-    await post(h, stored.id, {
+    await post(formHandler, stored.id, {
       ...valid,
       'cera-website': 'http://spam.example',
     }),
@@ -333,15 +333,15 @@ test('the endpoint refuses bots, bad answers and forms that aren’t live', asyn
   );
   assert.equal((await listSubmissions(staffEditor, { formId: stored.id })).length, 0);
 
-  const forged = await post(h, stored.id, valid, `${Date.now() - 5_000}.forged`);
+  const forged = await post(formHandler, stored.id, valid, `${Date.now() - 5_000}.forged`);
   assert.deepEqual([forged.status, forged.body.ok === false && forged.body.reason], [403, 'bad-request']);
 
-  const old = await post(h, stored.id, valid, issueFormToken(SECRET, stored.id, Date.now() - MAX_AGE_MS - 1_000));
+  const old = await post(formHandler, stored.id, valid, issueFormToken(SECRET, stored.id, Date.now() - MAX_AGE_MS - 1_000));
   assert.equal(old.status, 409);
   assert.ok(!old.body.ok && old.body.reason === 'expired' && old.body.token, 'an expired token comes back with a fresh one');
-  if (!old.body.ok && old.body.reason === 'expired') assert.equal((await post(h, stored.id, valid, old.body.token)).body.ok, true);
+  if (!old.body.ok && old.body.reason === 'expired') assert.equal((await post(formHandler, stored.id, valid, old.body.token)).body.ok, true);
 
-  const invalid = await post(h, stored.id, { email: 'nope' });
+  const invalid = await post(formHandler, stored.id, { email: 'nope' });
   assert.equal(invalid.status, 422);
   assert.ok(!invalid.body.ok && invalid.body.reason === 'invalid' && invalid.body.errors.email);
 
@@ -356,19 +356,19 @@ test('the endpoint refuses bots, bad answers and forms that aren’t live', asyn
     ).ok,
     true,
   );
-  const notLive = await post(h, draft.id, { name: 'x' });
+  const notLive = await post(formHandler, draft.id, { name: 'x' });
   assert.deepEqual([notLive.status, !notLive.body.ok && notLive.body.reason], [404, 'not-live']);
 });
 
 test('the endpoint limits how often one sender can submit', async () => {
   const stored = storedForm([field('text', { label: 'Name' })], {}, 'limited');
   await publish(stored);
-  const h = handler({ max: 2, minutes: 10 }, '198.51.100.1');
-  assert.equal((await post(h, stored.id, { name: 'a' })).body.ok, true);
+  const formHandler = handler({ max: 2, minutes: 10 }, '198.51.100.1');
+  assert.equal((await post(formHandler, stored.id, { name: 'a' })).body.ok, true);
   // Refused answers don't count towards the limit.
-  assert.equal((await post(h, stored.id, { name: 'x'.repeat(600) })).status, 422);
-  assert.equal((await post(h, stored.id, { name: 'b' })).body.ok, true);
-  const third = await post(h, stored.id, { name: 'c' });
+  assert.equal((await post(formHandler, stored.id, { name: 'x'.repeat(600) })).status, 422);
+  assert.equal((await post(formHandler, stored.id, { name: 'b' })).body.ok, true);
+  const third = await post(formHandler, stored.id, { name: 'c' });
   assert.deepEqual([third.status, !third.body.ok && third.body.reason], [429, 'rate-limited']);
   // Someone else still can.
   assert.equal(
@@ -384,9 +384,9 @@ test('the endpoint limits how often one sender can submit', async () => {
 test('only admins and editors read and delete submissions; a form with submissions can’t be deleted', async () => {
   const stored = storedForm([field('text', { label: 'Name' })], {}, 'access');
   await publish(stored);
-  const h = handler({ max: 10, minutes: 10 }, '192.0.2.9');
-  await post(h, stored.id, { name: 'one' });
-  await post(h, stored.id, { name: 'two' });
+  const formHandler = handler({ max: 10, minutes: 10 }, '192.0.2.9');
+  await post(formHandler, stored.id, { name: 'one' });
+  await post(formHandler, stored.id, { name: 'two' });
 
   assert.equal((await listSubmissions(staffEditor, { formId: stored.id })).length, 2);
   assert.deepEqual(await listSubmissions(staffViewer, { formId: stored.id }), []);
@@ -403,7 +403,7 @@ test('only admins and editors read and delete submissions; a form with submissio
         formId: stored.id,
         before: newest!.createdAt,
       })
-    ).map((s) => s.values[0]!.value),
+    ).map((submission) => submission.values[0]!.value),
     ['one'],
   );
 

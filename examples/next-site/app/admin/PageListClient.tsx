@@ -4,5 +4,5 @@ import { PageList } from '@lateraltranslucence/cera/admin';
 import type { PageSummary } from '@lateraltranslucence/cera/supabase';
 
 export function PageListClient({ pages }: { pages: PageSummary[] }) {
-  return <PageList pages={pages} editHref={(p) => `/admin/pages/${p.id}`} />;
+  return <PageList pages={pages} editHref={(page) => `/admin/pages/${page.id}`} />;
 }

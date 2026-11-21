@@ -8,7 +8,7 @@ export { formType, iconType, landingPage, simplePage };
 /**
  * Landing pages and simple pages have pages of their own, both at /[slug]
  * (one address scope). Forms show on them through the Form panel; icons
- * through f.icon() fields.
+ * through field.icon() fields.
  */
 export const contentTypes = [landingPage, simplePage, formType, iconType] as const;
 /** The types the site's /[slug] route serves. */

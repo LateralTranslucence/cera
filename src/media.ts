@@ -31,16 +31,16 @@ export function isMediaMimeType(type: string): type is MediaMimeType {
 }
 
 /** A file size for people: 512 B, 340 KB, 2.5 MB. */
-export function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
 }
 
 /** The `accept` attribute for a file input limited to `kinds`. */
 export function mediaAccept(kinds: readonly MediaKind[]): string {
   return Object.entries(MEDIA_TYPES)
-    .filter(([, t]) => kinds.includes(t.kind))
+    .filter(([, mediaType]) => kinds.includes(mediaType.kind))
     .map(([mime]) => mime)
     .join(',');
 }

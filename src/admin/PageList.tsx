@@ -28,11 +28,11 @@ export interface PageListProps {
 type Filter = 'all' | 'published' | 'drafts' | 'scheduled';
 type Sort = 'updated' | 'title';
 
-const FILTERS: Array<{ value: Filter; label: string; test: (p: PageSummary) => boolean }> = [
+const FILTERS: Array<{ value: Filter; label: string; test: (page: PageSummary) => boolean }> = [
   { value: 'all', label: 'All', test: () => true },
-  { value: 'published', label: 'Published', test: (p) => p.published },
-  { value: 'drafts', label: 'Drafts', test: (p) => !p.published },
-  { value: 'scheduled', label: 'Scheduled', test: (p) => Boolean(p.schedule) },
+  { value: 'published', label: 'Published', test: (page) => page.published },
+  { value: 'drafts', label: 'Drafts', test: (page) => !page.published },
+  { value: 'scheduled', label: 'Scheduled', test: (page) => Boolean(page.schedule) },
 ];
 
 const day = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
@@ -41,14 +41,14 @@ const dateTime = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeri
 
 /** "Just now", "5 min ago", "3 hr ago", "Yesterday", "Nov 12", "Nov 12, 2025". */
 export function formatWhen(iso: string, now = Date.now()): string {
-  const t = new Date(iso).getTime();
-  const minutes = Math.round((now - t) / 60_000);
+  const timestamp = new Date(iso).getTime();
+  const minutes = Math.round((now - timestamp) / 60_000);
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours} hr ago`;
   if (hours < 48) return 'Yesterday';
-  const date = new Date(t);
+  const date = new Date(timestamp);
   return date.getFullYear() === new Date(now).getFullYear() ? day.format(date) : dayYear.format(date);
 }
 
@@ -96,15 +96,15 @@ export function PageList({
   const [sort, setSort] = useState<Sort>('updated');
   const [page, setPage] = useState(0);
 
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.value, pages.filter(f.test).length])) as Record<Filter, number>, [pages]);
+  const counts = useMemo(() => Object.fromEntries(FILTERS.map((option) => [option.value, pages.filter(option.test).length])) as Record<Filter, number>, [pages]);
 
   const shown = useMemo(() => {
     const words = search.toLowerCase().split(/\s+/).filter(Boolean);
-    const test = FILTERS.find((f) => f.value === filter)!.test;
+    const test = FILTERS.find((option) => option.value === filter)!.test;
     return pages
       .filter(test)
-      .filter((p) => words.every((w) => `${p.title} ${p.slug}`.toLowerCase().includes(w)))
-      .sort((a, b) => (sort === 'title' ? (a.title || a.slug).localeCompare(b.title || b.slug) : b.updatedAt.localeCompare(a.updatedAt)));
+      .filter((summary) => words.every((word) => `${summary.title} ${summary.slug}`.toLowerCase().includes(word)))
+      .sort((first, second) => (sort === 'title' ? (first.title || first.slug).localeCompare(second.title || second.slug) : second.updatedAt.localeCompare(first.updatedAt)));
   }, [pages, search, filter, sort]);
 
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize));
@@ -120,22 +120,22 @@ export function PageList({
             Search {nounPlural}
           </label>
           <Icon name="search" />
-          <input id="cera-page-search" type="search" placeholder={slugs === 'path' ? 'Search by title or address' : 'Search by name or ID'} value={search} onChange={(e) => (setSearch(e.target.value), reset())} />
+          <input id="cera-page-search" type="search" placeholder={slugs === 'path' ? 'Search by title or address' : 'Search by name or ID'} value={search} onChange={(event) => (setSearch(event.target.value), reset())} />
         </div>
         <div className="cera-segmented" role="group" aria-label="Status">
-          {FILTERS.map((f) => (
-            <button key={f.value} type="button" aria-pressed={filter === f.value} onClick={() => (setFilter(f.value), reset())}>
-              {f.label} · {counts[f.value]}
+          {FILTERS.map((option) => (
+            <button key={option.value} type="button" aria-pressed={filter === option.value} onClick={() => (setFilter(option.value), reset())}>
+              {option.label} · {counts[option.value]}
             </button>
           ))}
         </div>
         {/* The same filter as a select, shown instead of the buttons on narrow screens (admin.css). */}
         <label className="cera-sort cera-list-toolbar__status">
           <span className="cera-visually-hidden">Status</span>
-          <select value={filter} onChange={(e) => (setFilter(e.target.value as Filter), reset())}>
-            {FILTERS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label} · {counts[f.value]}
+          <select value={filter} onChange={(event) => (setFilter(event.target.value as Filter), reset())}>
+            {FILTERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label} · {counts[option.value]}
               </option>
             ))}
           </select>
@@ -143,7 +143,7 @@ export function PageList({
         </label>
         <label className="cera-sort">
           <span className="cera-visually-hidden">Sort by</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+          <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
             <option value="updated">Sort: Last updated</option>
             <option value="title">Sort: Title</option>
           </select>
@@ -173,23 +173,23 @@ export function PageList({
                 </td>
               </tr>
             ) : (
-              rows.map((p) => (
-                <tr key={p.id}>
+              rows.map((summary) => (
+                <tr key={summary.id}>
                   <td>
-                    <a className="cera-table__title" href={editHref(p)}>
-                      {p.title || 'Untitled'}
+                    <a className="cera-table__title" href={editHref(summary)}>
+                      {summary.title || 'Untitled'}
                     </a>
-                    <span className="cera-table__slug">{slugs === 'id' ? p.slug : p.slug === 'home' ? '/' : `/${p.slug}`}</span>
+                    <span className="cera-table__slug">{slugs === 'id' ? summary.slug : summary.slug === 'home' ? '/' : `/${summary.slug}`}</span>
                   </td>
                   <td>
-                    <PageStatus page={p} />
+                    <PageStatus page={summary} />
                   </td>
-                  {countLabel !== null && <td className="cera-table__muted">{p.panelCount}</td>}
-                  {extra && <td className="cera-table__muted">{extra.render(p)}</td>}
-                  <td className="cera-table__muted">{p.updatedBy ?? '—'}</td>
+                  {countLabel !== null && <td className="cera-table__muted">{summary.panelCount}</td>}
+                  {extra && <td className="cera-table__muted">{extra.render(summary)}</td>}
+                  <td className="cera-table__muted">{summary.updatedBy ?? '—'}</td>
                   <td className="cera-table__muted is-end">
-                    <time dateTime={p.updatedAt} title={dateTime.format(new Date(p.updatedAt))} suppressHydrationWarning>
-                      {formatWhen(p.updatedAt)}
+                    <time dateTime={summary.updatedAt} title={dateTime.format(new Date(summary.updatedAt))} suppressHydrationWarning>
+                      {formatWhen(summary.updatedAt)}
                     </time>
                   </td>
                 </tr>

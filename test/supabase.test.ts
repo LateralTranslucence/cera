@@ -26,10 +26,10 @@ before(async () => {
 });
 
 function newPage(slug: string): StoredPage {
-  const p = structuredClone(sample) as unknown as StoredPage;
-  p.id = crypto.randomUUID();
-  p.slug = slug;
-  return p;
+  const page = structuredClone(sample) as unknown as StoredPage;
+  page.id = crypto.randomUUID();
+  page.slug = slug;
+  return page;
 }
 
 test('publish, then read the live page as an anonymous visitor', async () => {
@@ -62,7 +62,7 @@ test('editing round trip: unknown panels and keys survive, the live page waits f
   const editing = await getPageForEditing(staff, landingPage, draft.id);
   assert.ok(editing);
   assert.equal(editing.published, true);
-  assert.equal(editing.page.panels.find((p) => p.id === 'p_new')?.type, 'carousel');
+  assert.equal(editing.page.panels.find((panel) => panel.id === 'p_new')?.type, 'carousel');
   assert.equal(editing.page.panels[0]!.data.legacy, 'keep me');
 
   // The editor changes the title and saves a draft.
@@ -72,7 +72,7 @@ test('editing round trip: unknown panels and keys survive, the live page waits f
 
   const reloaded = await getPageForEditing(staff, landingPage, draft.id);
   assert.equal(reloaded!.page.title, 'Services (new)');
-  assert.deepEqual(reloaded!.page.panels.find((p) => p.id === 'p_new')?.data, { slides: ['a'] });
+  assert.deepEqual(reloaded!.page.panels.find((panel) => panel.id === 'p_new')?.data, { slides: ['a'] });
   assert.equal(reloaded!.page.panels[0]!.data.legacy, 'keep me');
 
   // Visitors still see the published title; preview shows the draft.
@@ -81,11 +81,11 @@ test('editing round trip: unknown panels and keys survive, the live page waits f
 });
 
 test('expected failures come back as reasons, not exceptions', async () => {
-  const p = newPage('contact');
-  const created = await savePage(server, landingPage, p, { mode: 'draft', expectedVersion: 0, userId: editor });
+  const page = newPage('contact');
+  const created = await savePage(server, landingPage, page, { mode: 'draft', expectedVersion: 0, userId: editor });
   assert.equal(created.ok, true);
 
-  const stale = await savePage(server, landingPage, p, { mode: 'draft', expectedVersion: 5, userId: editor });
+  const stale = await savePage(server, landingPage, page, { mode: 'draft', expectedVersion: 5, userId: editor });
   assert.equal(stale.ok === false && stale.reason, 'conflict');
 
   const forbidden = await savePage(server, landingPage, newPage('viewer-page'), { mode: 'draft', expectedVersion: 0, userId: viewer });
@@ -102,9 +102,9 @@ test('expected failures come back as reasons, not exceptions', async () => {
 });
 
 test('unpublish removes the live page', async () => {
-  const p = newPage('temporary');
-  await savePage(server, landingPage, p, { mode: 'publish', expectedVersion: 0, userId: editor });
-  await unpublishPage(server, p.id, editor);
+  const page = newPage('temporary');
+  await savePage(server, landingPage, page, { mode: 'publish', expectedVersion: 0, userId: editor });
+  await unpublishPage(server, page.id, editor);
   assert.equal(await getPublishedPage(anon, landingPage, 'temporary'), null);
 });
 
@@ -117,9 +117,9 @@ test('listPages shows staff every working copy with its live status; visitors ar
   await savePage(server, landingPage, draft, { mode: 'draft', expectedVersion: 0, userId: editor });
 
   const pages = await listPages(staff, { contentType: 'landing_page' });
-  const mine = pages.filter((p) => p.slug.startsWith('list-'));
+  const mine = pages.filter((page) => page.slug.startsWith('list-'));
   assert.deepEqual(
-    mine.map((p) => [p.title, p.published, p.version]),
+    mine.map((page) => [page.title, page.published, page.version]),
     [
       ['AAA live', true, 1],
       ['AAB draft', false, 1],
@@ -136,7 +136,7 @@ test('page resolver: the live site sees only published, visible pages; preview s
   const draftOnly = newPage('resolver-draft-only');
   const hidden = newPage('resolver-hidden');
   hidden.boxes.admin = { hidden: true };
-  for (const p of [live, hidden]) await savePage(server, landingPage, p, { mode: 'publish', expectedVersion: 0, userId: editor });
+  for (const page of [live, hidden]) await savePage(server, landingPage, page, { mode: 'publish', expectedVersion: 0, userId: editor });
   await savePage(server, landingPage, draftOnly, { mode: 'draft', expectedVersion: 0, userId: editor });
   // An unpublished change to the live page.
   await savePage(server, landingPage, { ...live, title: 'Draft title' }, { mode: 'draft', expectedVersion: 1, userId: editor });
@@ -158,7 +158,7 @@ test('page resolver: the live site sees only published, visible pages; preview s
   ]);
 
   const preview = await createPageResolver(staff, [landingPage], { draft: true }).byIds(ids);
-  assert.deepEqual(preview.map((p) => p.title), [hidden.title, draftOnly.title, 'Draft title']); // in the order asked
+  assert.deepEqual(preview.map((page) => page.title), [hidden.title, draftOnly.title, 'Draft title']); // in the order asked
 
   assert.deepEqual(await createPageResolver(anon, [], { draft: false }).byIds([live.id]), []); // unknown content type
   assert.deepEqual(await createPageResolver(anon, [landingPage], { draft: false }).byIds([]), []);

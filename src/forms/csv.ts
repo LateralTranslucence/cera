@@ -18,11 +18,11 @@ interface Row {
  */
 export function submissionsCsv(rows: readonly Row[]): string {
   const columns = new Map<string, string>();
-  for (const r of rows) for (const v of r.values) if (!columns.has(v.name)) columns.set(v.name, v.label);
+  for (const row of rows) for (const answer of row.values) if (!columns.has(answer.name)) columns.set(answer.name, answer.label);
   const header = ['Sent', 'Form', 'Contact email', 'Page', ...columns.values()];
-  const lines = [header, ...rows.map((r) => {
-    const byName = new Map(r.values.map((v) => [v.name, Array.isArray(v.value) ? v.value.join('; ') : v.value]));
-    return [r.createdAt, r.formTitle ?? '', r.email ?? '', r.pagePath ?? '', ...[...columns.keys()].map((k) => byName.get(k) ?? '')];
+  const lines = [header, ...rows.map((row) => {
+    const byName = new Map(row.values.map((answer) => [answer.name, Array.isArray(answer.value) ? answer.value.join('; ') : answer.value]));
+    return [row.createdAt, row.formTitle ?? '', row.email ?? '', row.pagePath ?? '', ...[...columns.keys()].map((name) => byName.get(name) ?? '')];
   })];
   return lines.map((cells) => cells.map(cell).join(',')).join('\r\n') + '\r\n';
 }

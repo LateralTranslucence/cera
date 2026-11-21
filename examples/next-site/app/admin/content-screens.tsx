@@ -23,7 +23,7 @@ export async function ListScreen({ ct, group, deleted }: { ct: AnyContentType; g
   // Icons show themselves: the cleaned SVG of each working copy.
   const previews =
     ct.name === iconType.name
-      ? Object.fromEntries((await supabaseIcons(staff.client, { draft: true }).get(pages.map((p) => p.id))).map((g) => [g.value.slice('custom:'.length), g.svg]))
+      ? Object.fromEntries((await supabaseIcons(staff.client, { draft: true }).get(pages.map((page) => page.id))).map((glyph) => [glyph.value.slice('custom:'.length), glyph.svg]))
       : undefined;
 
   return (

@@ -22,15 +22,15 @@ function parse(html: string): DocumentFragment {
   return template.content;
 }
 
-const isElement = (n: Node): n is Element => n.nodeType === 1;
-const isText = (n: Node) => n.nodeType === 3;
+const isElement = (node: Node): node is Element => node.nodeType === 1;
+const isText = (node: Node) => node.nodeType === 3;
 const tagOf = (el: Element) => el.tagName.toLowerCase();
-const isInline = (n: Node) => isText(n) || (isElement(n) && (MARKS.has(tagOf(n)) || INLINE_ATOMS.has(tagOf(n))));
-const isBlank = (n: Node) => isText(n) && !/\S/.test(n.nodeValue ?? '');
+const isInline = (node: Node) => isText(node) || (isElement(node) && (MARKS.has(tagOf(node)) || INLINE_ATOMS.has(tagOf(node))));
+const isBlank = (node: Node) => isText(node) && !/\S/.test(node.nodeValue ?? '');
 
 function attrKey(el: Element): string {
   return [...el.attributes]
-    .map((a) => `${a.name}=${a.value.trim()}`)
+    .map((attribute) => `${attribute.name}=${attribute.value.trim()}`)
     .sort()
     .join(' ');
 }
@@ -47,7 +47,7 @@ function attrKey(el: Element): string {
 export function tidyEditorHtml(html: string): string {
   const root = parse(html);
   for (const el of root.querySelectorAll([...UNWRAP].join(','))) {
-    const kids = [...el.childNodes].filter((n) => !isBlank(n));
+    const kids = [...el.childNodes].filter((node) => !isBlank(node));
     const only = kids[0];
     if (kids.length === 1 && only && isElement(only) && tagOf(only) === 'p' && only.attributes.length === 0) {
       only.replaceWith(...only.childNodes);
@@ -96,7 +96,7 @@ function normalizeInline(items: Inline[]): Inline[] {
   if (first && 'text' in first) first.text = first.text.trimStart();
   const last = merged[merged.length - 1];
   if (last && 'text' in last) last.text = last.text.trimEnd();
-  const out = merged.filter((i) => !('text' in i) || i.text !== '');
+  const out = merged.filter((item) => !('text' in item) || item.text !== '');
   const end = out[out.length - 1];
   if (end && 'atom' in end && end.atom.startsWith('br ')) out.pop();
   return out;
@@ -130,7 +130,7 @@ function blocksOf(nodes: Iterable<Node>): Block[] {
 function blockOf(el: Element): Block {
   const tag = tagOf(el);
   const attrs = attrKey(el);
-  const hasBlocks = [...el.childNodes].some((n) => isElement(n) && !isInline(n));
+  const hasBlocks = [...el.childNodes].some((child) => isElement(child) && !isInline(child));
   if (!hasBlocks) return { tag, attrs, inline: normalizeInline(inlineOf(el.childNodes)) };
   const blocks = blocksOf(el.childNodes);
   const only = blocks[0];
@@ -144,6 +144,6 @@ export function contentKey(html: string): string {
 }
 
 /** Whether two pieces of HTML show the same content (same text, formatting, links and attributes). */
-export function sameContent(a: string, b: string): boolean {
-  return contentKey(a) === contentKey(b);
+export function sameContent(first: string, second: string): boolean {
+  return contentKey(first) === contentKey(second);
 }

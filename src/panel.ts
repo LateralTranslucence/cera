@@ -54,7 +54,7 @@ export interface LoadContext {
   pages: PageResolver;
   /** Needed by Form panels. */
   forms?: FormResolver;
-  /** Needed by panels with icons (`f.icon()` fields), e.g. Blocks. Without it, icons aren't drawn. */
+  /** Needed by panels with icons (`field.icon()` fields), e.g. Blocks. Without it, icons aren't drawn. */
   icons?: IconResolver;
   /** True in draft-mode preview: linked pages resolve to their working copies. */
   draft: boolean;
@@ -63,37 +63,37 @@ export interface LoadContext {
 }
 
 /** Runs on the server before the panel renders; its result arrives as the component's `loaded` prop. */
-export type PanelLoad<D, L> = (data: D, ctx: LoadContext) => L | Promise<L>;
+export type PanelLoad<Data, Loaded> = (data: Data, ctx: LoadContext) => Loaded | Promise<Loaded>;
 
 /* ------------------------------------------------------------------ */
 /* Props                                                               */
 /* ------------------------------------------------------------------ */
 
 /** `loaded` is only part of the props for panels that define `load`. */
-export type PanelComponentProps<D, L = undefined> = { data: D; panel: PanelContext } & ([L] extends [undefined] ? {} : { loaded: L });
+export type PanelComponentProps<Data, Loaded = undefined> = { data: Data; panel: PanelContext } & ([Loaded] extends [undefined] ? {} : { loaded: Loaded });
 
 /**
- * Props for a component rendering a panel built from field map `M`, with
- * `L` the result of its `load` (if any):
+ * Props for a component rendering a panel built from field map `Fields`, with
+ * `Loaded` the result of its `load` (if any):
  *   PanelPropsOf<typeof featuredPostFields, FeaturedPostLoaded>
  */
-export type PanelPropsOf<M extends FieldMap, L = undefined> = PanelComponentProps<InferFields<M>, L>;
+export type PanelPropsOf<Fields extends FieldMap, Loaded = undefined> = PanelComponentProps<InferFields<Fields>, Loaded>;
 
-export type ComponentLoader<P> = () => Promise<{ default: ComponentType<P> }>;
+export type ComponentLoader<Props> = () => Promise<{ default: ComponentType<Props> }>;
 
 /** Upgrades stored data from version `n` to `n + 1`. */
 export type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
 
-export interface PanelDefinition<T extends string = string, M extends FieldMap = FieldMap, L = undefined> {
-  readonly type: T;
+export interface PanelDefinition<TypeName extends string = string, Fields extends FieldMap = FieldMap, Loaded = undefined> {
+  readonly type: TypeName;
   readonly label: string;
   readonly description?: string;
   /** Bump when `fields` change shape; add a migration for the previous version. */
   readonly version: number;
-  readonly fields: M;
-  readonly schema: z.ZodType<InferFields<M>>;
-  readonly load?: PanelLoad<InferFields<M>, L>;
-  readonly component: ComponentLoader<PanelPropsOf<M, L>>;
+  readonly fields: Fields;
+  readonly schema: z.ZodType<InferFields<Fields>>;
+  readonly load?: PanelLoad<InferFields<Fields>, Loaded>;
+  readonly component: ComponentLoader<PanelPropsOf<Fields, Loaded>>;
   readonly migrations: Readonly<Record<number, Migration>>;
 }
 
@@ -102,12 +102,12 @@ export type AnyPanel = PanelDefinition<string, any, any>;
 
 /** Stored data for a panel definition. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type PanelData<P> = P extends PanelDefinition<string, infer M, any> ? InferFields<M> : never;
+export type PanelData<Definition> = Definition extends PanelDefinition<string, infer Fields, any> ? InferFields<Fields> : never;
 
 /** One panel as stored in `pages.panels` (JSONB array). Distributes over unions → discriminated by `type`. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type PanelInstance<P> = P extends PanelDefinition<infer T, infer M, any>
-  ? { id: string; type: T; v: number; hidden: boolean; data: InferFields<M> }
+export type PanelInstance<Definition> = Definition extends PanelDefinition<infer TypeName, infer Fields, any>
+  ? { id: string; type: TypeName; v: number; hidden: boolean; data: InferFields<Fields> }
   : never;
 
 export type PanelUnion<Ps extends readonly AnyPanel[]> = PanelInstance<Ps[number]>;

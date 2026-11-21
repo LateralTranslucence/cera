@@ -7,7 +7,7 @@ import type { LoadContext } from '../panel.ts';
 import type { blocksFields } from './blocks.fields.ts';
 
 export async function loadBlocks(data: InferFields<typeof blocksFields>, ctx: LoadContext) {
-  const values = data.blocks.filter((b) => !b.hidden && b.icon).map((b) => b.icon!);
+  const values = data.blocks.filter((block) => !block.hidden && block.icon).map((block) => block.icon!);
   const found = values.length > 0 && ctx.icons ? await ctx.icons.byValues(values) : new Map<string, IconGlyph>();
   return { icons: Object.fromEntries(found) as Record<string, IconGlyph> };
 }

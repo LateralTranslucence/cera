@@ -87,8 +87,8 @@ export async function prepareMediaUpload(service: SupabaseClient, request: Media
   return { ok: true, path: data!.path, signedUrl: data!.signedUrl, token: data!.token };
 }
 
-const dimension = (v: unknown): number | undefined =>
-  typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= MAX_DIMENSION ? v : undefined;
+const dimension = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_DIMENSION ? value : undefined;
 
 /** Step 3. `service` must use the secret key; `userId` must come from a verified session. */
 export async function finishMediaUpload(
@@ -138,11 +138,11 @@ const ROW_COLUMNS = 'id, path, kind, mime_type, alt, width, height, size_bytes, 
 /** The media library, newest first. Any client can read it (the files are public). */
 export async function listMedia(client: SupabaseClient, query: MediaQuery = {}): Promise<MediaItem[]> {
   const limit = Math.min(Math.max(Math.trunc(query.limit ?? 60), 1), 200);
-  let q = client.from('cera_media').select(ROW_COLUMNS);
-  if (query.kinds?.length) q = q.in('kind', query.kinds);
+  let request = client.from('cera_media').select(ROW_COLUMNS);
+  if (query.kinds?.length) request = request.in('kind', query.kinds);
   const search = (query.search ?? '').trim().toLowerCase();
-  if (search) q = q.ilike('search', `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(limit);
+  if (search) request = request.ilike('search', `%${search.replace(/[\\%_]/g, (character) => `\\${character}`)}%`);
+  const { data, error } = await request.order('created_at', { ascending: false }).limit(limit);
   if (error) fail(error);
   return (data ?? []).map((row) => toItem(row as Record<string, unknown>));
 }
@@ -175,13 +175,13 @@ export async function mediaUsage(client: SupabaseClient, path: string): Promise<
   if (!PATH.test(path)) return [];
   const { data, error } = await client.rpc('cera_media_usage', { p_path: path });
   if (error) fail(error);
-  return ((data as Array<Record<string, unknown>> | null) ?? []).map((u) => ({
-    id: String(u.id),
-    title: String(u.title ?? ''),
-    slug: String(u.slug ?? ''),
-    contentType: String(u.contentType ?? ''),
-    draft: u.draft === true,
-    live: u.live === true,
+  return ((data as Array<Record<string, unknown>> | null) ?? []).map((usage) => ({
+    id: String(usage.id),
+    title: String(usage.title ?? ''),
+    slug: String(usage.slug ?? ''),
+    contentType: String(usage.contentType ?? ''),
+    draft: usage.draft === true,
+    live: usage.live === true,
   }));
 }
 
@@ -214,8 +214,8 @@ export async function deleteMedia(service: SupabaseClient, id: string, opts: { u
 }
 
 function toItem(row: Record<string, unknown>): MediaItem {
-  const str = (v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined);
-  const num = (v: unknown) => (v === null || v === undefined || v === '' ? undefined : Number(v));
+  const str = (value: unknown) => (typeof value === 'string' && value !== '' ? value : undefined);
+  const num = (value: unknown) => (value === null || value === undefined || value === '' ? undefined : Number(value));
   return {
     id: String(row.id),
     path: String(row.path),

@@ -89,12 +89,12 @@ const TYPES: Record<string, FormFieldType> = {
   'cera/field-hidden': 'hidden',
 };
 
-const clean = (s: unknown) => (typeof s === 'string' ? s.trim() : '');
+const clean = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
 /** Only paths on this site: "/thank-you", not "//evil.example" or "https://…". */
 export function internalPath(url: string | undefined): string | undefined {
-  const u = clean(url);
-  return /^\/(?!\/)/.test(u) && !/[\s\\]/.test(u) ? u : undefined;
+  const path = clean(url);
+  return /^\/(?!\/)/.test(path) && !/[\s\\]/.test(path) ? path : undefined;
 }
 
 /**
@@ -105,23 +105,23 @@ export function publicForm(page: PageOf<FormType>, version: number): PublicForm 
   const items: FormItem[] = [];
   let section: FormSection | null = null;
   const used = new Set<string>();
-  let n = 0;
+  let fieldNumber = 0;
 
   for (const panel of page.panels) {
     if (panel.hidden) continue;
-    const d = panel.data as Record<string, unknown>;
+    const data = panel.data as Record<string, unknown>;
     if (panel.type === 'cera/field-section') {
-      const legend = clean(d.legend);
-      section = legend ? { type: 'section', legend, ...(clean(d.note) && { note: clean(d.note) }), fields: [] } : null;
+      const legend = clean(data.legend);
+      section = legend ? { type: 'section', legend, ...(clean(data.note) && { note: clean(data.note) }), fields: [] } : null;
       if (section) items.push(section);
       continue;
     }
     const type = TYPES[panel.type];
     if (!type) continue;
-    n++;
+    fieldNumber++;
 
-    const label = clean(d.label) || `Field ${n}`;
-    const base = slugForId(clean(d.name) || label) || `field-${n}`;
+    const label = clean(data.label) || `Field ${fieldNumber}`;
+    const base = slugForId(clean(data.name) || label) || `field-${fieldNumber}`;
     let name = base;
     for (let i = 2; RESERVED.has(name) || used.has(name); i++) name = `${base}-${i}`;
     used.add(name);
@@ -130,36 +130,36 @@ export function publicForm(page: PageOf<FormType>, version: number): PublicForm 
       type,
       name,
       label,
-      required: type !== 'hidden' && type !== 'range' && d.required === true,
-      hideLabel: d.hideLabel === true,
-      ...(clean(d.note) && { note: clean(d.note) }),
+      required: type !== 'hidden' && type !== 'range' && data.required === true,
+      hideLabel: data.hideLabel === true,
+      ...(clean(data.note) && { note: clean(data.note) }),
     };
-    if (type === 'text' && typeof d.autocomplete === 'string' && d.autocomplete !== 'none') field.autocomplete = d.autocomplete;
-    if (Array.isArray(d.options)) {
+    if (type === 'text' && typeof data.autocomplete === 'string' && data.autocomplete !== 'none') field.autocomplete = data.autocomplete;
+    if (Array.isArray(data.options)) {
       const seen = new Set<string>();
       field.options = [];
-      for (const o of d.options as Array<Record<string, unknown>>) {
-        const optLabel = clean(o.label);
-        const value = clean(o.value) || optLabel;
+      for (const option of data.options as Array<Record<string, unknown>>) {
+        const optLabel = clean(option.label);
+        const value = clean(option.value) || optLabel;
         if (!value || seen.has(value)) continue;
         seen.add(value);
-        field.options.push({ label: optLabel || value, value, ...(clean(o.description) && { description: clean(o.description) }) });
+        field.options.push({ label: optLabel || value, value, ...(clean(option.description) && { description: clean(option.description) }) });
       }
     }
     if (type === 'range') {
-      const int = (v: unknown, dflt: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-1e9, Math.min(1e9, Math.round(v))) : dflt);
-      const min = int(d.min, 0);
+      const int = (input: unknown, dflt: number) => (typeof input === 'number' && Number.isFinite(input) ? Math.max(-1e9, Math.min(1e9, Math.round(input))) : dflt);
+      const min = int(data.min, 0);
       field.min = min;
-      field.max = Math.max(min, int(d.max, 100));
-      field.step = Math.max(1, int(d.step, 1));
+      field.max = Math.max(min, int(data.max, 100));
+      field.step = Math.max(1, int(data.step, 1));
     }
     if (type === 'toggle') {
-      field.offLabel = clean(d.offLabel) || 'No';
-      field.onLabel = clean(d.onLabel) || 'Yes';
+      field.offLabel = clean(data.offLabel) || 'No';
+      field.onLabel = clean(data.onLabel) || 'Yes';
     }
     if (type === 'hidden') {
-      if (clean(d.value)) field.value = clean(d.value);
-      if (clean(d.fromQuery)) field.fromQuery = clean(d.fromQuery);
+      if (clean(data.value)) field.value = clean(data.value);
+      if (clean(data.fromQuery)) field.fromQuery = clean(data.fromQuery);
     }
 
     if (section) section.fields.push(field);
@@ -183,7 +183,7 @@ export function publicForm(page: PageOf<FormType>, version: number): PublicForm 
 
 /** Every field, sections flattened. */
 export function formFieldList(form: Pick<PublicForm, 'items'>): FormField[] {
-  return form.items.flatMap((i) => (i.type === 'section' ? i.fields : [i]));
+  return form.items.flatMap((item) => (item.type === 'section' ? item.fields : [item]));
 }
 
 /** One answer as stored: in form order, with the label it had when sent. */
@@ -202,9 +202,9 @@ const PHONE = /^[0-9+().\-\s]*[0-9][0-9+().\-\s]*$/;
 
 /** Plain text: no control characters (tabs and, in a text area, line breaks are kept). */
 function plain(value: string, multiline: boolean): string {
-  const v = value.replace(/\r\n?/g, '\n');
+  const normalized = value.replace(/\r\n?/g, '\n');
   // eslint-disable-next-line no-control-regex
-  return (multiline ? v.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '') : v.replace(/[\u0000-\u0008\u000A-\u001F\u007F]/g, ' ')).trim();
+  return (multiline ? normalized.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '') : normalized.replace(/[\u0000-\u0008\u000A-\u001F\u007F]/g, ' ')).trim();
 }
 
 /**
@@ -218,7 +218,7 @@ export function checkSubmission(form: Pick<PublicForm, 'items'>, get: (name: str
   let email: string | undefined;
 
   for (const field of formFieldList(form)) {
-    const sent = get(field.name).filter((v) => typeof v === 'string');
+    const sent = get(field.name).filter((entry) => typeof entry === 'string');
     const first = plain(sent[0] ?? '', field.type === 'textarea');
     const max = MAX_LENGTH[field.type];
     const fail = (message: string) => {
@@ -249,14 +249,14 @@ export function checkSubmission(form: Pick<PublicForm, 'items'>, get: (name: str
       case 'button-select':
         if (!first) {
           if (field.required) missing();
-        } else if (!field.options?.some((o) => o.value === first)) fail('Choose one of the options.');
+        } else if (!field.options?.some((option) => option.value === first)) fail('Choose one of the options.');
         break;
       case 'checkbox': {
-        const picked = [...new Set(sent.map((v) => v.trim()).filter(Boolean))];
-        if (picked.some((v) => !field.options?.some((o) => o.value === v))) fail('Choose from the options.');
+        const picked = [...new Set(sent.map((entry) => entry.trim()).filter(Boolean))];
+        if (picked.some((pickedValue) => !field.options?.some((option) => option.value === pickedValue))) fail('Choose from the options.');
         else if (field.required && picked.length === 0) missing();
         // Stored in the options' order.
-        value = (field.options ?? []).map((o) => o.value).filter((v) => picked.includes(v));
+        value = (field.options ?? []).map((option) => option.value).filter((optionValue) => picked.includes(optionValue));
         break;
       }
       case 'binary':
@@ -271,11 +271,11 @@ export function checkSubmission(form: Pick<PublicForm, 'items'>, get: (name: str
         value = first ? field.onLabel! : field.offLabel!;
         break;
       case 'range': {
-        const n = Number(first);
+        const chosen = Number(first);
         const min = field.min ?? 0;
         const max = field.max ?? 100;
         const step = field.step ?? 1;
-        if (!/^-?\d+$/.test(first) || n < min || n > max || (n - min) % step !== 0) fail(`Choose a number from ${min} to ${max}.`);
+        if (!/^-?\d+$/.test(first) || chosen < min || chosen > max || (chosen - min) % step !== 0) fail(`Choose a number from ${min} to ${max}.`);
         break;
       }
     }

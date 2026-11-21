@@ -28,75 +28,75 @@ export function TabsClient({ items, baseId }: { items: TabItem[]; baseId: string
   useEffect(() => {
     const fromHash = () => {
       const hash = decodeURIComponent(window.location.hash.slice(1));
-      const i = hash ? items.findIndex((t) => t.id === hash) : -1;
-      if (i > -1) setActive(i);
+      const index = hash ? items.findIndex((tab) => tab.id === hash) : -1;
+      if (index > -1) setActive(index);
     };
     fromHash();
     window.addEventListener('hashchange', fromHash);
     return () => window.removeEventListener('hashchange', fromHash);
   }, [items]);
 
-  const select = (i: number, focus: boolean) => {
-    const next = (i + items.length) % items.length;
+  const select = (index: number, focus: boolean) => {
+    const next = (index + items.length) % items.length;
     setActive(next);
     if (focus) tabRefs.current[next]?.focus();
   };
 
-  const onKeyDown = (e: KeyboardEvent, i: number) => {
+  const onKeyDown = (event: KeyboardEvent, i: number) => {
     const moves: Record<string, number> = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 };
-    if (e.key in moves) {
-      e.preventDefault();
-      select(moves[e.key]!, true);
+    if (event.key in moves) {
+      event.preventDefault();
+      select(moves[event.key]!, true);
     }
   };
 
   return (
     <div className="tabs">
       <div role="tablist" className="tabs__nav" aria-orientation="horizontal">
-        {items.map((t, i) => (
+        {items.map((tab, i) => (
           <button
-            key={t.id}
+            key={tab.id}
             ref={(el) => {
               tabRefs.current[i] = el;
             }}
             type="button"
             role="tab"
-            id={`${baseId}-tab-${t.id}`}
+            id={`${baseId}-tab-${tab.id}`}
             aria-selected={i === active}
-            aria-controls={`${baseId}-panel-${t.id}`}
+            aria-controls={`${baseId}-panel-${tab.id}`}
             tabIndex={i === active ? 0 : -1}
             className="tabs__tab"
             onClick={() => select(i, false)}
-            onKeyDown={(e) => onKeyDown(e, i)}
+            onKeyDown={(event) => onKeyDown(event, i)}
           >
-            {t.navLabel}
+            {tab.navLabel}
           </button>
         ))}
       </div>
-      {items.map((t, i) => (
+      {items.map((tab, i) => (
         <div
-          key={t.id}
-          id={`${baseId}-panel-${t.id}`}
+          key={tab.id}
+          id={`${baseId}-panel-${tab.id}`}
           role="tabpanel"
-          aria-labelledby={`${baseId}-tab-${t.id}`}
+          aria-labelledby={`${baseId}-tab-${tab.id}`}
           tabIndex={0}
           hidden={i !== active}
           className="tabs__panel"
         >
           {/* The in-page link target. */}
-          <span id={t.id} className="tabs__anchor" />
-          {t.media &&
-            (t.media.kind === 'video' ? (
-              <video className="tabs__media" src={t.media.src} controls playsInline preload="metadata" />
+          <span id={tab.id} className="tabs__anchor" />
+          {tab.media &&
+            (tab.media.kind === 'video' ? (
+              <video className="tabs__media" src={tab.media.src} controls playsInline preload="metadata" />
             ) : (
-              <img className="tabs__media" src={t.media.src} alt={t.media.alt} width={t.media.width} height={t.media.height} loading="lazy" />
+              <img className="tabs__media" src={tab.media.src} alt={tab.media.alt} width={tab.media.width} height={tab.media.height} loading="lazy" />
             ))}
           <div className="tabs__text">
-            {t.title && <h3>{t.title}</h3>}
-            {t.copy && <Html html={t.copy} />}
-            {t.cta && (
+            {tab.title && <h3>{tab.title}</h3>}
+            {tab.copy && <Html html={tab.copy} />}
+            {tab.cta && (
               <p className="ctas">
-                <CtaLink cta={t.cta} />
+                <CtaLink cta={tab.cta} />
               </p>
             )}
           </div>

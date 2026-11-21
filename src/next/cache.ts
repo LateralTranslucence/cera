@@ -27,7 +27,7 @@ export const CERA_PAGES_TAG = 'cera:pages';
 export const DEFAULT_REVALIDATE_SECONDS = 300;
 
 /** Wraps a live (published-only) read in Next's data cache. Its arguments become part of the cache key. */
-export function cacheLive<A extends unknown[], R>(name: string, read: (...args: A) => Promise<R>, opts: { revalidate?: number } = {}): (...args: A) => Promise<R> {
+export function cacheLive<Args extends unknown[], Result>(name: string, read: (...args: Args) => Promise<Result>, opts: { revalidate?: number } = {}): (...args: Args) => Promise<Result> {
   return unstable_cache(read, ['cera', name], { tags: [CERA_PAGES_TAG], revalidate: opts.revalidate ?? DEFAULT_REVALIDATE_SECONDS });
 }
 

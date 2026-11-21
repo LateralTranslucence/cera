@@ -7,8 +7,8 @@ import type { featuredPost } from '../src/panels/featured-post.ts';
 import type { decisionTree } from '../src/panels/decision-tree.ts';
 import type { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
-type Expect<T extends true> = T;
+type Equal<Actual, Expected> = (<Probe>() => Probe extends Actual ? 1 : 2) extends <Probe>() => Probe extends Expected ? 1 : 2 ? true : false;
+type Expect<Condition extends true> = Condition;
 
 type Blocks = PanelData<typeof blocks>;
 type Featured = PanelData<typeof featuredPost>;
@@ -16,7 +16,7 @@ type DecisionTree = PanelData<typeof decisionTree>;
 type Page = PageOf<typeof landingPage>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type LoadedOf<P> = P extends PanelDefinition<any, any, infer L> ? L : never;
+type LoadedOf<Definition> = Definition extends PanelDefinition<any, any, infer Loaded> ? Loaded : never;
 
 export type _tests = [
   // optional text
@@ -67,16 +67,16 @@ export type _tests = [
 ];
 
 // Narrowing on `type` gives the right data shape.
-export function narrow(p: Page['panels'][number]) {
-  if (p.type === 'cera/blocks') {
-    const n: number = p.data.perRow;
-    return n;
+export function narrow(panel: Page['panels'][number]) {
+  if (panel.type === 'cera/blocks') {
+    const perRow: number = panel.data.perRow;
+    return perRow;
   }
-  if (p.type === 'cera/text-media') {
-    const a: 'left' | 'right' | 'alternate' = p.data.alignment;
-    return a;
+  if (panel.type === 'cera/text-media') {
+    const alignment: 'left' | 'right' | 'alternate' = panel.data.alignment;
+    return alignment;
   }
-  if (p.type === 'cera/featured-post') return p.data.linkTarget;
+  if (panel.type === 'cera/featured-post') return panel.data.linkTarget;
   return null;
 }
 

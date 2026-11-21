@@ -159,7 +159,7 @@ export function Icon({ name, size = 18, strokeWidth = 1.75 }: { name: IconName; 
 export function GripIcon() {
   return (
     <svg className="cera-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-      {[6, 12, 18].map((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" />))}
+      {[6, 12, 18].map((centerY) => [9, 15].map((centerX) => <circle key={`${centerX}-${centerY}`} cx={centerX} cy={centerY} r="1.6" />))}
     </svg>
   );
 }
@@ -178,8 +178,8 @@ export function CeraSeal({ size = 30, small = size <= 24, label = 'Cera' }: { si
     <svg width={size} height={size} viewBox="0 0 64 64" {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })} focusable="false">
       <g fill="#E2A11B">
         <circle cx="32" cy="32" r="22" />
-        {PETALS.map(([cx, cy, r]) => (
-          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} />
+        {PETALS.map(([cx, cy, radius]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={radius} />
         ))}
       </g>
       {small ? (

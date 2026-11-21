@@ -1,7 +1,7 @@
 'use client';
 /**
- * Admin controls for icons: the picker for `f.icon()` fields, and the SVG
- * upload for `f.svg()` fields (the Icon content type's File).
+ * Admin controls for icons: the picker for `field.icon()` fields, and the SVG
+ * upload for `field.svg()` fields (the Icon content type's File).
  *
  * The picker searches every icon set the site has (custom icons, Lucide,
  * any it plugs in) through a server action, `icons.search`, and shows the
@@ -48,7 +48,7 @@ export function IconPicker({
   useEffect(() => {
     if (!current) return setPicked(undefined);
     let live = true;
-    icons.get([current]).then((r) => live && setPicked(r.find((g) => g.value === current) ?? null));
+    icons.get([current]).then((glyphs) => live && setPicked(glyphs.find((glyph) => glyph.value === current) ?? null));
     return () => {
       live = false;
     };
@@ -61,23 +61,23 @@ export function IconPicker({
   useEffect(() => {
     if (!open) return;
     let live = true;
-    const t = setTimeout(() => icons.search(query).then((r) => live && setResult(r)), 200);
+    const timer = setTimeout(() => icons.search(query).then((found) => live && setResult(found)), 200);
     return () => {
       live = false;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [open, query, icons]);
 
-  const pick = (g: IconGlyph) => {
-    onChange(g.value);
-    setPicked(g);
+  const pick = (glyph: IconGlyph) => {
+    onChange(glyph.value);
+    setPicked(glyph);
     setOpen(false);
     setQuery('');
   };
 
   const groups = (result?.sets ?? [])
-    .map((s) => ({ ...s, icons: (result?.icons ?? []).filter((g) => g.value.startsWith(`${s.name}:`)) }))
-    .filter((s) => s.icons.length > 0);
+    .map((iconSet) => ({ ...iconSet, icons: (result?.icons ?? []).filter((glyph) => glyph.value.startsWith(`${iconSet.name}:`)) }))
+    .filter((group) => group.icons.length > 0);
 
   return (
     <div className="cera-icon-picker">
@@ -122,9 +122,9 @@ export function IconPicker({
             placeholder="Search icons, e.g. arrow, mail, star"
             autoComplete="off"
             autoFocus
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setOpen(false);
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setOpen(false);
             }}
           />
           {result === null ? (
@@ -132,11 +132,11 @@ export function IconPicker({
           ) : groups.length === 0 ? (
             <p className="cera-note">No icons match “{query}”.</p>
           ) : (
-            groups.map((g) => (
-              <section key={g.name} className="cera-icon-picker__group" aria-label={g.label}>
-                <h4>{g.label}</h4>
+            groups.map((group) => (
+              <section key={group.name} className="cera-icon-picker__group" aria-label={group.label}>
+                <h4>{group.label}</h4>
                 <ul className="cera-icon-picker__grid">
-                  {g.icons.map((icon) => (
+                  {group.icons.map((icon) => (
                     <li key={icon.value}>
                       <button
                         type="button"
@@ -184,7 +184,7 @@ export function SvgInput({ value, onChange, readOnly, id }: { value: unknown; on
       )}
       {!readOnly && (
         <span className="cera-svg-input__actions">
-          <input id={id} type="file" accept=".svg,image/svg+xml" aria-describedby={noteId} onChange={(e) => void read(e.target.files?.[0])} />
+          <input id={id} type="file" accept=".svg,image/svg+xml" aria-describedby={noteId} onChange={(event) => void read(event.target.files?.[0])} />
           {svg && (
             <button type="button" className="cera-button cera-button--small" onClick={() => onChange(undefined)}>
               Remove

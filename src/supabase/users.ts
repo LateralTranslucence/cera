@@ -24,12 +24,12 @@ export function ceraRoleOf(user: Pick<User, 'app_metadata'>): CeraRole | null {
 export type UserResult = { ok: true; user: CeraUser } | { ok: false; message: string };
 export type CreateUserResult = { ok: true; user: CeraUser; password: string } | { ok: false; message: string };
 
-const toCeraUser = (u: User): CeraUser => ({
-  id: u.id,
-  email: u.email ?? '',
-  role: ceraRoleOf(u),
-  createdAt: u.created_at,
-  lastSignInAt: u.last_sign_in_at ?? undefined,
+const toCeraUser = (user: User): CeraUser => ({
+  id: user.id,
+  email: user.email ?? '',
+  role: ceraRoleOf(user),
+  createdAt: user.created_at,
+  lastSignInAt: user.last_sign_in_at ?? undefined,
 });
 
 /** Every account, people with a role first, then by email. */
@@ -41,8 +41,8 @@ export async function listCeraUsers(service: SupabaseClient): Promise<CeraUser[]
     users.push(...data.users.map(toCeraUser));
     if (data.users.length < 1000) break;
   }
-  const rank = (u: CeraUser) => (u.role ? CERA_ROLES.indexOf(u.role) : CERA_ROLES.length);
-  return users.sort((a, b) => rank(a) - rank(b) || a.email.localeCompare(b.email));
+  const rank = (user: CeraUser) => (user.role ? CERA_ROLES.indexOf(user.role) : CERA_ROLES.length);
+  return users.sort((first, second) => rank(first) - rank(second) || first.email.localeCompare(second.email));
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,8 +54,8 @@ export function temporaryPassword(length = 20): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length * 2));
   let out = '';
   // Rejection sampling keeps every character equally likely.
-  for (const b of bytes) {
-    if (b < 256 - (256 % ALPHABET.length)) out += ALPHABET[b % ALPHABET.length];
+  for (const byte of bytes) {
+    if (byte < 256 - (256 % ALPHABET.length)) out += ALPHABET[byte % ALPHABET.length];
     if (out.length === length) return out;
   }
   return out + temporaryPassword(length - out.length);
@@ -100,7 +100,7 @@ export async function setCeraRole(
   if (getError || !found?.user) return { ok: false, message: 'That account no longer exists.' };
 
   if (ceraRoleOf(found.user) === 'admin' && role !== 'admin') {
-    const admins = (await listCeraUsers(service)).filter((u) => u.role === 'admin');
+    const admins = (await listCeraUsers(service)).filter((user) => user.role === 'admin');
     if (admins.length <= 1) return { ok: false, message: 'This is the only admin. Make someone else an admin first.' };
   }
 

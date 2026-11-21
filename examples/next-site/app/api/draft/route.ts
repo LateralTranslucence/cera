@@ -7,9 +7,9 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function secretMatches(given: string | null): boolean {
   const expected = process.env.CERA_PREVIEW_SECRET;
   if (!expected || !given) return false;
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const givenBytes = Buffer.from(given);
+  const expectedBytes = Buffer.from(expected);
+  return givenBytes.length === expectedBytes.length && timingSafeEqual(givenBytes, expectedBytes);
 }
 
 /** Enters draft mode: /api/draft?secret=…&slug=about. The admin will link here. */

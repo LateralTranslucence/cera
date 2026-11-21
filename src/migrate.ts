@@ -32,17 +32,17 @@ export function upgradePanel(def: AnyPanel, stored: StoredPanel): StoredPanel {
 export function upgradePagePanels(
   panels: readonly AnyPanel[],
   stored: StoredPanel[],
-  onUnknown: (p: StoredPanel) => void = (p) => console.warn(`Unknown panel type "${p.type}" (${p.id}) dropped.`),
+  onUnknown: (panel: StoredPanel) => void = (panel) => console.warn(`Unknown panel type "${panel.type}" (${panel.id}) dropped.`),
 ): StoredPanel[] {
-  const byType = new Map(panels.map((p) => [p.type, p]));
+  const byType = new Map(panels.map((definition) => [definition.type, definition]));
   const out: StoredPanel[] = [];
-  for (const p of stored) {
-    const def = byType.get(p.type);
+  for (const storedPanel of stored) {
+    const def = byType.get(storedPanel.type);
     if (!def) {
-      onUnknown(p);
+      onUnknown(storedPanel);
       continue;
     }
-    out.push(upgradePanel(def, p));
+    out.push(upgradePanel(def, storedPanel));
   }
   return out;
 }

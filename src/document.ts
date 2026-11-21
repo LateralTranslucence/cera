@@ -56,8 +56,8 @@ export interface StoredPage {
 
 export type SaveMode = 'draft' | 'publish';
 
-export interface ReadResult<P> {
-  page: P;
+export interface ReadResult<Page> {
+  page: Page;
   issues: PageIssue[];
 }
 
@@ -102,11 +102,11 @@ function envelopeSchema(contentType: string) {
 }
 
 function toPath(path: readonly PropertyKey[]): IssuePath {
-  return path.map((p) => (typeof p === 'symbol' ? String(p) : p));
+  return path.map((segment) => (typeof segment === 'symbol' ? String(segment) : segment));
 }
 
 function envelopeIssues(error: z.ZodError): PageIssue[] {
-  return error.issues.map((i) => ({ severity: 'error', code: 'invalid-page', path: toPath(i.path), message: i.message }));
+  return error.issues.map((issue) => ({ severity: 'error', code: 'invalid-page', path: toPath(issue.path), message: issue.message }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -142,8 +142,8 @@ function parseFields(
       else value[key] = result.data;
       continue;
     }
-    for (const i of result.error.issues) {
-      issues.push({ severity, code: 'invalid-field', path: [...path, key, ...toPath(i.path)], message: i.message, panelId });
+    for (const issue of result.error.issues) {
+      issues.push({ severity, code: 'invalid-field', path: [...path, key, ...toPath(issue.path)], message: issue.message, panelId });
     }
     if (mode === 'keep') {
       complete = false;
@@ -161,8 +161,8 @@ function parseFields(
   return { value, issues, complete };
 }
 
-function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /* ------------------------------------------------------------------ */
@@ -180,7 +180,7 @@ export interface ReadOptions {
  * panel or field content; throws `PageShapeError` only if the row isn't a page
  * of this content type.
  */
-export function readPage<CT extends AnyContentType>(ct: CT, raw: unknown, opts: ReadOptions = {}): ReadResult<PageOf<CT>> {
+export function readPage<Type extends AnyContentType>(ct: Type, raw: unknown, opts: ReadOptions = {}): ReadResult<PageOf<Type>> {
   const env = envelopeSchema(ct.name).safeParse(raw);
   if (!env.success) {
     throw new PageShapeError(`Not a valid "${ct.name}" page.`, envelopeIssues(env.error));
@@ -190,35 +190,35 @@ export function readPage<CT extends AnyContentType>(ct: CT, raw: unknown, opts: 
 
   const boxes: Record<string, Record<string, unknown>> = {};
   for (const [name, fields] of Object.entries(ct.boxes as BoxMap)) {
-    const r = parseFields(fields, stored.boxes[name] ?? {}, ['boxes', name], 'fallback', 'warning');
-    issues.push(...r.issues);
-    boxes[name] = r.value;
+    const parsed = parseFields(fields, stored.boxes[name] ?? {}, ['boxes', name], 'fallback', 'warning');
+    issues.push(...parsed.issues);
+    boxes[name] = parsed.value;
   }
 
-  const defs = new Map<string, AnyPanel>(ct.panels.map((p: AnyPanel) => [p.type, p]));
+  const defs = new Map<string, AnyPanel>(ct.panels.map((definition: AnyPanel) => [definition.type, definition]));
   const panels: Array<{ id: string; type: string; v: number; hidden: boolean; data: Record<string, unknown> }> = [];
 
-  stored.panels.forEach((p, index) => {
+  stored.panels.forEach((storedPanel, index) => {
     const path: IssuePath = ['panels', index];
-    const def = defs.get(p.type);
+    const def = defs.get(storedPanel.type);
     if (!def) {
-      issues.push({ severity: 'warning', code: 'unknown-panel', path, panelId: p.id, message: `Unknown panel type "${p.type}"; not rendered.` });
+      issues.push({ severity: 'warning', code: 'unknown-panel', path, panelId: storedPanel.id, message: `Unknown panel type "${storedPanel.type}"; not rendered.` });
       return;
     }
     let upgraded: StoredPanel;
     try {
-      upgraded = upgradePanel(def, p);
-    } catch (e) {
-      issues.push({ severity: 'warning', code: 'migration-failed', path, panelId: p.id, message: `${errorMessage(e)} Panel not rendered.` });
+      upgraded = upgradePanel(def, storedPanel);
+    } catch (error) {
+      issues.push({ severity: 'warning', code: 'migration-failed', path, panelId: storedPanel.id, message: `${errorMessage(error)} Panel not rendered.` });
       return;
     }
-    const r = parseFields(def.fields, upgraded.data, [...path, 'data'], 'fallback', 'warning', p.id);
-    issues.push(...r.issues);
-    if (!r.complete) {
-      issues.push({ severity: 'warning', code: 'invalid-panel', path, panelId: p.id, message: 'A required field is missing or invalid; panel not rendered.' });
+    const parsed = parseFields(def.fields, upgraded.data, [...path, 'data'], 'fallback', 'warning', storedPanel.id);
+    issues.push(...parsed.issues);
+    if (!parsed.complete) {
+      issues.push({ severity: 'warning', code: 'invalid-panel', path, panelId: storedPanel.id, message: 'A required field is missing or invalid; panel not rendered.' });
       return;
     }
-    panels.push({ id: p.id, type: p.type, v: upgraded.v, hidden: p.hidden ?? false, data: r.value });
+    panels.push({ id: storedPanel.id, type: storedPanel.type, v: upgraded.v, hidden: storedPanel.hidden ?? false, data: parsed.value });
   });
 
   if (opts.onIssue) issues.forEach(opts.onIssue);
@@ -232,7 +232,7 @@ export function readPage<CT extends AnyContentType>(ct: CT, raw: unknown, opts: 
     boxes,
     panels,
   };
-  return { page: page as unknown as PageOf<CT>, issues };
+  return { page: page as unknown as PageOf<Type>, issues };
 }
 
 /* ------------------------------------------------------------------ */
@@ -255,42 +255,42 @@ function validateForSave(ct: AnyContentType, raw: unknown, mode: SaveMode): Prep
   }
 
   const seen = new Set<string>();
-  stored.panels.forEach((p, index) => {
-    if (seen.has(p.id)) issues.push({ severity: 'error', code: 'duplicate-panel-id', path: ['panels', index, 'id'], panelId: p.id, message: `Duplicate panel id "${p.id}".` });
-    seen.add(p.id);
+  stored.panels.forEach((storedPanel, index) => {
+    if (seen.has(storedPanel.id)) issues.push({ severity: 'error', code: 'duplicate-panel-id', path: ['panels', index, 'id'], panelId: storedPanel.id, message: `Duplicate panel id "${storedPanel.id}".` });
+    seen.add(storedPanel.id);
   });
 
   // Boxes: validate the ones the content type defines; keep any others untouched.
   const boxes: Record<string, Record<string, unknown>> = { ...stored.boxes };
   for (const [name, fields] of Object.entries(ct.boxes as BoxMap)) {
-    const r = parseFields(fields, stored.boxes[name] ?? {}, ['boxes', name], 'keep', severity);
-    issues.push(...r.issues);
-    boxes[name] = r.value;
+    const parsed = parseFields(fields, stored.boxes[name] ?? {}, ['boxes', name], 'keep', severity);
+    issues.push(...parsed.issues);
+    boxes[name] = parsed.value;
   }
 
   // Panels: upgrade and validate known types; keep unknown types exactly as they are.
-  const defs = new Map<string, AnyPanel>(ct.panels.map((p: AnyPanel) => [p.type, p]));
-  const panels: StoredPanel[] = stored.panels.map((p, index) => {
+  const defs = new Map<string, AnyPanel>(ct.panels.map((definition: AnyPanel) => [definition.type, definition]));
+  const panels: StoredPanel[] = stored.panels.map((storedPanel, index) => {
     const path: IssuePath = ['panels', index];
-    const def = defs.get(p.type);
+    const def = defs.get(storedPanel.type);
     if (!def) {
-      issues.push({ severity: 'warning', code: 'unknown-panel', path, panelId: p.id, message: `Unknown panel type "${p.type}"; kept as is.` });
-      return p;
+      issues.push({ severity: 'warning', code: 'unknown-panel', path, panelId: storedPanel.id, message: `Unknown panel type "${storedPanel.type}"; kept as is.` });
+      return storedPanel;
     }
     let upgraded: StoredPanel;
     try {
-      upgraded = upgradePanel(def, p);
-    } catch (e) {
-      issues.push({ severity, code: 'migration-failed', path, panelId: p.id, message: errorMessage(e) });
-      return p;
+      upgraded = upgradePanel(def, storedPanel);
+    } catch (error) {
+      issues.push({ severity, code: 'migration-failed', path, panelId: storedPanel.id, message: errorMessage(error) });
+      return storedPanel;
     }
-    const r = parseFields(def.fields, upgraded.data, [...path, 'data'], 'keep', severity, p.id);
-    issues.push(...r.issues);
-    return { ...p, v: upgraded.v, hidden: p.hidden ?? false, data: r.value };
+    const parsed = parseFields(def.fields, upgraded.data, [...path, 'data'], 'keep', severity, storedPanel.id);
+    issues.push(...parsed.issues);
+    return { ...storedPanel, v: upgraded.v, hidden: storedPanel.hidden ?? false, data: parsed.value };
   });
 
   const page: StoredPage = { id: stored.id, contentType: stored.contentType, slug: stored.slug, title: stored.title, boxes, panels };
-  if (issues.some((i) => i.severity === 'error')) return { ok: false, page, issues };
+  if (issues.some((issue) => issue.severity === 'error')) return { ok: false, page, issues };
   return { ok: true, page, issues };
 }
 
@@ -303,7 +303,7 @@ export interface PrepareOptions {
 /* ------------------------------------------------------------------ */
 
 /**
- * Sanitizes every `f.html()` value in the known boxes and panels (repeaters
+ * Sanitizes every `field.html()` value in the known boxes and panels (repeaters
  * included), reporting a warning wherever something was removed. Unknown
  * panels and keys are left alone: they aren't rendered.
  */
@@ -317,12 +317,12 @@ async function sanitizePage(ct: AnyContentType, page: StoredPage): Promise<{ pag
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
     const out: Record<string, unknown> = { ...(value as Record<string, unknown>) };
     for (const [key, field] of Object.entries(fields)) {
-      const v = out[key];
-      if (field.kind === 'html' && typeof v === 'string') {
+      const fieldValue = out[key];
+      if (field.kind === 'html' && typeof fieldValue === 'string') {
         const toolbar = (field.config as { toolbar?: 'full' | 'limited' } | undefined)?.toolbar ?? 'full';
-        const r = sanitizeRichTextWithReport(v, toolbar);
-        out[key] = r.html;
-        if (r.removed) {
+        const sanitized = sanitizeRichTextWithReport(fieldValue, toolbar);
+        out[key] = sanitized.html;
+        if (sanitized.removed) {
           issues.push({
             severity: 'warning',
             code: 'html-sanitized',
@@ -334,14 +334,14 @@ async function sanitizePage(ct: AnyContentType, page: StoredPage): Promise<{ pag
                 : 'HTML that isn’t allowed (scripts, inline styles, unsafe links) was removed.',
           });
         }
-      } else if (field.kind === 'svg' && typeof v === 'string' && v !== '') {
-        const r = cleanSvg(v);
-        if ('error' in r) {
+      } else if (field.kind === 'svg' && typeof fieldValue === 'string' && fieldValue !== '') {
+        const cleaned = cleanSvg(fieldValue);
+        if ('error' in cleaned) {
           out[key] = undefined;
-          issues.push({ severity: 'error', code: 'svg-invalid', path: [...path, key], panelId, message: `${r.error} Upload another file.` });
+          issues.push({ severity: 'error', code: 'svg-invalid', path: [...path, key], panelId, message: `${cleaned.error} Upload another file.` });
         } else {
-          out[key] = r.svg;
-          if (r.removed) {
+          out[key] = cleaned.svg;
+          if (cleaned.removed) {
             issues.push({
               severity: 'warning',
               code: 'svg-cleaned',
@@ -351,9 +351,9 @@ async function sanitizePage(ct: AnyContentType, page: StoredPage): Promise<{ pag
             });
           }
         }
-      } else if (field.kind === 'repeater' && Array.isArray(v)) {
+      } else if (field.kind === 'repeater' && Array.isArray(fieldValue)) {
         const sub = (field.config as { fields: FieldMap }).fields;
-        out[key] = v.map((item, i) => clean(sub, item, [...path, key, i], panelId));
+        out[key] = fieldValue.map((item, i) => clean(sub, item, [...path, key, i], panelId));
       }
     }
     return out;
@@ -363,12 +363,12 @@ async function sanitizePage(ct: AnyContentType, page: StoredPage): Promise<{ pag
   for (const [name, fields] of Object.entries(ct.boxes as BoxMap)) {
     if (boxes[name]) boxes[name] = clean(fields, boxes[name], ['boxes', name]) as Record<string, unknown>;
   }
-  const defs = new Map<string, AnyPanel>(ct.panels.map((p: AnyPanel) => [p.type, p]));
-  const panels = page.panels.map((p, index) => {
-    const def = defs.get(p.type);
+  const defs = new Map<string, AnyPanel>(ct.panels.map((definition: AnyPanel) => [definition.type, definition]));
+  const panels = page.panels.map((storedPanel, index) => {
+    const def = defs.get(storedPanel.type);
     // Only panels at the current version: a panel whose migration failed may not match the fields.
-    if (!def || p.v !== def.version) return p;
-    return { ...p, data: clean(def.fields, p.data, ['panels', index, 'data'], p.id) as Record<string, unknown> };
+    if (!def || storedPanel.v !== def.version) return storedPanel;
+    return { ...storedPanel, data: clean(def.fields, storedPanel.data, ['panels', index, 'data'], storedPanel.id) as Record<string, unknown> };
   });
   return { page: { ...page, boxes, panels }, issues };
 }
@@ -382,13 +382,13 @@ async function validateAndSanitize(ct: AnyContentType, raw: unknown, mode: SaveM
   if (!result.page) return result;
   const cleaned = await sanitizePage(ct, result.page);
   const issues = [...result.issues, ...cleaned.issues];
-  const ok = result.ok && !cleaned.issues.some((i) => i.severity === 'error');
+  const ok = result.ok && !cleaned.issues.some((issue) => issue.severity === 'error');
   return ok ? { ok: true, page: cleaned.page, issues } : { ok: false, page: cleaned.page, issues };
 }
 
 /**
  * Validates a page the admin wants to save and returns what to write.
- * Rich-text (`f.html()`) values are sanitized; anything removed is reported
+ * Rich-text (`field.html()`) values are sanitized; anything removed is reported
  * as an `html-sanitized` warning, which doesn't block saving or publishing.
  *
  * `beforeSave` runs only when every known field is valid (always the case for
@@ -396,31 +396,31 @@ async function validateAndSanitize(ct: AnyContentType, raw: unknown, mode: SaveM
  * the known panels only; unknown panels are put back at their original
  * positions afterward, and the hook's result is validated again.
  */
-export async function preparePageForSave<CT extends AnyContentType>(ct: CT, raw: unknown, opts: PrepareOptions): Promise<PrepareResult> {
+export async function preparePageForSave<Type extends AnyContentType>(ct: Type, raw: unknown, opts: PrepareOptions): Promise<PrepareResult> {
   const first = await validateAndSanitize(ct, raw, opts.mode);
   const hook = ct.hooks?.beforeSave;
   if (!first.ok || !first.page || !hook) return first;
-  if (first.issues.some((i) => !CLEANING_NOTES.has(i.code))) return first;
+  if (first.issues.some((issue) => !CLEANING_NOTES.has(issue.code))) return first;
 
-  const known = new Set(ct.panels.map((p: AnyPanel) => p.type));
-  const unknown = first.page.panels.map((p, index) => ({ p, index })).filter(({ p }) => !known.has(p.type));
+  const known = new Set(ct.panels.map((definition: AnyPanel) => definition.type));
+  const unknown = first.page.panels.map((panel, index) => ({ panel, index })).filter(({ panel }) => !known.has(panel.type));
   const typed = {
     ...first.page,
     status: opts.mode === 'publish' ? 'published' : 'draft',
-    panels: first.page.panels.filter((p) => known.has(p.type)),
-  } as unknown as PageOf<CT>;
+    panels: first.page.panels.filter((panel) => known.has(panel.type)),
+  } as unknown as PageOf<Type>;
 
   const result = (await hook(typed)) as unknown as StoredPage & { status?: PageStatus };
   const { status: _status, ...rest } = result;
   const panels = [...rest.panels];
-  for (const { p, index } of unknown) panels.splice(Math.min(index, panels.length), 0, p);
+  for (const { panel, index } of unknown) panels.splice(Math.min(index, panels.length), 0, panel);
 
   // Validate and sanitize again: the hook may have changed anything. The second
   // pass sees HTML that is already clean, so carry over the first pass's
   // sanitize warnings for the editor.
   const second = await validateAndSanitize(ct, { ...rest, id: first.page.id, contentType: first.page.contentType, panels }, opts.mode);
-  const seen = new Set(second.issues.map((i) => `${i.code}:${i.path.join('.')}`));
-  const carried = first.issues.filter((i) => i.code !== 'unknown-panel' && CLEANING_NOTES.has(i.code) && !seen.has(`${i.code}:${i.path.join('.')}`));
+  const seen = new Set(second.issues.map((issue) => `${issue.code}:${issue.path.join('.')}`));
+  const carried = first.issues.filter((issue) => issue.code !== 'unknown-panel' && CLEANING_NOTES.has(issue.code) && !seen.has(`${issue.code}:${issue.path.join('.')}`));
   const issues = [...second.issues, ...carried];
   return second.ok ? { ok: true, page: second.page, issues } : { ok: false, page: second.page, issues };
 }

@@ -40,16 +40,16 @@ export interface FormContext {
   findPages?: (query: PageQuery) => Promise<PageOption[]>;
   /** Uploads and the media library. Without it, media fields take typed paths and URLs only. */
   media?: MediaContext;
-  /** The site's icon sets, for `f.icon()` fields. Without it, icon fields take typed values (`lucide:rocket`). */
+  /** The site's icon sets, for `field.icon()` fields. Without it, icon fields take typed values (`lucide:rocket`). */
   icons?: IconsContext;
 }
 
 type Change = (value: unknown) => void;
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const asString = (v: unknown): string => (typeof v === 'string' ? v : v === undefined || v === null ? '' : String(v));
-const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
-const emptyToUndefined = (s: string): string | undefined => (s === '' ? undefined : s);
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const asString = (value: unknown): string => (typeof value === 'string' ? value : value === undefined || value === null ? '' : String(value));
+const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+const emptyToUndefined = (text: string): string | undefined => (text === '' ? undefined : text);
 
 /* ------------------------------------------------------------------ */
 /* Field map                                                           */
@@ -77,7 +77,7 @@ export function FieldMapForm({
           name={key}
           field={field}
           value={obj[key]}
-          onChange={(v) => onChange(setIn(obj, [key], v))}
+          onChange={(fieldValue) => onChange(setIn(obj, [key], fieldValue))}
           path={[...path, key]}
           siblings={obj}
           ctx={ctx}
@@ -125,7 +125,7 @@ function FieldRow(props: FieldProps) {
     </>
   );
 
-  const className = `cera-field cera-field--${field.kind}${own.some((i) => i.severity === 'error') ? ' has-error' : own.length ? ' has-warning' : ''}`;
+  const className = `cera-field cera-field--${field.kind}${own.some((issue) => issue.severity === 'error') ? ' has-error' : own.length ? ' has-warning' : ''}`;
 
   // Every field is a two-column row: label on the left, control and
   // its note/counter/issues on the right (stacked in narrow containers).
@@ -135,7 +135,7 @@ function FieldRow(props: FieldProps) {
         <label htmlFor={id} className="cera-field__label">
           {label}
         </label>
-        <input type="checkbox" id={id} checked={value === true} disabled={ctx.readOnly} onChange={(e) => props.onChange(e.target.checked)} />
+        <input type="checkbox" id={id} checked={value === true} disabled={ctx.readOnly} onChange={(event) => props.onChange(event.target.checked)} />
         {extras}
       </div>
     );
@@ -169,9 +169,9 @@ export function IssueList({ issues }: { issues: readonly PageIssue[] }) {
   if (issues.length === 0) return null;
   return (
     <ul className="cera-issues">
-      {issues.map((i, n) => (
-        <li key={n} className={`cera-issue cera-issue--${i.severity}`}>
-          {i.message}
+      {issues.map((issue, n) => (
+        <li key={n} className={`cera-issue cera-issue--${issue.severity}`}>
+          {issue.message}
         </li>
       ))}
     </ul>
@@ -198,7 +198,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
           readOnly={ro}
           inputMode={field.kind === 'url' ? 'url' : undefined}
           placeholder={field.kind === 'url' ? '/path or https://…' : undefined}
-          onChange={(e) => onChange(emptyToUndefined(e.target.value))}
+          onChange={(event) => onChange(emptyToUndefined(event.target.value))}
         />
       );
 
@@ -206,7 +206,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
       return <SvgInput value={value} onChange={onChange} readOnly={ro} id={id} />;
 
     case 'textarea':
-      return <textarea id={id} rows={3} value={asString(value)} readOnly={ro} onChange={(e) => onChange(emptyToUndefined(e.target.value))} />;
+      return <textarea id={id} rows={3} value={asString(value)} readOnly={ro} onChange={(event) => onChange(emptyToUndefined(event.target.value))} />;
 
     case 'html':
       return (
@@ -232,7 +232,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
           min={field.kind === 'perRow' ? 1 : cfg.min}
           max={cfg.max}
           readOnly={ro}
-          onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+          onChange={(event) => onChange(event.target.value === '' ? undefined : Number(event.target.value))}
         />
       );
     }
@@ -240,7 +240,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
     case 'select': {
       const options = (field.config as { options: Record<string, string> }).options;
       return (
-        <select id={id} value={asString(value)} disabled={ro} onChange={(e) => onChange(emptyToUndefined(e.target.value))}>
+        <select id={id} value={asString(value)} disabled={ro} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
           {fieldDefault(field) === undefined && <option value="">—</option>}
           {value !== undefined && !(asString(value) in options) && <option value={asString(value)}>{asString(value)} (not an option)</option>}
           {Object.entries(options).map(([key, label]) => (
@@ -264,11 +264,11 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
         <div className="cera-group">
           <label className="cera-inline">
             Color
-            <input type="text" value={asString(bg.color)} placeholder="#2b2118" readOnly={ro} onChange={(e) => onChange(setIn(bg, ['color'], emptyToUndefined(e.target.value)))} />
+            <input type="text" value={asString(bg.color)} placeholder="#2b2118" readOnly={ro} onChange={(event) => onChange(setIn(bg, ['color'], emptyToUndefined(event.target.value)))} />
           </label>
-          <MediaInput value={bg.media} onChange={(m) => onChange(setIn(bg, ['media'], m))} readOnly={ro} media={ctx.media} accept={['image', 'video']} />
+          <MediaInput value={bg.media} onChange={(media) => onChange(setIn(bg, ['media'], media))} readOnly={ro} media={ctx.media} accept={['image', 'video']} />
           <label className="cera-check">
-            <input type="checkbox" checked={bg.overlay === true} disabled={ro} onChange={(e) => onChange(setIn(bg, ['overlay'], e.target.checked))} />
+            <input type="checkbox" checked={bg.overlay === true} disabled={ro} onChange={(event) => onChange(setIn(bg, ['overlay'], event.target.checked))} />
             Dark overlay
           </label>
         </div>
@@ -293,9 +293,9 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
             <CtaInput
               key={i}
               value={cta}
-              onChange={(v) => onChange(setIn(list, [i], v))}
+              onChange={(itemValue) => onChange(setIn(list, [i], itemValue))}
               onRemove={() => onChange(removeItem(list, i))}
-              onMove={(d) => onChange(moveItem(list, i, i + d))}
+              onMove={(delta) => onChange(moveItem(list, i, i + delta))}
               readOnly={ro}
             />
           ))}
@@ -328,7 +328,7 @@ function Control({ field, value, onChange, path, siblings, ctx, id }: FieldProps
             value={ids.join(', ')}
             readOnly={ro}
             placeholder="Page ids, comma-separated"
-            onChange={(e) => onChange(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+            onChange={(event) => onChange(event.target.value.split(',').map((pageId) => pageId.trim()).filter(Boolean))}
           />
           <p className="cera-note">This admin has no page search; paste page ids.</p>
         </>
@@ -367,15 +367,15 @@ function CtaInput({
     <div className="cera-group cera-cta">
       <label className="cera-inline">
         Text
-        <input type="text" value={asString(cta.text)} readOnly={readOnly} onChange={(e) => onChange(setIn(cta, ['text'], e.target.value))} />
+        <input type="text" value={asString(cta.text)} readOnly={readOnly} onChange={(event) => onChange(setIn(cta, ['text'], event.target.value))} />
       </label>
       <label className="cera-inline">
         Link
-        <input type="text" value={asString(cta.url)} placeholder="about or https://…" readOnly={readOnly} onChange={(e) => onChange(setIn(cta, ['url'], e.target.value))} />
+        <input type="text" value={asString(cta.url)} placeholder="about or https://…" readOnly={readOnly} onChange={(event) => onChange(setIn(cta, ['url'], event.target.value))} />
       </label>
       <label className="cera-inline">
         Opens in
-        <select value={asString(cta.target) || '_self'} disabled={readOnly} onChange={(e) => onChange(setIn(cta, ['target'], e.target.value))}>
+        <select value={asString(cta.target) || '_self'} disabled={readOnly} onChange={(event) => onChange(setIn(cta, ['target'], event.target.value))}>
           <option value="_self">Same tab</option>
           <option value="_blank">New tab</option>
           <option value="modal">Modal</option>
@@ -391,15 +391,15 @@ function ItemButtons({ onMove, onRemove, readOnly }: { onMove?: (delta: -1 | 1) 
     <div className="cera-item-buttons">
       {onMove && (
         <>
-          <button type="button" className="cera-icon-button" aria-label="Move up" title="Move up" disabled={readOnly} onClick={(e) => { e.preventDefault(); onMove(-1); }}>
+          <button type="button" className="cera-icon-button" aria-label="Move up" title="Move up" disabled={readOnly} onClick={(event) => { event.preventDefault(); onMove(-1); }}>
             ↑
           </button>
-          <button type="button" className="cera-icon-button" aria-label="Move down" title="Move down" disabled={readOnly} onClick={(e) => { e.preventDefault(); onMove(1); }}>
+          <button type="button" className="cera-icon-button" aria-label="Move down" title="Move down" disabled={readOnly} onClick={(event) => { event.preventDefault(); onMove(1); }}>
             ↓
           </button>
         </>
       )}
-      <button type="button" className="cera-icon-button cera-danger" aria-label="Remove" title="Remove" disabled={readOnly} onClick={(e) => { e.preventDefault(); onRemove(); }}>
+      <button type="button" className="cera-icon-button cera-danger" aria-label="Remove" title="Remove" disabled={readOnly} onClick={(event) => { event.preventDefault(); onRemove(); }}>
         ✕
       </button>
     </div>
@@ -414,7 +414,7 @@ function Repeater({ field, value, onChange, path, ctx }: { field: AnyField; valu
 
   const add = () => {
     const item = newRepeaterItem(cfg.fields, newId());
-    setOpen((s) => new Set(s).add(item._id as string));
+    setOpen((previous) => new Set(previous).add(item._id as string));
     onChange([...items, item]);
   };
 
@@ -429,10 +429,10 @@ function Repeater({ field, value, onChange, path, ctx }: { field: AnyField; valu
             key={key}
             className={`cera-item${itemIssues.length ? ' has-warning' : ''}`}
             open={open.has(key) || itemIssues.length > 0}
-            onToggle={(e) => {
-              const isOpen = (e.currentTarget as HTMLDetailsElement).open;
-              setOpen((s) => {
-                const next = new Set(s);
+            onToggle={(event) => {
+              const isOpen = (event.currentTarget as HTMLDetailsElement).open;
+              setOpen((previous) => {
+                const next = new Set(previous);
                 if (isOpen) next.add(key);
                 else next.delete(key);
                 return next;
@@ -441,9 +441,9 @@ function Repeater({ field, value, onChange, path, ctx }: { field: AnyField; valu
           >
             <summary>
               <span className="cera-item-title">{title || `Item ${i + 1}`}</span>
-              <ItemButtons onMove={(d) => onChange(moveItem(items, i, i + d))} onRemove={() => onChange(removeItem(items, i))} readOnly={ctx.readOnly} />
+              <ItemButtons onMove={(delta) => onChange(moveItem(items, i, i + delta))} onRemove={() => onChange(removeItem(items, i))} readOnly={ctx.readOnly} />
             </summary>
-            <FieldMapForm fields={cfg.fields} value={item} onChange={(v) => onChange(setIn(items, [i], v))} path={[...path, i]} ctx={ctx} />
+            <FieldMapForm fields={cfg.fields} value={item} onChange={(itemValue) => onChange(setIn(items, [i], itemValue))} path={[...path, i]} ctx={ctx} />
           </details>
         );
       })}
@@ -460,7 +460,7 @@ function SelectFrom({ field, value, onChange, id, ctx }: { field: AnyField; valu
   const [options, setOptions] = useState<Option[] | null>(null);
   useEffect(() => {
     let live = true;
-    Promise.resolve(cfg.options(ctx.options)).then((o) => live && setOptions(o));
+    Promise.resolve(cfg.options(ctx.options)).then((loadedOptions) => live && setOptions(loadedOptions));
     return () => {
       live = false;
     };
@@ -472,31 +472,31 @@ function SelectFrom({ field, value, onChange, id, ctx }: { field: AnyField; valu
     const selected = new Set(asArray(value).map(asString));
     return (
       <div className="cera-checks">
-        {options.map((o) => (
-          <label key={o.value} className="cera-check">
+        {options.map((option) => (
+          <label key={option.value} className="cera-check">
             <input
               type="checkbox"
-              checked={selected.has(o.value)}
+              checked={selected.has(option.value)}
               disabled={ctx.readOnly}
-              onChange={(e) => {
+              onChange={(event) => {
                 const next = new Set(selected);
-                if (e.target.checked) next.add(o.value);
-                else next.delete(o.value);
+                if (event.target.checked) next.add(option.value);
+                else next.delete(option.value);
                 onChange([...next]);
               }}
             />
-            {o.label}
+            {option.label}
           </label>
         ))}
       </div>
     );
   }
   return (
-    <select id={id} value={asString(value)} disabled={ctx.readOnly} onChange={(e) => onChange(emptyToUndefined(e.target.value))}>
+    <select id={id} value={asString(value)} disabled={ctx.readOnly} onChange={(event) => onChange(emptyToUndefined(event.target.value))}>
       <option value="">—</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
         </option>
       ))}
     </select>
@@ -531,16 +531,16 @@ function PagePicker({
   // Allowed content types: fixed, or read from a sibling field (theme: post_types_field). None ticked
   // means any type with pages of its own (not forms, which only show inside other pages).
   const picked0 = Array.isArray(cfg.to) ? cfg.to : asArray(siblings[cfg.to.field]).map(asString).filter(Boolean);
-  const types = picked0.length > 0 ? picked0 : ctx.options.contentTypes.filter((t) => t.public).map((t) => t.name);
+  const types = picked0.length > 0 ? picked0 : ctx.options.contentTypes.filter((contentType) => contentType.public).map((contentType) => contentType.name);
   const typesKey = types.join(',');
-  const labelOf = (name: string) => ctx.options.contentTypes.find((t) => t.name === name)?.label ?? name;
+  const labelOf = (name: string) => ctx.options.contentTypes.find((contentType) => contentType.name === name)?.label ?? name;
 
   // Details for the picked ids.
   const [picked, setPicked] = useState<PageOption[]>([]);
   useEffect(() => {
     if (!idsKey) return setPicked([]);
     let live = true;
-    findPages({ ids: idsKey.split(',') }).then((r) => live && setPicked(r));
+    findPages({ ids: idsKey.split(',') }).then((pages) => live && setPicked(pages));
     return () => {
       live = false;
     };
@@ -553,23 +553,23 @@ function PagePicker({
   useEffect(() => {
     if (!open) return;
     let live = true;
-    const t = setTimeout(() => {
-      findPages({ search, contentTypes: typesKey ? typesKey.split(',') : undefined }).then((r) => live && setResults(r));
+    const timer = setTimeout(() => {
+      findPages({ search, contentTypes: typesKey ? typesKey.split(',') : undefined }).then((pages) => live && setResults(pages));
     }, 200);
     return () => {
       live = false;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [open, search, typesKey, findPages]);
 
   const single = cfg.limit === 1;
   const full = cfg.limit !== undefined && ids.length >= cfg.limit && !single;
-  const pick = (p: PageOption) => {
-    onChange(single ? [p.id] : [...ids, p.id]);
+  const pick = (page: PageOption) => {
+    onChange(single ? [page.id] : [...ids, page.id]);
     setSearch('');
     setOpen(false);
   };
-  const choices = (results ?? []).filter((r) => !ids.includes(r.id)).slice(0, 8);
+  const choices = (results ?? []).filter((result) => !ids.includes(result.id)).slice(0, 8);
 
   return (
     <div className="cera-picker">
@@ -578,14 +578,14 @@ function PagePicker({
       ) : (
         <ul className="cera-picker__picked">
           {ids.map((pid, i) => {
-            const p = picked.find((x) => x.id === pid);
+            const page = picked.find((pickedPage) => pickedPage.id === pid);
             return (
               <li key={pid}>
-                <span className="cera-picker__title">{p ? p.title || p.slug : 'Page not found'}</span>
+                <span className="cera-picker__title">{page ? page.title || page.slug : 'Page not found'}</span>
                 <span className="cera-picker__meta">
-                  {p ? `${p.contentTypeLabel} · ${p.slug}` : 'It may have been deleted. Remove it or pick another.'}
+                  {page ? `${page.contentTypeLabel} · ${page.slug}` : 'It may have been deleted. Remove it or pick another.'}
                 </span>
-                {p && !p.published && <span className="cera-badge cera-badge--dirty">Not published: hidden on the live site</span>}
+                {page && !page.published && <span className="cera-badge cera-badge--dirty">Not published: hidden on the live site</span>}
                 {!ctx.readOnly && (
                   <button type="button" className="cera-icon-button cera-danger" aria-label="Remove page" title="Remove" onClick={() => onChange(removeItem(ids, i))}>
                     ✕
@@ -609,11 +609,11 @@ function PagePicker({
             autoComplete="off"
             onFocus={() => setOpen(true)}
             onBlur={() => setOpen(false)}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setOpen(false);
-              if (e.key === 'Enter' && choices[0]) {
-                e.preventDefault();
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setOpen(false);
+              if (event.key === 'Enter' && choices[0]) {
+                event.preventDefault();
                 pick(choices[0]);
               }
             }}
@@ -625,14 +625,14 @@ function PagePicker({
               ) : choices.length === 0 ? (
                 <li className="cera-note">No matching pages.</li>
               ) : (
-                choices.map((p) => (
-                  <li key={p.id} role="option" aria-selected={false}>
+                choices.map((page) => (
+                  <li key={page.id} role="option" aria-selected={false}>
                     {/* mousedown fires before the input's blur, which would close the list first. */}
-                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(p)}>
-                      <span className="cera-picker__title">{p.title || p.slug}</span>
+                    <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => pick(page)}>
+                      <span className="cera-picker__title">{page.title || page.slug}</span>
                       <span className="cera-picker__meta">
-                        {p.contentTypeLabel} · {p.slug}
-                        {p.published ? '' : ' · not published'}
+                        {page.contentTypeLabel} · {page.slug}
+                        {page.published ? '' : ' · not published'}
                       </span>
                     </button>
                   </li>

@@ -46,15 +46,15 @@ export function fontAwesomeIcons(opts: { name: string; label: string; icons: Rec
       const words = queryWords(query);
       const scored: Array<[number, string]> = [];
       for (const name of names) {
-        const aliases = byName.get(name)!.icon[2].filter((a): a is string => typeof a === 'string');
+        const aliases = byName.get(name)!.icon[2].filter((alias): alias is string => typeof alias === 'string');
         const score = matchScore(name, aliases, words);
         if (score !== null) scored.push([score, name]);
       }
-      scored.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
+      scored.sort((first, second) => first[0] - second[0] || first[1].localeCompare(second[1]));
       return scored.slice(0, limit).map(([, name]) => glyph(name));
     },
     get(wanted) {
-      return wanted.filter((n) => byName.has(n)).map(glyph);
+      return wanted.filter((name) => byName.has(name)).map(glyph);
     },
   };
 }

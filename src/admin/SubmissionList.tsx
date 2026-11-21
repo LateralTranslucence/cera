@@ -35,7 +35,7 @@ export function SubmissionList({ submissions: initial, forms, formId, onFilter, 
   const [confirm, setConfirm] = useState<{ ids?: string[]; formId?: string } | null>(null);
   const [status, setStatus] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [busy, startBusy] = useTransition();
-  const byId = new Map(forms.map((f) => [f.id, f]));
+  const byId = new Map(forms.map((formEntry) => [formEntry.id, formEntry]));
   const form = formId ? byId.get(formId) : undefined;
 
   const remove = () => {
@@ -45,10 +45,10 @@ export function SubmissionList({ submissions: initial, forms, formId, onFilter, 
     startBusy(async () => {
       try {
         const count = await onDelete(target);
-        setSubmissions((list) => (target.ids ? list.filter((s) => !target.ids!.includes(s.id)) : list.filter((s) => s.formId !== target.formId)));
+        setSubmissions((list) => (target.ids ? list.filter((submission) => !target.ids!.includes(submission.id)) : list.filter((submission) => submission.formId !== target.formId)));
         setStatus({ tone: 'success', text: count === 1 ? 'Deleted 1 submission.' : `Deleted ${count} submissions.` });
-      } catch (e) {
-        setStatus({ tone: 'error', text: `Delete failed: ${e instanceof Error ? e.message : String(e)}` });
+      } catch (error) {
+        setStatus({ tone: 'error', text: `Delete failed: ${error instanceof Error ? error.message : String(error)}` });
       }
     });
   };
@@ -58,11 +58,11 @@ export function SubmissionList({ submissions: initial, forms, formId, onFilter, 
       <div className="cera-list-toolbar">
         <label className="cera-sort">
           <span className="cera-visually-hidden">Form</span>
-          <select value={formId ?? ''} onChange={(e) => onFilter(e.target.value || undefined)}>
+          <select value={formId ?? ''} onChange={(event) => onFilter(event.target.value || undefined)}>
             <option value="">All forms</option>
-            {forms.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.title || f.slug}
+            {forms.map((formOption) => (
+              <option key={formOption.id} value={formOption.id}>
+                {formOption.title || formOption.slug}
               </option>
             ))}
           </select>
@@ -92,38 +92,38 @@ export function SubmissionList({ submissions: initial, forms, formId, onFilter, 
         <p className="cera-card cera-table__empty">{newestHref ? 'No older submissions.' : form ? `No submissions to “${form.title || form.slug}” yet.` : 'No submissions yet.'}</p>
       ) : (
         <ol className="cera-submissions">
-          {submissions.map((s) => {
-            const f = byId.get(s.formId);
+          {submissions.map((submission) => {
+            const submissionForm = byId.get(submission.formId);
             return (
-              <li key={s.id} className="cera-card cera-submission">
+              <li key={submission.id} className="cera-card cera-submission">
                 <div className="cera-submission__head">
                   <div>
-                    <h2 className="cera-submission__title">{s.email ?? 'No email address'}</h2>
+                    <h2 className="cera-submission__title">{submission.email ?? 'No email address'}</h2>
                     <p className="cera-submission__meta" suppressHydrationWarning>
-                      <time dateTime={s.createdAt} title={full.format(new Date(s.createdAt))}>
-                        {formatWhen(s.createdAt)}
+                      <time dateTime={submission.createdAt} title={full.format(new Date(submission.createdAt))}>
+                        {formatWhen(submission.createdAt)}
                       </time>
                       {' · '}
-                      {f ? f.title || f.slug : 'Deleted form'}
-                      {s.pagePath && (
+                      {submissionForm ? submissionForm.title || submissionForm.slug : 'Deleted form'}
+                      {submission.pagePath && (
                         <>
                           {' · from '}
-                          <span className="cera-mono">{s.pagePath}</span>
+                          <span className="cera-mono">{submission.pagePath}</span>
                         </>
                       )}
                     </p>
                   </div>
                   {onDelete && (
-                    <button type="button" className="cera-icon-button cera-danger" aria-label="Delete submission" title="Delete submission" disabled={busy} onClick={() => setConfirm({ ids: [s.id] })}>
+                    <button type="button" className="cera-icon-button cera-danger" aria-label="Delete submission" title="Delete submission" disabled={busy} onClick={() => setConfirm({ ids: [submission.id] })}>
                       <Icon name="trash" />
                     </button>
                   )}
                 </div>
                 <dl className="cera-submission__answers">
-                  {s.values.map((v) => (
-                    <div key={v.name}>
-                      <dt>{v.label}</dt>
-                      <dd>{Array.isArray(v.value) ? v.value.join(', ') || '—' : v.value || '—'}</dd>
+                  {submission.values.map((answer) => (
+                    <div key={answer.name}>
+                      <dt>{answer.label}</dt>
+                      <dd>{Array.isArray(answer.value) ? answer.value.join(', ') || '—' : answer.value || '—'}</dd>
                     </div>
                   ))}
                 </dl>

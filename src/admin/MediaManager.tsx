@@ -38,14 +38,14 @@ export function MediaManager({ media, canEdit, onUpdate, onDelete, findUsage, pa
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const reload = () => setVersion((v) => v + 1);
+  const reload = () => setVersion((previous) => previous + 1);
 
   async function uploadAll(files: File[]) {
     setStatus(null);
     const failures: string[] = [];
     let last: MediaItem | null = null;
-    for (const [n, file] of files.entries()) {
-      setBusy(files.length > 1 ? `Uploading ${n + 1} of ${files.length}: ${file.name}…` : `Uploading ${file.name}…`);
+    for (const [index, file] of files.entries()) {
+      setBusy(files.length > 1 ? `Uploading ${index + 1} of ${files.length}: ${file.name}…` : `Uploading ${file.name}…`);
       try {
         const result = await media.upload(file);
         if (result.ok) last = result.item;
@@ -68,20 +68,20 @@ export function MediaManager({ media, canEdit, onUpdate, onDelete, findUsage, pa
   return (
     <div
       className="cera-media-manager"
-      onDragOver={(e) => {
-        if (canEdit && !busy) e.preventDefault();
+      onDragOver={(event) => {
+        if (canEdit && !busy) event.preventDefault();
       }}
-      onDrop={(e) => {
+      onDrop={(event) => {
         if (!canEdit || busy) return;
-        e.preventDefault();
-        const files = [...e.dataTransfer.files];
+        event.preventDefault();
+        const files = [...event.dataTransfer.files];
         if (files.length) void uploadAll(files);
       }}
     >
       <div className="cera-media-manager__bar">
         <label className="cera-inline">
           Show
-          <select value={kind} onChange={(e) => setKind(e.target.value as keyof typeof KINDS)}>
+          <select value={kind} onChange={(event) => setKind(event.target.value as keyof typeof KINDS)}>
             <option value="all">All files</option>
             <option value="image">Images</option>
             <option value="video">Videos</option>
@@ -96,8 +96,8 @@ export function MediaManager({ media, canEdit, onUpdate, onDelete, findUsage, pa
               className="cera-visually-hidden"
               accept={mediaAccept(['image', 'video'])}
               disabled={Boolean(busy)}
-              onChange={(e) => {
-                const files = [...(e.target.files ?? [])];
+              onChange={(event) => {
+                const files = [...(event.target.files ?? [])];
                 if (files.length) void uploadAll(files);
               }}
             />
@@ -188,8 +188,8 @@ function MediaDetails({
     };
   }, [findUsage, item.path]);
 
-  function save(e: FormEvent) {
-    e.preventDefault();
+  function save(event: FormEvent) {
+    event.preventDefault();
     setStatus(null);
     startTransition(async () => {
       const result = await onUpdate({ id: item.id, alt });
@@ -262,7 +262,7 @@ function MediaDetails({
       <form onSubmit={save} className="cera-media-details__alt">
         <label>
           Alt text
-          <textarea value={alt} rows={3} maxLength={500} readOnly={!canEdit} placeholder={item.kind === 'image' ? 'Describe the image for people who can’t see it' : ''} onChange={(e) => setAlt(e.target.value)} />
+          <textarea value={alt} rows={3} maxLength={500} readOnly={!canEdit} placeholder={item.kind === 'image' ? 'Describe the image for people who can’t see it' : ''} onChange={(event) => setAlt(event.target.value)} />
         </label>
         <p className="cera-note">Used when this file is added to a page. Pages that already use it keep their own alt text, which you change on the page.</p>
         {canEdit && (

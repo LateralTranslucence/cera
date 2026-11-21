@@ -13,7 +13,7 @@ export function ContentListClient({ pages, contentType, previews }: { pages: Pag
   return (
     <PageList
       pages={pages}
-      editHref={(p) => `${place.base}/${p.id}`}
+      editHref={(page) => `${place.base}/${page.id}`}
       noun={place.noun}
       countLabel={null}
       slugs={place.section === 'icons' ? 'id' : 'path'}
@@ -21,7 +21,7 @@ export function ContentListClient({ pages, contentType, previews }: { pages: Pag
         extra: {
           label: 'Icon',
           // Cleaned SVG from the server (supabaseIcons), safe to inline.
-          render: (p: PageSummary) => (previews[p.id] ? <span className="cera-icon-glyph" aria-hidden="true" dangerouslySetInnerHTML={{ __html: previews[p.id]! }} /> : '—'),
+          render: (page: PageSummary) => (previews[page.id] ? <span className="cera-icon-glyph" aria-hidden="true" dangerouslySetInnerHTML={{ __html: previews[page.id]! }} /> : '—'),
         },
       })}
     />

@@ -1,5 +1,5 @@
 /**
- * `@lateraltranslucence/cera/icons` — icons for `f.icon()` fields: the
+ * `@lateraltranslucence/cera/icons` — icons for `field.icon()` fields: the
  * bundled Lucide set, a site's own icons (the Icon content type), and any
  * other set a site plugs in (e.g. Font Awesome Pro).
  *

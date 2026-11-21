@@ -52,13 +52,13 @@ test('saving sanitizes boxes and panels, including repeater items, and warns whe
   items[0]!.copy = '<h2>Big</h2><p><strong>ok</strong></p>'; // block copy uses the limited toolbar
   raw.panels[0]!.data.copy = '<p>Fine <a href="about">link</a></p>';
 
-  const r = await preparePageForSave(landingPage, raw, { mode: 'publish' });
-  assert.equal(r.ok, true, JSON.stringify(r.issues));
-  assert.equal(r.page!.boxes.hero!.copy, '<p>Hello</p>');
-  assert.equal((r.page!.panels[0]!.data.blocks as Array<Record<string, unknown>>)[0]!.copy, 'Big<p><strong>ok</strong></p>');
-  assert.equal(r.page!.panels[0]!.data.copy, '<p>Fine <a href="about">link</a></p>');
+  const result = await preparePageForSave(landingPage, raw, { mode: 'publish' });
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  assert.equal(result.page!.boxes.hero!.copy, '<p>Hello</p>');
+  assert.equal((result.page!.panels[0]!.data.blocks as Array<Record<string, unknown>>)[0]!.copy, 'Big<p><strong>ok</strong></p>');
+  assert.equal(result.page!.panels[0]!.data.copy, '<p>Fine <a href="about">link</a></p>');
   assert.deepEqual(
-    r.issues.map((i) => [i.code, i.severity, i.path.join('.')]),
+    result.issues.map((issue) => [issue.code, issue.severity, issue.path.join('.')]),
     [
       ['html-sanitized', 'warning', 'boxes.hero.copy'],
       ['html-sanitized', 'warning', 'panels.0.data.blocks.0.copy'],
@@ -70,17 +70,17 @@ test('panels of unknown types are kept exactly, unsanitized (they are never rend
   const raw = clone();
   const unknown = { id: 'u', type: 'carousel', v: 1, data: { copy: '<script>x</script>' } };
   raw.panels.push(unknown);
-  const r = await preparePageForSave(landingPage, raw, { mode: 'draft' });
-  assert.deepEqual(r.page!.panels.at(-1), unknown);
+  const result = await preparePageForSave(landingPage, raw, { mode: 'draft' });
+  assert.deepEqual(result.page!.panels.at(-1), unknown);
 });
 
 test('sanitize warnings do not stop beforeSave, and the warnings survive the second pass', async () => {
   const raw = clone();
   raw.slug = 'home'; // landing page hook sets the title to "Home"
   raw.boxes.hero!.copy = '<p onclick="x()">Hi</p>';
-  const r = await preparePageForSave(landingPage, raw, { mode: 'publish' });
-  assert.equal(r.ok, true);
-  assert.equal(r.page!.title, 'Home');
-  assert.equal(r.page!.boxes.hero!.copy, '<p>Hi</p>');
-  assert.deepEqual(r.issues.map((i) => i.path.join('.')), ['boxes.hero.copy']);
+  const result = await preparePageForSave(landingPage, raw, { mode: 'publish' });
+  assert.equal(result.ok, true);
+  assert.equal(result.page!.title, 'Home');
+  assert.equal(result.page!.boxes.hero!.copy, '<p>Hi</p>');
+  assert.deepEqual(result.issues.map((issue) => issue.path.join('.')), ['boxes.hero.copy']);
 });

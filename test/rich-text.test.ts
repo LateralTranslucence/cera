@@ -15,10 +15,10 @@ let html: typeof import('../src/admin/rich-text/html.ts');
 const GLOBALS = ['window', 'document', 'navigator', 'Node', 'Element', 'HTMLElement', 'Text', 'DocumentFragment', 'DOMParser', 'MutationObserver', 'getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame'];
 
 before(async () => {
-  const g = globalThis as Record<string, unknown>;
+  const globalScope = globalThis as Record<string, unknown>;
   for (const key of GLOBALS) {
     const value = key === 'window' ? window : (window as unknown as Record<string, unknown>)[key];
-    Object.defineProperty(g, key, { value: typeof value === 'function' && /^[a-z]/.test(key) ? value.bind(window) : value, configurable: true, writable: true });
+    Object.defineProperty(globalScope, key, { value: typeof value === 'function' && /^[a-z]/.test(key) ? value.bind(window) : value, configurable: true, writable: true });
   }
   ({ Editor } = await import('@tiptap/core'));
   ({ richTextExtensions } = await import('../src/admin/rich-text/extensions.ts'));

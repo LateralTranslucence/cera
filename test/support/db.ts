@@ -39,7 +39,7 @@ const SUPABASE_STUB = `
 export async function createTestDb(): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(SUPABASE_STUB);
-  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
+  for (const file of readdirSync(MIGRATIONS).filter((fileName) => fileName.endsWith('.sql')).sort()) {
     await db.exec(readFileSync(join(MIGRATIONS, file), 'utf8'));
   }
   return db;
@@ -54,26 +54,26 @@ export async function addUser(db: PGlite, role: 'admin' | 'editor' | 'viewer' | 
 export type DbRole = 'anon' | 'authenticated' | 'service_role';
 
 /** Runs `sql` as `role`, with JWT claims visible to auth.jwt(). */
-export async function queryAs<T = Record<string, unknown>>(
+export async function queryAs<Row = Record<string, unknown>>(
   db: PGlite,
   role: DbRole,
   sql: string,
   params: unknown[] = [],
   claims: Record<string, unknown> = {},
-): Promise<T[]> {
+): Promise<Row[]> {
   return db.transaction(async (tx) => {
     await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)]);
     await tx.exec(`set local role ${role}`);
-    const r = await tx.query<T>(sql, params);
-    return r.rows;
+    const result = await tx.query<Row>(sql, params);
+    return result.rows;
   });
 }
 
 type PgError = { code?: string; message: string };
 
-function toError(e: unknown): PgError {
-  const err = e as { code?: string; message?: string };
-  return { code: err.code, message: err.message ?? String(e) };
+function toError(error: unknown): PgError {
+  const err = error as { code?: string; message?: string };
+  return { code: err.code, message: err.message ?? String(error) };
 }
 
 /**
@@ -98,16 +98,16 @@ export function fakeSupabase(
     let limit = '';
     // [column, value, operator]: `=` for eq, `= any` for in (value is an array), `ilike` for ilike.
     const filters: Array<[string, unknown, 'eq' | 'in' | 'ilike']> = [];
-    const condition = ([c, , op]: (typeof filters)[number], i: number) =>
-      op === 'in' ? `${c}::text = any($${i + 1}::text[])` : op === 'ilike' ? `${c} ilike $${i + 1}` : `${c} = $${i + 1}`;
+    const condition = ([column, , op]: (typeof filters)[number], i: number) =>
+      op === 'in' ? `${column}::text = any($${i + 1}::text[])` : op === 'ilike' ? `${column} ilike $${i + 1}` : `${column} = $${i + 1}`;
     const run = async (single: boolean) => {
       const where = filters.length ? ` where ${filters.map(condition).join(' and ')}` : '';
       try {
-        const rows = await queryAs(db, role, `select ${columns} from public.${table}${where}${orderBy}${limit}`, filters.map(([, v]) => v), claims);
+        const rows = await queryAs(db, role, `select ${columns} from public.${table}${where}${orderBy}${limit}`, filters.map(([, value]) => value), claims);
         if (single && rows.length > 1) return { data: null, error: { code: 'PGRST116', message: 'multiple rows' } };
         return { data: single ? (rows[0] ?? null) : rows, error: null };
-      } catch (e) {
-        return { data: null, error: toError(e) };
+      } catch (error) {
+        return { data: null, error: toError(error) };
       }
     };
     const builder = {
@@ -131,19 +131,19 @@ export function fakeSupabase(
         orderBy = ` order by ${column} ${opts.ascending === false ? 'desc' : 'asc'}`;
         return builder;
       },
-      limit(n: number) {
-        limit = ` limit ${Number(n)}`;
+      limit(maxRows: number) {
+        limit = ` limit ${Number(maxRows)}`;
         return builder;
       },
       maybeSingle: () => run(true),
-      then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => run(false).then(resolve, reject),
+      then: (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => run(false).then(resolve, reject),
     };
     return builder;
   };
 
   const rpc = async (fn: string, args: Record<string, unknown> = {}) => {
     const keys = Object.keys(args);
-    const call = `public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')})`;
+    const call = `public.${fn}(${keys.map((key, i) => `${key} => $${i + 1}`).join(', ')})`;
     // Functions that return rows come back as a JSON array, as PostgREST sends them (times as ISO strings).
     const procs = await db.query<{ proretset: boolean; names: string[] | null; types: string[] }>(
       `select p.proretset, p.proargnames as names, p.proargtypes::regtype[]::text[] as types
@@ -153,17 +153,17 @@ export function fakeSupabase(
     const proc = procs.rows[0];
     const sql = proc?.proretset ? `select coalesce(jsonb_agg(t), '[]'::jsonb) as result from ${call} t` : `select ${call} as result`;
     // As PostgREST does: JSON for json/jsonb arguments, Postgres arrays for array arguments.
-    const typeOf = (k: string) => proc?.types[proc.names?.indexOf(k) ?? -1] ?? '';
-    const params = keys.map((k) => {
-      const v = args[k];
-      if (Array.isArray(v) && typeOf(k).endsWith('[]')) return v;
-      return v !== null && typeof v === 'object' ? JSON.stringify(v) : v;
+    const typeOf = (key: string) => proc?.types[proc.names?.indexOf(key) ?? -1] ?? '';
+    const params = keys.map((key) => {
+      const value = args[key];
+      if (Array.isArray(value) && typeOf(key).endsWith('[]')) return value;
+      return value !== null && typeof value === 'object' ? JSON.stringify(value) : value;
     });
     try {
       const rows = await queryAs<{ result: unknown }>(db, role, sql, params, claims);
       return { data: rows[0]?.result ?? null, error: null };
-    } catch (e) {
-      return { data: null, error: toError(e) };
+    } catch (error) {
+      return { data: null, error: toError(error) };
     }
   };
 
@@ -175,12 +175,12 @@ export function fakeSupabase(
         return { data: { path, token, signedUrl: `https://storage.test/object/upload/sign/${bucket}/${path}?token=${token}` }, error: null };
       },
       async info(path: string) {
-        const o = objects.get(path);
-        if (!o) return { data: null, error: { message: 'Object not found', statusCode: '404' } };
-        return { data: { name: path, bucketId: bucket, contentType: o.contentType, size: o.size }, error: null };
+        const storedObject = objects.get(path);
+        if (!storedObject) return { data: null, error: { message: 'Object not found', statusCode: '404' } };
+        return { data: { name: path, bucketId: bucket, contentType: storedObject.contentType, size: storedObject.size }, error: null };
       },
       async remove(paths: string[]) {
-        for (const p of paths) objects.delete(p);
+        for (const path of paths) objects.delete(path);
         return { data: paths.map((name) => ({ name })), error: null };
       },
     }),
