@@ -9,6 +9,9 @@
     "exactOptionalPropertyTypes": false,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
+    // Inside this repo, the package's own imports resolve to src/ (the
+    // "source" export condition); everyone else gets dist/.
+    "customConditions": ["source"],
     "noEmit": true,
     "skipLibCheck": true,
     "types": [

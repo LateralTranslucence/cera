@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { defineContentType, definePanel, field, readPage, type StoredPage } from '../src/index.ts';
 import { PanelBoundary, Panels, createPreviewHandler, previewSecret } from '../src/next/index.ts';
 import { returnPath } from '../src/next/preview.ts';
-import { text } from '../src/panels/text.ts';
+import { text } from '../src/panels/text.panel.ts';
 
 const exploding = definePanel({
   type: 'exploding',

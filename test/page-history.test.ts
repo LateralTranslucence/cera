@@ -10,7 +10,9 @@ import {
   getPublishedPage,
   listPages,
   pageHistory,
+  getRevisionPage,
   pageLinks,
+  pruneRevisions,
   restoreRevision,
   savePage,
   unpublishPage,
@@ -180,4 +182,35 @@ test('restoring checks the version, the editor and the address', async () => {
   await save(newPage('restore-b'), 'draft', 0);
   result = await restoreRevision(server, landingPage, page.id, 1, { expectedVersion: 2, userId: editor });
   assert.deepEqual([result.ok, !result.ok && result.reason], [false, 'slug-taken']);
+});
+
+test('pruning keeps each page’s newest drafts, every published version and the current one', async () => {
+  const page = newPage('prune-a', 'Version 1');
+  await save(page, 'publish', 0);
+  for (let version = 2; version <= 7; version++) await save({ ...page, title: `Version ${version}` }, 'draft', version - 1);
+  // Make every revision old enough to prune.
+  await db.query(`update public.cera_page_revisions set created_at = now() - interval '60 days' where page_id = $1`, [page.id]);
+
+  // Young drafts stay whatever their number.
+  assert.equal(await pruneRevisions(server, { keep: 2, olderThanDays: 90 }), 0);
+  assert.equal(await pruneRevisions(server, { keep: 2, olderThanDays: 30 }), 4);
+  const left = (await pageHistory(staff, page.id)).map((revision) => revision.version);
+  // Drafts 6 and 7 (the newest two, 7 being current) and the published version 1.
+  assert.deepEqual(left, [7, 6, 1]);
+  assert.equal((await getPublishedPage(server, landingPage, 'prune-a'))?.page.title, 'Version 1');
+
+  // Only the server may prune.
+  await assert.rejects(pruneRevisions(staff), { code: '42501' });
+  await assert.rejects(pruneRevisions(server, { keep: 0 }));
+});
+
+test('an old version reads like a working copy, for previewing it from History', async () => {
+  const page = newPage('revision-a', 'First');
+  await save(page, 'publish', 0);
+  await save({ ...page, title: 'Second' }, 'draft', 1);
+  const old = await getRevisionPage(server, [landingPage], page.id, 1);
+  assert.deepEqual([old?.page.title, old?.page.status, old?.type], ['First', 'draft', landingPage.name]);
+  assert.equal(await getRevisionPage(server, [landingPage], page.id, 9), null);
+  // Visitors can read only the live version.
+  assert.equal((await getRevisionPage(anonymous, [landingPage], page.id, 2)), null);
 });

@@ -2,11 +2,11 @@
 import { test } from 'node:test';
 import type { CTA, ImageLink, InferFields, LinkedPage, MediaRef, PageOf, PanelData, PanelDefinition, PanelPropsOf } from '../src/index.ts';
 import { field } from '../src/index.ts';
-import type { textMedia } from '../src/panels/text-media.ts';
+import type { textMedia } from '../src/panels/text-media.panel.ts';
 import type { blocksFields } from '../src/panels/blocks.fields.ts';
-import type { blocks } from '../src/panels/blocks.ts';
-import type { featuredPost } from '../src/panels/featured-post.ts';
-import type { decisionTree } from '../src/panels/decision-tree.ts';
+import type { blocks } from '../src/panels/blocks.panel.ts';
+import type { featuredPost } from '../src/panels/featured-post.panel.ts';
+import type { decisionTree } from '../src/panels/decision-tree.panel.ts';
 import type { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 
 type Equal<Actual, Expected> = (<Probe>() => Probe extends Actual ? 1 : 2) extends <Probe>() => Probe extends Expected ? 1 : 2 ? true : false;

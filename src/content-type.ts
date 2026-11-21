@@ -71,6 +71,14 @@ export interface ContentTypeConfig<Name extends string, Boxes extends BoxMap, Pa
   /** A page's own breadcrumbs, after the type's, e.g. from a field editors fill in. */
   pageBreadcrumbs?: (page: PageDocument<Name, Boxes, Panels>) => Breadcrumb[];
   boxes: Boxes;
+  /**
+   * Boxes visitors must never see (theme: private_fields), e.g. a form's
+   * email settings. They're edited and saved like any box, with history, but
+   * kept out of what visitors can read, published versions included: pages
+   * read for the live site have their defaults. The server reads them with
+   * `getPrivateBoxes` and the secret key.
+   */
+  privateBoxes?: ReadonlyArray<keyof Boxes & string>;
   panels?: Panels;
   seo?: {
     title?: (page: PageDocument<Name, Boxes, Panels>) => string | undefined;

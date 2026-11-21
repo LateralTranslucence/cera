@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultsFor, getIn, humanize, issuesAt, moveItem, newPanel, newRepeaterItem, removeItem, setIn, slugify } from '../src/admin/state.ts';
 import type { PageIssue } from '../src/index.ts';
-import { blocks } from '../src/panels/blocks.ts';
+import { blocks } from '../src/panels/blocks.panel.ts';
 import { blocksFields } from '../src/panels/blocks.fields.ts';
 
 test('setIn is immutable, creates containers and removes cleared keys', () => {

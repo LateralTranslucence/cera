@@ -7,7 +7,7 @@
  * must round-trip whatever is stored, including invalid values the editor is
  * still fixing and keys it doesn't know.
  */
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ComponentType, type ReactNode } from 'react';
 import type { AnyField, FieldMap, Option, OptionsContext, OptionsSource } from '../fields.ts';
 import type { PageIssue } from '../document.ts';
 import { GalleryInput, MediaInput, type MediaContext } from './media.tsx';
@@ -32,6 +32,23 @@ export interface PageOption {
   published: boolean;
 }
 
+/**
+ * A site's own control for a `custom()` field kind. It gets the raw stored
+ * value (unknown: check it), and sets a new one with onChange.
+ */
+export interface CustomControlProps {
+  /** The input's id: the field's label points at it. */
+  id: string;
+  field: AnyField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  readOnly: boolean;
+  context: FormContext;
+}
+
+/** Controls for `custom()` kinds, by kind: `{ color: ColorPicker }`. */
+export type CustomControls = Record<string, ComponentType<CustomControlProps>>;
+
 export interface FormContext {
   issues: readonly PageIssue[];
   options: OptionsContext;
@@ -42,6 +59,8 @@ export interface FormContext {
   media?: MediaContext;
   /** The site's icon sets, for `field.icon()` fields. Without it, icon fields take typed values (`lucide:rocket`). */
   icons?: IconsContext;
+  /** The site's controls for `custom()` kinds. A kind without one shows read-only, its value kept. */
+  controls?: CustomControls;
 }
 
 type Change = (value: unknown) => void;
@@ -376,13 +395,16 @@ function Control({ field, value, onChange, path, siblings, context, id }: FieldP
       );
     }
 
-    default:
+    default: {
+      const Custom = context.controls?.[field.kind];
+      if (Custom) return <Custom id={id} field={field} value={value} onChange={onChange} readOnly={readOnly} context={context} />;
       return (
         <>
           <pre className="cera-readonly">{JSON.stringify(value, null, 2) ?? '(empty)'}</pre>
           <p className="cera-note">No editor for “{field.kind}” fields yet. The stored value is kept as is.</p>
         </>
       );
+    }
   }
 }
 

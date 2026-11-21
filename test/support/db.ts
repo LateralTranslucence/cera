@@ -28,8 +28,14 @@ const SUPABASE_STUB = `
     id text primary key, name text not null, public boolean not null default false,
     file_size_limit bigint, allowed_mime_types text[]
   );
+  -- Storage's objects table, as far as the media cleanup reads it.
+  create table storage.objects (
+    id uuid primary key default gen_random_uuid(), bucket_id text not null, name text not null,
+    created_at timestamptz not null default now()
+  );
   grant usage on schema storage to service_role;
   grant select on storage.buckets to service_role;
+  grant select on storage.objects to service_role;
 
   grant usage on schema public to anon, authenticated, service_role;
   alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
@@ -79,7 +85,7 @@ function toError(error: unknown): PgError {
 /**
  * The subset of supabase-js the Cera Supabase module uses:
  *   from(t).select(cols).eq(c, v)….maybeSingle()
- *   from(t).select(cols).in(c, vs).ilike(c, p).order(c, { ascending }).limit(n)
+ *   from(t).select(cols).in(c, vs).ilike(c, p).lt(c, v).order(c, { ascending }).limit(n)
  *   rpc(fn, namedArgs)
  *   storage.from(bucket).createSignedUploadUrl / info / remove
  *
@@ -96,10 +102,11 @@ export function fakeSupabase(
     let columns = '*';
     let orderBy = '';
     let limit = '';
-    // [column, value, operator]: `=` for eq, `= any` for in (value is an array), `ilike` for ilike.
-    const filters: Array<[string, unknown, 'eq' | 'in' | 'ilike']> = [];
+    // [column, value, operator]: `=` for eq, `= any` for in (value is an array), `ilike` for ilike, `<` for lt.
+    const filters: Array<[string, unknown, 'eq' | 'in' | 'ilike' | 'lt']> = [];
+    const operators = { eq: '=', ilike: 'ilike', lt: '<' } as const;
     const condition = ([column, , operator]: (typeof filters)[number], i: number) =>
-      operator === 'in' ? `${column}::text = any($${i + 1}::text[])` : operator === 'ilike' ? `${column} ilike $${i + 1}` : `${column} = $${i + 1}`;
+      operator === 'in' ? `${column}::text = any($${i + 1}::text[])` : `${column} ${operators[operator]} $${i + 1}`;
     const run = async (single: boolean) => {
       const where = filters.length ? ` where ${filters.map(condition).join(' and ')}` : '';
       try {
@@ -125,6 +132,10 @@ export function fakeSupabase(
       },
       ilike(column: string, pattern: string) {
         filters.push([column, pattern, 'ilike']);
+        return builder;
+      },
+      lt(column: string, value: unknown) {
+        filters.push([column, value, 'lt']);
         return builder;
       },
       order(column: string, options: { ascending?: boolean } = {}) {

@@ -11,7 +11,7 @@ npm install
 supabase start                      # local stack on ports 56320–56329, applies supabase/migrations
 npm run env -w cera-next-site       # writes examples/next-site/.env.local from `supabase status`
 npm run seed -w cera-next-site      # admin account + a published home and about page
-npm run dev -w cera-next-site       # http://localhost:3100
+npm run dev                         # builds the package, rebuilds it on change, and serves http://localhost:3100
 ```
 
 - **Admin:** http://localhost:3100/admin. Sign in with `CERA_ADMIN_EMAIL` / `CERA_ADMIN_PASSWORD` from `.env.local` (generated locally; the seed creates or resets that account).
@@ -47,13 +47,14 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 | `app/api/cera/search` | The Search panel's endpoint: `createSearchHandler` (live pages, or working copies in draft mode), with live results cached |
 | `app/api/cera/forms` | Where forms post: `createFormHandler` (token, honeypot, checks, rate limit), storing submissions with the secret key |
 | `app/admin/users`, `app/admin/account` | People (admins: add people, set roles) and Account (change your password) |
-| `app/admin/actions.ts` | Server actions: save/publish via `savePage` with the user from the verified session; media upload (prepare and finish, editors only) and the library; sign in/out |
-| `app/admin/preview` | Preview from the admin: checks the session, enables draft mode |
+| `app/admin/actions.ts` | Server actions: one-line wrappers around the package's `createAdminActions` (save and publish with the user from the verified session, media, people, sign in and out), each checking the role itself |
+| `app/admin/preview` | Preview from the admin (`createPreviewHandler`): checks the session, enables draft mode; with `page` and `version`, an old version from History |
 | `app/api/draft` | Preview for external tools: `/api/draft?secret=…&slug=about` |
+| `app/api/cera/cleanup` | Daily upkeep for Vercel Cron (`vercel.json`, `CRON_SECRET`): removes unfinished and replaced uploads nothing uses, prunes old drafts |
 | `proxy.ts` | Refreshes the admin's Supabase session cookies |
-| `lib/auth.ts` | `requireStaff(role)`: verified user + Cera role from `app_metadata.cera_role` |
-| `lib/pages.ts` | Picks the live revision or, in draft mode, the working copy; logs read issues; `loadContextFor` gives panels' `load` a page resolver, a form resolver and icons (published-only live) |
-| `lib/icons.ts` | The site's icon sets (its own icons, then Lucide; add Font Awesome packs here) and the cached live icon lookup |
+| `lib/auth.ts` | `requireStaff(role)` from the package's `createStaffAuth`: verified user + Cera role from `app_metadata.cera_role` |
+| `lib/pages.ts` | Picks the live revision or, in draft mode, the working copy (or the old version History asked for); logs read issues; `loadContextFor` (the package's `createLoadContexts`) gives panels' `load` linked pages, forms, icons and searches, cached on the live site |
+| `lib/icons.ts` | The site's icon sets: its own icons, then Lucide |
 | `lib/supabase.ts` | Anonymous client (published pages only) and secret-key client (server only) |
 | `scripts/seed.ts` | Admin account and pages, saved through `savePage` like the admin does |
 | `scripts/import-developers-only.ts` | One-off import of the Developers Only WordPress site's content from its REST API (`npm run import:devo`; see decision 35 in HANDOFF.md) |

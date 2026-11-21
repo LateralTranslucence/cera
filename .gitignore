@@ -7,3 +7,5 @@ supabase/.branches
 supabase/.temp
 *.tsbuildinfo
 .vercel
+dist
+packages/create-cera/template

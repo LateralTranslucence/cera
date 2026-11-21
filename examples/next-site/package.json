@@ -5,13 +5,17 @@
   "type": "module",
   "description": "Example Next.js site built on Cera, run against a local Supabase stack",
   "scripts": {
+    "predev": "npm run build --prefix ../..",
     "dev": "next dev --port 3100",
+    "prebuild": "npm run build --prefix ../..",
     "build": "next build",
     "start": "next start --port 3100",
+    "pretypecheck": "npm run build --prefix ../..",
     "typecheck": "tsc --noEmit",
-    "env": "node --import tsx scripts/env.ts",
-    "seed": "node --env-file=.env.local --import tsx scripts/seed.ts",
-    "import:devo": "node --env-file=.env.local --import tsx scripts/import-developers-only.ts"
+    "env": "node --conditions=source --import tsx scripts/env.ts",
+    "seed": "node --env-file=.env.local --conditions=source --import tsx scripts/seed.ts",
+    "import:devo": "node --env-file=.env.local --conditions=source --import tsx scripts/import-developers-only.ts",
+    "dev:site": "next dev --port 3100"
   },
   "dependencies": {
     "@lateraltranslucence/cera": "file:../..",

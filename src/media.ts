@@ -63,7 +63,22 @@ export interface MediaQuery {
   search?: string;
   kinds?: MediaKind[];
   limit?: number;
+  /** The next page: files added before this time (the last file's `createdAt`). */
+  before?: string;
+  /** Only files no page uses (working copy, live or pending scheduled version). */
+  unused?: boolean;
 }
+
+/** A new file for a library item: its uploaded path (from prepareMediaUpload) and size, measured in the browser. */
+export interface MediaReplace {
+  id: string;
+  path: string;
+  width?: number;
+  height?: number;
+}
+
+/** A replaced file, and how many pages now show it. */
+export type MediaReplaceResult = { ok: true; item: MediaItem; pages: number } | { ok: false; message: string };
 
 /** What a browser sends before uploading. Nothing here is trusted: the server checks it, and Storage checks it again. */
 export interface MediaUploadRequest {

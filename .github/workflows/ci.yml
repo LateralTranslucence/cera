@@ -40,3 +40,12 @@ jobs:
         run: npm run build -w cera-next-site
         env:
           NEXT_TELEMETRY_DISABLED: '1'
+
+      # A site made by create-cera, against the package just built. It borrows
+      # this checkout's node_modules rather than installing from npm.
+      - name: Try create-cera
+        run: |
+          node packages/create-cera/scripts/sync-template.mjs
+          node packages/create-cera/index.mjs "$RUNNER_TEMP/new-site" --cera "$PWD"
+          ln -s "$PWD/node_modules" "$RUNNER_TEMP/new-site/node_modules"
+          npx tsc --noEmit -p "$RUNNER_TEMP/new-site"

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mediaAccept, toMediaRef } from '../src/index.ts';
-import { deleteMedia, finishMediaUpload, listMedia, mediaPathFor, mediaUsage, prepareMediaUpload, updateMedia } from '../src/supabase/index.ts';
+import { cleanUpUploads, deleteMedia, finishMediaUpload, listMedia, mediaPathFor, mediaUsage, prepareMediaUpload, replaceMedia, updateMedia } from '../src/supabase/index.ts';
 import { addUser, createTestDb, fakeSupabase, queryAs, type FakeObject } from './support/db.ts';
 
 let db: PGlite;
@@ -236,4 +236,71 @@ test('browsers can’t edit or delete media, and only signed-in users can check 
   await assert.rejects(queryAs(db, 'authenticated', 'select public.cera_delete_media($1, $2)', [item.id, editor], claims), /permission denied/);
   await assert.rejects(queryAs(db, 'authenticated', `update public.cera_media set alt = 'x' where id = $1`, [item.id], claims), /permission denied/);
   await assert.rejects(queryAs(db, 'anon', 'select public.cera_media_usage($1)', [item.path]), /permission denied/);
+});
+
+test('the library pages past its newest files, and lists the files no page uses', async () => {
+  const first = await uploaded('paging-1.png');
+  await db.query(`update public.cera_media set created_at = now() - interval '1 hour' where id = $1`, [first.id]);
+  const second = await uploaded('paging-2.png');
+  const [newest] = await listMedia(anonymous, { search: 'paging', limit: 1 });
+  assert.equal(newest?.id, second.id);
+  assert.deepEqual((await listMedia(anonymous, { search: 'paging', limit: 1, before: newest!.createdAt })).map((media) => media.id), [first.id]);
+
+  const staff = fakeSupabase(db, 'authenticated', { sub: viewer, app_metadata: { cera_role: 'viewer' } });
+  await savePanels(crypto.randomUUID(), 'paging-page', [{ id: 'p1', type: 'cera/featured-media', v: 1, data: { media: { id: first.id, path: first.path, kind: 'image' } } }], { publish: false, version: 0 });
+  assert.deepEqual((await listMedia(staff, { search: 'paging', unused: true })).map((media) => media.id), [second.id]);
+});
+
+test('cleanup removes old files with no library row that no page uses, and nothing else', async () => {
+  const library = await uploaded('kept.png');
+  const old = (name: string) => db.query(`insert into storage.objects (bucket_id, name, created_at) values ('cera-media', $1, now() - interval '2 days')`, [name]);
+  for (const name of ['2026/11/aaaa0001-abandoned.png', '2026/11/aaaa0002-in-a-page.png', library.path]) {
+    await old(name);
+    objects.set(name, { contentType: 'image/png', size: 10 });
+  }
+  await db.query(`insert into storage.objects (bucket_id, name) values ('cera-media', '2026/11/aaaa0003-just-now.png')`);
+  objects.set('2026/11/aaaa0003-just-now.png', { contentType: 'image/png', size: 10 });
+  // A page still points at a file with no library row (it was replaced): it stays.
+  await savePanels(crypto.randomUUID(), 'cleanup-page', [{ id: 'p1', type: 'cera/text', v: 1, data: { copy: '<p><img src="/x/2026/11/aaaa0002-in-a-page.png"></p>' } }], { publish: false, version: 0 });
+
+  assert.deepEqual(await cleanUpUploads(server), ['2026/11/aaaa0001-abandoned.png']);
+  assert.deepEqual(['2026/11/aaaa0002-in-a-page.png', '2026/11/aaaa0003-just-now.png', library.path].map((path) => objects.has(path)), [true, true, true]);
+  // Only the server may look for them.
+  await assert.rejects(cleanUpUploads(anonymous));
+});
+
+test('replace points every page that uses a file at the new one, live versions included', async () => {
+  const item = await uploaded('before.png');
+  const page = crypto.randomUUID();
+  const reference = { id: item.id, path: item.path, kind: 'image', alt: 'Our own words', width: 10, height: 10 };
+  const panels = [
+    { id: 'p1', type: 'cera/featured-media', v: 1, data: { media: reference } },
+    { id: 'p2', type: 'cera/text', v: 1, data: { copy: `<p><img src="https://x.supabase.co/storage/v1/object/public/cera-media/${item.path}"></p>` } },
+  ];
+  await savePanels(page, 'replace-page', panels, { publish: true, version: 0 });
+
+  const ticket = await prepareMediaUpload(server, { name: 'after.webp', type: 'image/webp', size: 2000 });
+  if (!ticket.ok) throw new Error(ticket.message);
+  objects.set(ticket.path, { contentType: 'image/webp', size: 2000 });
+  const replaced = await replaceMedia(server, { id: item.id, path: ticket.path, width: 1200, height: 800 }, { userId: editor });
+  assert.equal(replaced.ok, true, JSON.stringify(replaced));
+  if (!replaced.ok) return;
+  assert.deepEqual([replaced.item.id, replaced.item.path, replaced.item.mimeType, replaced.item.width, replaced.pages], [item.id, ticket.path, 'image/webp', 1200, 1]);
+
+  for (const table of ['cera_pages where id = $1', 'cera_page_revisions where page_id = $1 and is_published']) {
+    const [row] = await queryAs<{ panels: Array<{ data: Record<string, unknown> }> }>(db, 'service_role', `select panels from public.${table}`, [page]);
+    assert.deepEqual(row?.panels[0]?.data.media, { ...reference, path: ticket.path, width: 1200, height: 800 }, table);
+    assert.match(String(row?.panels[1]?.data.copy), new RegExp(ticket.path));
+    assert.doesNotMatch(String(row?.panels[1]?.data.copy), new RegExp(item.path));
+  }
+  // The old file stays in Storage until cleanup finds nothing using it.
+  assert.equal(objects.has(item.path), true);
+
+  const video = await prepareMediaUpload(server, { name: 'clip.mp4', type: 'video/mp4', size: 3000 });
+  if (!video.ok) throw new Error(video.message);
+  objects.set(video.path, { contentType: 'video/mp4', size: 3000 });
+  const mismatch = await replaceMedia(server, { id: item.id, path: video.path }, { userId: editor });
+  assert.deepEqual(mismatch, { ok: false, message: 'Replace an image with an image, and a video with a video.' });
+  assert.equal(objects.has(video.path), false);
+  assert.equal((await replaceMedia(server, { id: item.id, path: ticket.path }, { userId: viewer })).ok, false);
 });

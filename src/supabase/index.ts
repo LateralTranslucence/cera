@@ -43,7 +43,7 @@ export {
 } from './forms.ts';
 export { supabaseIcons } from './icons.ts';
 export { createSearchResolver, DEFAULT_SEARCH_ENDPOINT, searchableText, searchedTypes } from './search.ts';
-export { deleteMedia, finishMediaUpload, listMedia, MEDIA_BUCKET, mediaPathFor, mediaUsage, prepareMediaUpload, updateMedia } from './media.ts';
+export { cleanUpUploads, deleteMedia, finishMediaUpload, listMedia, MEDIA_BUCKET, mediaPathFor, mediaUsage, prepareMediaUpload, replaceMedia, updateMedia } from './media.ts';
 export {
   CERA_ROLE_LABELS,
   CERA_ROLES,
@@ -76,8 +76,40 @@ function toStored(id: string, row: PageRow): StoredPage {
 export { CeraDatabaseError };
 
 /** The page as the save functions take it: with its content type's address scope (see `slugScope`). */
+/** The reserved key that carries private boxes to the database (see the cera_private_boxes migration). */
+const PRIVATE_KEY = '$private';
+
 function forRpc(contentType: AnyContentType, page: StoredPage) {
-  return { ...page, slugScope: contentType.slugScope ?? contentType.name };
+  const names: readonly string[] = contentType.privateBoxes ?? [];
+  if (names.length === 0) return { ...page, slugScope: contentType.slugScope ?? contentType.name };
+  const boxes: Record<string, unknown> = {};
+  const hidden: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(page.boxes ?? {})) (names.includes(name) ? hidden : boxes)[name] = value;
+  return { ...page, boxes: { ...boxes, [PRIVATE_KEY]: hidden }, slugScope: contentType.slugScope ?? contentType.name };
+}
+
+/** A stored row's boxes with its private boxes put back, for the editor and restoring. */
+function withPrivateBoxes(row: PageRow & { private_boxes?: PageRow['boxes'] | null }): PageRow {
+  return { ...row, boxes: { ...(row.boxes ?? {}), ...(row.private_boxes ?? {}) } };
+}
+
+/**
+ * A page's private boxes (a content type's `privateBoxes`): the live
+ * version's by default, or the working copy's. Null when the page or its live
+ * version doesn't exist. Service-role client only: visitors can't read them.
+ */
+export async function getPrivateBoxes(
+  service: SupabaseClient,
+  pageId: string,
+  options: { from?: 'live' | 'working' } = {},
+): Promise<Record<string, Record<string, unknown>> | null> {
+  const request =
+    options.from === 'working'
+      ? service.from('cera_pages').select('private_boxes').eq('id', pageId)
+      : service.from('cera_page_revisions').select('private_boxes').eq('page_id', pageId).eq('is_published', true);
+  const { data, error } = await request.maybeSingle();
+  if (error) fail(error);
+  return data ? (((data as { private_boxes?: unknown }).private_boxes ?? {}) as Record<string, Record<string, unknown>>) : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -173,6 +205,27 @@ export async function findDraftPage<const Types extends readonly AnyContentType[
   return { ...readPage(contentType, toStored(row.id, row), { ...options, status: 'draft' }), type: contentType.name } as FoundPage<Types[number]>;
 }
 
+/**
+ * One saved version of a page, read like a working copy (status 'draft'):
+ * previewing an old version from the admin's History. Null when the page has
+ * no such version or it isn't one of these types. Service-role client only:
+ * revisions other than the live one aren't public.
+ */
+export async function getRevisionPage<const Types extends readonly AnyContentType[]>(
+  client: SupabaseClient,
+  contentTypes: Types,
+  pageId: string,
+  version: number,
+  options: Omit<ReadOptions, 'status'> = {},
+): Promise<FoundPage<Types[number]> | null> {
+  const { data, error } = await client.from('cera_page_revisions').select(PAGE_COLUMNS).eq('page_id', pageId).eq('page_version', version).maybeSingle();
+  if (error) fail(error);
+  const row = data as PageRow | null;
+  const contentType = row && contentTypes.find((candidate) => candidate.name === row.content_type);
+  if (!row || !contentType) return null;
+  return { ...readPage(contentType, toStored(pageId, row), { ...options, status: 'draft' }), type: contentType.name } as FoundPage<Types[number]>;
+}
+
 export interface EditablePage {
   /** Exactly as stored, unknown panels and keys included. Send it back to `savePage`. */
   page: StoredPage;
@@ -202,17 +255,18 @@ export interface PageSchedule {
 export async function getPageForEditing(client: SupabaseClient, contentType: AnyContentType, id: string): Promise<EditablePage | null> {
   const { data, error } = await client
     .from('cera_pages')
-    .select(`id, version, updated_at, ${PAGE_COLUMNS}`)
+    .select(`id, version, updated_at, private_boxes, ${PAGE_COLUMNS}`)
     .eq('content_type', contentType.name)
     .eq('id', id)
     .maybeSingle();
   if (error) fail(error);
   if (!data) return null;
-  const row = data as PageRow & { id: string; version: number; updated_at: string };
+  // The editor edits private boxes like the rest.
+  const row = withPrivateBoxes(data as PageRow) as PageRow & { id: string; version: number; updated_at: string };
 
-  const live = await client.from('cera_page_revisions').select(`page_version, ${PAGE_COLUMNS}`).eq('page_id', id).eq('is_published', true).maybeSingle();
+  const live = await client.from('cera_page_revisions').select(`page_version, private_boxes, ${PAGE_COLUMNS}`).eq('page_id', id).eq('is_published', true).maybeSingle();
   if (live.error) fail(live.error);
-  const liveRow = live.data as (PageRow & { page_version: number }) | null;
+  const liveRow = live.data ? (withPrivateBoxes(live.data as PageRow) as PageRow & { page_version: number }) : null;
   const content = (pageRow: PageRow) => JSON.stringify([pageRow.title, pageRow.slug, pageRow.boxes, pageRow.panels]);
   const pending = await client
     .from('cera_page_revisions')
@@ -570,6 +624,19 @@ export async function pageHistory(client: SupabaseClient, pageId: string, option
 }
 
 /**
+ * Deletes old draft revisions: each page keeps its newest `keep` drafts
+ * (default 50) and anything younger than `olderThanDays` (default 30).
+ * Published and scheduled versions, the live one and the current one are
+ * never deleted. The database runs this daily where pg_cron is available.
+ * Service-role client only. Returns how many were deleted.
+ */
+export async function pruneRevisions(client: SupabaseClient, options: { keep?: number; olderThanDays?: number } = {}): Promise<number> {
+  const { data, error } = await client.rpc('cera_prune_revisions', { p_keep: options.keep ?? 50, p_older_than: `${options.olderThanDays ?? 30} days` });
+  if (error) fail(error);
+  return data as number;
+}
+
+/**
  * Restores an old version: its content becomes the working copy, saved as a
  * new draft (checked and upgraded like any draft save). The live page is
  * unchanged until someone publishes. Returns what a draft `savePage` would;
@@ -584,7 +651,7 @@ export async function restoreRevision<Type extends AnyContentType>(
 ): Promise<SaveResult> {
   const { data: row, error: readError } = await client
     .from('cera_page_revisions')
-    .select(PAGE_COLUMNS)
+    .select(`private_boxes, ${PAGE_COLUMNS}`)
     .eq('page_id', pageId)
     .eq('page_version', version)
     .maybeSingle();
@@ -593,7 +660,7 @@ export async function restoreRevision<Type extends AnyContentType>(
     return { ok: false, reason: 'not-found', message: `This page has no version ${version}.`, issues: [] };
   }
 
-  const prepared = await preparePageForSave(contentType, toStored(pageId, row as PageRow), { mode: 'draft' });
+  const prepared = await preparePageForSave(contentType, toStored(pageId, withPrivateBoxes(row as PageRow)), { mode: 'draft' });
   if (!prepared.ok) return { ok: false, reason: 'invalid', issues: prepared.issues };
 
   const { data, error } = await client.rpc('cera_restore_revision', {

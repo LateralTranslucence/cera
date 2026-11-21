@@ -90,7 +90,10 @@ export function EditorClient({
       onDeleted={() => router.replace(`${list}?deleted=${encodeURIComponent(page.title || `Untitled ${noun}`)}`)}
       backHref={list}
       backLabel={title}
-      {...(contentType.route && { previewHref: (slug: string) => `/admin/preview?slug=${encodeURIComponent(slug)}` })}
+      {...(contentType.route && {
+        previewHref: (slug: string, version?: { pageId: string; version: number }) =>
+          `/admin/preview?slug=${encodeURIComponent(slug)}${version ? `&page=${version.pageId}&version=${version.version}` : ''}`,
+      })}
     />
   );
 }

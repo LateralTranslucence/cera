@@ -1,6 +1,6 @@
 /**
  * Writes .env.local from the running local Supabase stack (`supabase start`
- * at the repo root). Keeps an existing CERA_PREVIEW_SECRET.
+ * in the site, or at this repository's root). Keeps an existing CERA_PREVIEW_SECRET.
  *
  *   npm run env -w cera-next-site
  */
@@ -10,7 +10,9 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
 const site = join(import.meta.dirname, '..');
-const repoRoot = join(site, '..', '..');
+// Where `supabase start` runs: the site itself when it has its own supabase/
+// folder (a site made by create-cera), else this repository's root.
+const repoRoot = existsSync(join(site, 'supabase', 'config.toml')) ? site : join(site, '..', '..');
 const target = join(site, '.env.local');
 
 function parse(text: string): Record<string, string> {

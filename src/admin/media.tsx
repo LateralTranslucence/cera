@@ -17,6 +17,8 @@ import {
   type MediaItem,
   type MediaKind,
   type MediaQuery,
+  type MediaReplace,
+  type MediaReplaceResult,
   type MediaUploadDone,
   type MediaUploadPrepared,
   type MediaUploadRequest,
@@ -41,16 +43,39 @@ export function mediaUploader(actions: {
   finish: (done: MediaUploadDone) => Promise<MediaUploadResult>;
 }): MediaContext['upload'] {
   return async (file) => {
-    const [size, ticket] = await Promise.all([measure(file), actions.prepare({ name: file.name, type: file.type, size: file.size })]);
-    if (!ticket.ok) return ticket;
-    const response = await fetch(ticket.signedUrl, {
-      method: 'PUT',
-      headers: { 'content-type': file.type, 'cache-control': 'max-age=31536000', 'x-upsert': 'false' },
-      body: file,
-    }).catch(() => null);
-    if (!response?.ok) return { ok: false, message: await uploadError(response) };
-    return actions.finish({ path: ticket.path, ...size });
+    const sent = await sendToStorage(file, actions.prepare);
+    return sent.ok ? actions.finish({ path: sent.path, ...sent.size }) : sent;
   };
+}
+
+/**
+ * Replaces a library file: uploads the new one like mediaUploader, then a
+ * server action wrapping `replaceMedia` swaps it in on every page.
+ */
+export function mediaReplacer(actions: {
+  prepare: (request: MediaUploadRequest) => Promise<MediaUploadPrepared>;
+  replace: (replace: MediaReplace) => Promise<MediaReplaceResult>;
+}): (id: string, file: File) => Promise<MediaReplaceResult> {
+  return async (id, file) => {
+    const sent = await sendToStorage(file, actions.prepare);
+    return sent.ok ? actions.replace({ id, path: sent.path, ...sent.size }) : sent;
+  };
+}
+
+/** Gets a signed URL, uploads the file to it, and measures the file meanwhile. */
+async function sendToStorage(
+  file: File,
+  prepare: (request: MediaUploadRequest) => Promise<MediaUploadPrepared>,
+): Promise<{ ok: true; path: string; size: { width?: number; height?: number } } | { ok: false; message: string }> {
+  const [size, ticket] = await Promise.all([measure(file), prepare({ name: file.name, type: file.type, size: file.size })]);
+  if (!ticket.ok) return ticket;
+  const response = await fetch(ticket.signedUrl, {
+    method: 'PUT',
+    headers: { 'content-type': file.type, 'cache-control': 'max-age=31536000', 'x-upsert': 'false' },
+    body: file,
+  }).catch(() => null);
+  if (!response?.ok) return { ok: false, message: await uploadError(response) };
+  return { ok: true, path: ticket.path, size };
 }
 
 async function uploadError(response: Response | null): Promise<string> {
@@ -315,30 +340,39 @@ function MediaPreview({ media }: { media: MediaRef }) {
 }
 
 /** A searchable grid of library items. Changing `version` reloads it (after an upload, edit or delete). */
+const PAGE_SIZE = 60;
+
 export function MediaLibrary({
   find,
   kinds,
   isSelected,
   onPick,
   version = 0,
+  unused = false,
 }: {
   find: MediaContext['find'];
   kinds: MediaKind[];
   isSelected: (id: string) => boolean;
   onPick: (item: MediaItem) => void;
   version?: number;
+  /** Only files no page uses. */
+  unused?: boolean;
 }) {
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<MediaItem[] | null>(null);
   const [error, setError] = useState(false);
+  // Whether the last page came back full, so there may be more.
+  const [more, setMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const kindsKey = kinds.join(',');
+  const query = { search, kinds: kindsKey.split(',') as MediaKind[], limit: PAGE_SIZE, ...(unused && { unused }) };
 
   useEffect(() => {
     let current = true;
     const timer = setTimeout(
       () => {
-        find({ search, kinds: kindsKey.split(',') as MediaKind[], limit: 60 })
-          .then((found) => current && (setItems(found), setError(false)))
+        find({ search, kinds: kindsKey.split(',') as MediaKind[], limit: PAGE_SIZE, ...(unused && { unused }) })
+          .then((found) => current && (setItems(found), setMore(found.length === PAGE_SIZE), setError(false)))
           .catch(() => current && setError(true));
       },
       search ? 250 : 0,
@@ -347,7 +381,20 @@ export function MediaLibrary({
       current = false;
       clearTimeout(timer);
     };
-  }, [find, search, kindsKey, version]);
+  }, [find, search, kindsKey, version, unused]);
+
+  function loadMore() {
+    const last = items?.[items.length - 1];
+    if (!last?.createdAt) return;
+    setLoadingMore(true);
+    find({ ...query, before: last.createdAt })
+      .then((found) => {
+        setItems((previous) => [...(previous ?? []), ...found.filter((item) => !previous?.some((known) => known.id === item.id))]);
+        setMore(found.length === PAGE_SIZE);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoadingMore(false));
+  }
 
   return (
     <div className="cera-media__library">
@@ -357,8 +404,9 @@ export function MediaLibrary({
       ) : items === null ? (
         <p className="cera-note">Loading…</p>
       ) : items.length === 0 ? (
-        <p className="cera-note">{search ? 'Nothing matches.' : 'The library is empty. Upload a file to start it.'}</p>
+        <p className="cera-note">{search ? 'Nothing matches.' : unused ? 'Every file is used on a page.' : 'The library is empty. Upload a file to start it.'}</p>
       ) : (
+        <>
         <ul className="cera-media__grid">
           {items.map((item) => (
             <li key={item.id}>
@@ -369,6 +417,12 @@ export function MediaLibrary({
             </li>
           ))}
         </ul>
+        {more && (
+          <button type="button" className="cera-button cera-button--small cera-media__more" disabled={loadingMore} onClick={loadMore}>
+            {loadingMore ? 'Loading…' : 'Load more'}
+          </button>
+        )}
+        </>
       )}
     </div>
   );
