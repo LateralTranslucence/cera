@@ -284,8 +284,8 @@ const pages: StoredPage[] = [
   },
 ];
 
-const onlyArg = process.argv.indexOf('--only');
-const only = onlyArg > -1 ? new Set((process.argv[onlyArg + 1] ?? '').split(',').filter(Boolean)) : null;
+const onlyFlagIndex = process.argv.indexOf('--only');
+const only = onlyFlagIndex > -1 ? new Set((process.argv[onlyFlagIndex + 1] ?? '').split(',').filter(Boolean)) : null;
 if (only) {
   const unknown = [...only].filter((slug) => !pages.some((page) => page.slug === slug));
   if (only.size === 0 || unknown.length) throw new Error(`--only takes page slugs from this script: ${pages.map((page) => page.slug).join(', ')}.`);

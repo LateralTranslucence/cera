@@ -9,7 +9,7 @@ export const postsFields = {
     label: 'Post Type',
     note: 'Limits which pages you can pick below. None ticked: any type.',
     multiple: true,
-    options: (ctx) => ctx.contentTypes.filter((contentType) => contentType.public).map((contentType) => ({ label: contentType.label, value: contentType.name })),
+    options: (context) => context.contentTypes.filter((contentType) => contentType.public).map((contentType) => ({ label: contentType.label, value: contentType.name })),
   }),
   posts: field.relation({ label: 'Posts', to: { field: 'postTypes' } }),
   perRow: field.perRow({ label: 'Posts Per Row', note: 'Default is 3.' }),

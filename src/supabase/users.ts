@@ -89,12 +89,12 @@ export async function createCeraUser(service: SupabaseClient, input: { email: st
 export async function setCeraRole(
   service: SupabaseClient,
   input: { userId: string; role: CeraRole | null },
-  opts: { actingUserId: string },
+  options: { actingUserId: string },
 ): Promise<UserResult> {
   const userId = String(input?.userId ?? '');
   const role = input?.role ?? null;
   if (role !== null && !isCeraRole(role)) return { ok: false, message: 'Pick a role.' };
-  if (userId === opts.actingUserId) return { ok: false, message: 'You can’t change your own role. Ask another admin.' };
+  if (userId === options.actingUserId) return { ok: false, message: 'You can’t change your own role. Ask another admin.' };
 
   const { data: found, error: getError } = await service.auth.admin.getUserById(userId);
   if (getError || !found?.user) return { ok: false, message: 'That account no longer exists.' };

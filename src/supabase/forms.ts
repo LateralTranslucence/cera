@@ -55,10 +55,10 @@ export async function getDraftForm(client: SupabaseClient, formId: string): Prom
  * version normally, the working copy in draft-mode preview. `endpoint` is
  * where the form posts (see `createFormHandler` in `cera/next`).
  */
-export function createFormResolver(client: SupabaseClient, opts: { draft: boolean; endpoint?: string }): FormResolver {
+export function createFormResolver(client: SupabaseClient, options: { draft: boolean; endpoint?: string }): FormResolver {
   return {
-    endpoint: opts.endpoint ?? DEFAULT_FORM_ENDPOINT,
-    byId: (id) => (opts.draft ? getDraftForm(client, id) : getLiveForm(client, id)),
+    endpoint: options.endpoint ?? DEFAULT_FORM_ENDPOINT,
+    byId: (id) => (options.draft ? getDraftForm(client, id) : getLiveForm(client, id)),
   };
 }
 
@@ -108,8 +108,8 @@ export interface Submission {
 type SubmissionRow = { id: string; form_id: string; form_version: number; data: SubmissionValue[]; email: string | null; page_path: string | null; created_at: string };
 
 /** Submissions newest first, for one form or all, `limit` at a time (default 50), older than `before` (a `createdAt`). */
-export async function listSubmissions(client: SupabaseClient, opts: { formId?: string; before?: string; limit?: number } = {}): Promise<Submission[]> {
-  const { data, error } = await client.rpc('cera_list_submissions', { p_form_id: opts.formId ?? null, p_before: opts.before ?? null, p_limit: opts.limit ?? 50 });
+export async function listSubmissions(client: SupabaseClient, options: { formId?: string; before?: string; limit?: number } = {}): Promise<Submission[]> {
+  const { data, error } = await client.rpc('cera_list_submissions', { p_form_id: options.formId ?? null, p_before: options.before ?? null, p_limit: options.limit ?? 50 });
   if (error) fail(error);
   return ((data as SubmissionRow[] | null) ?? []).map((row) => ({
     id: row.id,
@@ -134,8 +134,8 @@ export async function submissionCounts(client: SupabaseClient): Promise<Map<stri
  * of `formId`'s. Returns how many went. Service-role client only; the
  * database checks that `userId` is an admin or editor.
  */
-export async function deleteSubmissions(client: SupabaseClient, opts: { ids?: string[]; formId?: string; userId: string }): Promise<number> {
-  const { data, error } = await client.rpc('cera_delete_submissions', { p_ids: opts.ids ?? null, p_form_id: opts.formId ?? null, p_user: opts.userId });
+export async function deleteSubmissions(client: SupabaseClient, options: { ids?: string[]; formId?: string; userId: string }): Promise<number> {
+  const { data, error } = await client.rpc('cera_delete_submissions', { p_ids: options.ids ?? null, p_form_id: options.formId ?? null, p_user: options.userId });
   if (error) fail(error);
   return Number(data ?? 0);
 }

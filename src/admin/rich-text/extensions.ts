@@ -32,8 +32,8 @@ const ClassAttribute = Extension.create({
         attributes: {
           class: {
             default: null,
-            parseHTML: (el) => el.getAttribute('class') || null,
-            renderHTML: (attrs) => (attrs.class ? { class: attrs.class } : {}),
+            parseHTML: (element) => element.getAttribute('class') || null,
+            renderHTML: (attributes) => (attributes.class ? { class: attributes.class } : {}),
           },
         },
       },

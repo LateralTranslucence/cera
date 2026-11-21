@@ -12,26 +12,26 @@ export function PostsSlider({ perRow, label, children }: { perRow: number; label
   const [atEnd, setAtEnd] = useState(false);
 
   useEffect(() => {
-    const el = list.current;
-    if (!el) return;
+    const element = list.current;
+    if (!element) return;
     const update = () => {
-      setAtStart(el.scrollLeft <= 1);
-      setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+      setAtStart(element.scrollLeft <= 1);
+      setAtEnd(element.scrollLeft + element.clientWidth >= element.scrollWidth - 1);
     };
     update();
-    el.addEventListener('scroll', update, { passive: true });
+    element.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update);
     return () => {
-      el.removeEventListener('scroll', update);
+      element.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
     };
   }, []);
 
   const move = (direction: 1 | -1) => {
-    const el = list.current;
-    if (!el) return;
+    const element = list.current;
+    if (!element) return;
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    el.scrollBy({ left: direction * el.clientWidth, behavior: reduce ? 'auto' : 'smooth' });
+    element.scrollBy({ left: direction * element.clientWidth, behavior: reduce ? 'auto' : 'smooth' });
   };
 
   return (

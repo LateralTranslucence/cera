@@ -1,7 +1,7 @@
 import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-function env(name: string): string {
+function environmentVariable(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing environment variable ${name}. See .env.example.`);
   return value;
@@ -11,7 +11,7 @@ const options = { auth: { persistSession: false, autoRefreshToken: false } };
 
 /** Anonymous client: can only read published pages (row-level security). */
 export function publicClient(): SupabaseClient {
-  return createClient(env('NEXT_PUBLIC_SUPABASE_URL'), env('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'), options);
+  return createClient(environmentVariable('NEXT_PUBLIC_SUPABASE_URL'), environmentVariable('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'), options);
 }
 
 /**
@@ -20,5 +20,5 @@ export function publicClient(): SupabaseClient {
  * admin, for `savePage`.
  */
 export function serviceClient(): SupabaseClient {
-  return createClient(env('NEXT_PUBLIC_SUPABASE_URL'), env('SUPABASE_SECRET_KEY'), options);
+  return createClient(environmentVariable('NEXT_PUBLIC_SUPABASE_URL'), environmentVariable('SUPABASE_SECRET_KEY'), options);
 }

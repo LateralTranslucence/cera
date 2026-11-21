@@ -82,7 +82,7 @@ test('initials and relative times for the admin chrome', async () => {
   assert.equal(initials(''), '?');
 
   const now = Date.parse('2026-11-20T12:00:00Z');
-  const ago = (ms: number) => new Date(now - ms).toISOString();
+  const ago = (milliseconds: number) => new Date(now - milliseconds).toISOString();
   assert.equal(formatWhen(ago(10_000), now), 'Just now');
   assert.equal(formatWhen(ago(5 * 60_000), now), '5 min ago');
   assert.equal(formatWhen(ago(3 * 3_600_000), now), '3 hr ago');

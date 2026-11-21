@@ -25,7 +25,7 @@ let editor: string;
 let viewer: string;
 let server: SupabaseClient;
 let staff: SupabaseClient;
-let anon: SupabaseClient;
+let anonymous: SupabaseClient;
 
 before(async () => {
   db = await createTestDb();
@@ -34,7 +34,7 @@ before(async () => {
   await db.query(`update auth.users set email = 'ed@example.test' where id = $1`, [editor]);
   server = fakeSupabase(db, 'service_role');
   staff = fakeSupabase(db, 'authenticated', { sub: viewer, app_metadata: { cera_role: 'viewer' } });
-  anon = fakeSupabase(db, 'anon');
+  anonymous = fakeSupabase(db, 'anon');
 });
 
 function newPage(slug: string, title = slug): StoredPage {
@@ -119,7 +119,7 @@ test('pageLinks lists the other pages that link to a page, draft and live', asyn
   );
   assert.deepEqual(await pageLinks(staff, liveLinker.id), []);
   // The public can't ask.
-  await assert.rejects(pageLinks(anon, target.id), { code: '42501' });
+  await assert.rejects(pageLinks(anonymous, target.id), { code: '42501' });
 });
 
 test('pageHistory lists versions newest first, with who saved them and what went live', async () => {
@@ -141,7 +141,7 @@ test('pageHistory lists versions newest first, with who saved them and what went
 
   // Paging: older than version 3, two at a time.
   assert.deepEqual((await pageHistory(staff, page.id, { before: 3, limit: 1 })).map((revision) => revision.version), [2]);
-  await assert.rejects(pageHistory(anon, page.id), { code: '42501' });
+  await assert.rejects(pageHistory(anonymous, page.id), { code: '42501' });
 });
 
 test('restoring a version saves its content as a new draft and leaves the live page alone', async () => {

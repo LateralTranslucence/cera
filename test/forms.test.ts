@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { checkSubmission, formType, publicForm, submissionsCsv, type FormField, type FormResponse, type PublicForm } from '../src/forms/index.ts';
-import { checkFormToken, issueFormToken, MAX_AGE_MS } from '../src/forms/server.ts';
+import { checkFormToken, issueFormToken, MAX_AGE_MILLISECONDS } from '../src/forms/server.ts';
 import { createFormHandler } from '../src/next/forms.ts';
 import { readPage, type StoredPage } from '../src/index.ts';
 import { deletePage, deleteSubmissions, listSubmissions, savePage, submissionCounts, unpublishPage } from '../src/supabase/index.ts';
@@ -187,7 +187,7 @@ test('form tokens: only for that form, a few seconds to a day old', () => {
   const token = issueFormToken('s3cret', id, now);
   assert.equal(checkFormToken('s3cret', id, token, now + 500), 'too-fast');
   assert.equal(checkFormToken('s3cret', id, token, now + 5_000), 'ok');
-  assert.equal(checkFormToken('s3cret', id, token, now + MAX_AGE_MS + 1), 'expired');
+  assert.equal(checkFormToken('s3cret', id, token, now + MAX_AGE_MILLISECONDS + 1), 'expired');
   assert.equal(checkFormToken('s3cret', crypto.randomUUID(), token, now + 5_000), 'invalid');
   assert.equal(checkFormToken('other', id, token, now + 5_000), 'invalid');
   assert.equal(checkFormToken('s3cret', id, `${now - 60_000}.${token.split('.')[1]}`, now + 5_000), 'invalid');
@@ -234,7 +234,7 @@ let editor: string;
 let server: SupabaseClient;
 let staffEditor: SupabaseClient;
 let staffViewer: SupabaseClient;
-let anon: SupabaseClient;
+let anonymous: SupabaseClient;
 const SECRET = 'test-secret';
 
 before(async () => {
@@ -250,7 +250,7 @@ before(async () => {
     sub: viewer,
     app_metadata: { cera_role: 'viewer' },
   });
-  anon = fakeSupabase(db, 'anon');
+  anonymous = fakeSupabase(db, 'anon');
 });
 
 async function publish(stored: StoredPage, expectedVersion = 0) {
@@ -281,8 +281,8 @@ async function post(formHandler: ReturnType<typeof handler>, formId: string, val
   body.set('cera-token', token);
   body.set('cera-page', '/contact-us');
   for (const [name, value] of Object.entries(values)) body.append(name, value);
-  const res = await formHandler.POST(new Request('http://localhost/api/cera/forms', { method: 'POST', body }));
-  return { status: res.status, body: (await res.json()) as FormResponse };
+  const response = await formHandler.POST(new Request('http://localhost/api/cera/forms', { method: 'POST', body }));
+  return { status: response.status, body: (await response.json()) as FormResponse };
 }
 
 const valid = {
@@ -336,7 +336,7 @@ test('the endpoint refuses bots, bad answers and forms that aren’t live', asyn
   const forged = await post(formHandler, stored.id, valid, `${Date.now() - 5_000}.forged`);
   assert.deepEqual([forged.status, forged.body.ok === false && forged.body.reason], [403, 'bad-request']);
 
-  const old = await post(formHandler, stored.id, valid, issueFormToken(SECRET, stored.id, Date.now() - MAX_AGE_MS - 1_000));
+  const old = await post(formHandler, stored.id, valid, issueFormToken(SECRET, stored.id, Date.now() - MAX_AGE_MILLISECONDS - 1_000));
   assert.equal(old.status, 409);
   assert.ok(!old.body.ok && old.body.reason === 'expired' && old.body.token, 'an expired token comes back with a fresh one');
   if (!old.body.ok && old.body.reason === 'expired') assert.equal((await post(formHandler, stored.id, valid, old.body.token)).body.ok, true);
@@ -390,7 +390,7 @@ test('only admins and editors read and delete submissions; a form with submissio
 
   assert.equal((await listSubmissions(staffEditor, { formId: stored.id })).length, 2);
   assert.deepEqual(await listSubmissions(staffViewer, { formId: stored.id }), []);
-  await assert.rejects(listSubmissions(anon), { code: '42501' });
+  await assert.rejects(listSubmissions(anonymous), { code: '42501' });
   assert.equal((await submissionCounts(staffEditor)).get(stored.id)?.total, 2);
   // Paging: older than the newest.
   const [newest] = await listSubmissions(staffEditor, {
@@ -432,9 +432,9 @@ test('the form shown on the live site is the published version', async () => {
   await publish(stored);
   await savePage(server, formType, { ...stored, title: 'Changed', panels: [] }, { mode: 'draft', expectedVersion: 1, userId: editor });
   const { getLiveForm, getDraftForm } = await import('../src/supabase/forms.ts');
-  const live = (await getLiveForm(anon, stored.id)) as PublicForm;
+  const live = (await getLiveForm(anonymous, stored.id)) as PublicForm;
   assert.deepEqual([live.title, live.version, live.items.length], ['Contact', 1, 1]);
   const draft = (await getDraftForm(server, stored.id)) as PublicForm;
   assert.deepEqual([draft.title, draft.version, draft.items.length], ['Changed', 2, 0]);
-  assert.equal(await getDraftForm(anon, stored.id), null);
+  assert.equal(await getDraftForm(anonymous, stored.id), null);
 });

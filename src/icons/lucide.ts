@@ -6,7 +6,7 @@
  * loads on the server the first time an icon is searched for or drawn, and
  * never reaches the browser: pages get only the SVG of the icons they use.
  */
-import { attr, iconLabel, matchScore, queryWords, type IconGlyph, type IconSet } from './library.ts';
+import { escapeAttribute, iconLabel, matchScore, queryWords, type IconGlyph, type IconSet } from './library.ts';
 
 type IconNode = Array<[string, Record<string, string | number>]>;
 
@@ -26,7 +26,7 @@ function load() {
 
 /** Lucide's own attributes, as in its SVG files (less the fixed size, which CSS sets). */
 function toSvg(node: IconNode): string {
-  const children = node.map(([tag, attrs]) => `<${tag}${Object.entries(attrs).map(([name, value]) => ` ${name}="${attr(value)}"`).join('')}/>`).join('');
+  const children = node.map(([tag, attributes]) => `<${tag}${Object.entries(attributes).map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`).join('')}/>`).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${children}</svg>`;
 }
 

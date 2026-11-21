@@ -37,8 +37,8 @@ export function AccordionClient({ items }: { items: AccordionItem[] }) {
           <li key={item.id} className={`accordion__item${isOpen ? ' is-open' : ''}`}>
             <h3 className="accordion__header">
               <button
-                ref={(el) => {
-                  triggers.current[i] = el;
+                ref={(element) => {
+                  triggers.current[i] = element;
                 }}
                 type="button"
                 id={triggerId}

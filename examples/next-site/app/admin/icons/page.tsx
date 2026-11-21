@@ -4,5 +4,5 @@ import { ListScreen } from '../content-screens.tsx';
 export const metadata = { title: 'Icons' };
 
 export default async function Icons({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
-  return <ListScreen ct={iconType} group="Library" deleted={(await searchParams).deleted} />;
+  return <ListScreen contentType={iconType} group="Library" deleted={(await searchParams).deleted} />;
 }

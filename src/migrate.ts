@@ -14,18 +14,18 @@ export interface StoredPanel {
   data: Record<string, unknown>;
 }
 
-export function upgradePanel(def: AnyPanel, stored: StoredPanel): StoredPanel {
-  if (stored.type !== def.type) throw new Error(`Type mismatch: stored "${stored.type}", definition "${def.type}".`);
-  if (stored.v > def.version) {
-    throw new Error(`Panel ${stored.id} is v${stored.v}, newer than definition v${def.version}. Deploy order problem?`);
+export function upgradePanel(definition: AnyPanel, stored: StoredPanel): StoredPanel {
+  if (stored.type !== definition.type) throw new Error(`Type mismatch: stored "${stored.type}", definition "${definition.type}".`);
+  if (stored.v > definition.version) {
+    throw new Error(`Panel ${stored.id} is v${stored.v}, newer than definition v${definition.version}. Deploy order problem?`);
   }
   let data = stored.data;
-  for (let v = stored.v; v < def.version; v++) {
-    const step = def.migrations[v];
-    if (!step) throw new Error(`Missing migration for "${def.type}" v${v} → v${v + 1}.`);
+  for (let v = stored.v; v < definition.version; v++) {
+    const step = definition.migrations[v];
+    if (!step) throw new Error(`Missing migration for "${definition.type}" v${v} → v${v + 1}.`);
     data = step(data);
   }
-  return { ...stored, v: def.version, data };
+  return { ...stored, v: definition.version, data };
 }
 
 /** Upgrade every panel on a raw page row before `pageSchema.parse()`. Unknown types are dropped (logged). */
@@ -37,12 +37,12 @@ export function upgradePagePanels(
   const byType = new Map(panels.map((definition) => [definition.type, definition]));
   const out: StoredPanel[] = [];
   for (const storedPanel of stored) {
-    const def = byType.get(storedPanel.type);
-    if (!def) {
+    const definition = byType.get(storedPanel.type);
+    if (!definition) {
       onUnknown(storedPanel);
       continue;
     }
-    out.push(upgradePanel(def, storedPanel));
+    out.push(upgradePanel(definition, storedPanel));
   }
   return out;
 }

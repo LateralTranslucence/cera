@@ -273,13 +273,13 @@ function LinkPanel({ editor, onClose }: { editor: Editor; onClose: () => void })
   function apply() {
     const url = href.trim();
     if (!url) return remove();
-    const attrs = { href: url, target: newTab ? '_blank' : null, rel: newTab ? 'noopener noreferrer' : null };
+    const attributes = { href: url, target: newTab ? '_blank' : null, rel: newTab ? 'noopener noreferrer' : null };
     const chain = editor.chain().focus();
     if (editor.state.selection.empty && !active) {
       // Nothing selected: insert the address as the link text.
-      chain.insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs }] }).run();
+      chain.insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: attributes }] }).run();
     } else {
-      chain.extendMarkRange('link').setLink(attrs).run();
+      chain.extendMarkRange('link').setLink(attributes).run();
     }
     onClose();
   }
@@ -413,8 +413,8 @@ function ImageAlt({ editor }: { editor: Editor }) {
           placeholder="Describe the image for people who can’t see it"
           onChange={(event) => {
             // Changing an attribute replaces the image node, which drops the selection; select it again so this box stays.
-            const pos = editor.state.selection.from;
-            editor.chain().updateAttributes('image', { alt: event.target.value }).setNodeSelection(pos).run();
+            const position = editor.state.selection.from;
+            editor.chain().updateAttributes('image', { alt: event.target.value }).setNodeSelection(position).run();
           }}
         />
       </label>

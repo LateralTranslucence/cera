@@ -15,26 +15,26 @@ import { addUser, createTestDb, fakeSupabase, queryAs } from './support/db.ts';
 let db: PGlite;
 let editor: string;
 let server: SupabaseClient;
-let anon: SupabaseClient;
+let anonymous: SupabaseClient;
 
 before(async () => {
   db = await createTestDb();
   editor = await addUser(db, 'editor');
   server = fakeSupabase(db, 'service_role');
-  anon = fakeSupabase(db, 'anon');
+  anonymous = fakeSupabase(db, 'anon');
 });
 
-const page = (ct: AnyContentType, slug: string, boxes: StoredPage['boxes'] = {}): StoredPage => ({
+const page = (contentType: AnyContentType, slug: string, boxes: StoredPage['boxes'] = {}): StoredPage => ({
   id: crypto.randomUUID(),
-  contentType: ct.name,
+  contentType: contentType.name,
   slug,
   title: slug,
   boxes,
   panels: [],
 });
 
-const save = (ct: AnyContentType, storedPage: StoredPage, mode: 'draft' | 'publish' | 'schedule' = 'publish', expectedVersion = 0) =>
-  savePage(server, ct, storedPage, { mode, expectedVersion, userId: editor, ...(mode === 'schedule' && { publishAt: new Date(Date.now() + 3_600_000).toISOString() }) });
+const save = (contentType: AnyContentType, storedPage: StoredPage, mode: 'draft' | 'publish' | 'schedule' = 'publish', expectedVersion = 0) =>
+  savePage(server, contentType, storedPage, { mode, expectedVersion, userId: editor, ...(mode === 'schedule' && { publishAt: new Date(Date.now() + 3_600_000).toISOString() }) });
 
 test('types in one slug scope can’t share an address; other types can', async () => {
   assert.equal((await save(landingPage, page(landingPage, 'shared'))).ok, true);
@@ -66,13 +66,13 @@ test('findPublishedPage and findDraftPage find a page at a shared route, whichev
   assert.equal((await save(landingPage, page(landingPage, 'fancy'))).ok, true);
   assert.equal((await save(simplePage, page(simplePage, 'unpublished'), 'draft')).ok, true);
 
-  const found = await findPublishedPage(anon, [landingPage, simplePage], 'plain');
+  const found = await findPublishedPage(anonymous, [landingPage, simplePage], 'plain');
   assert.equal(found?.type, 'simple_page');
   assert.equal(found?.page.boxes.content.description, '<p>A <strong>short</strong> page.</p>');
-  assert.equal((await findPublishedPage(anon, [landingPage, simplePage], 'fancy'))?.type, 'landing_page');
-  assert.equal(await findPublishedPage(anon, [landingPage, simplePage], 'unpublished'), null);
+  assert.equal((await findPublishedPage(anonymous, [landingPage, simplePage], 'fancy'))?.type, 'landing_page');
+  assert.equal(await findPublishedPage(anonymous, [landingPage, simplePage], 'unpublished'), null);
   // Only the types asked for.
-  assert.equal(await findPublishedPage(anon, [landingPage], 'plain'), null);
+  assert.equal(await findPublishedPage(anonymous, [landingPage], 'plain'), null);
 
   const draft = await findDraftPage(server, [landingPage, simplePage], 'unpublished');
   assert.deepEqual([draft?.type, draft?.page.status], ['simple_page', 'draft']);

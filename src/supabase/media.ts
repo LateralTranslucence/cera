@@ -94,18 +94,18 @@ const dimension = (value: unknown): number | undefined =>
 export async function finishMediaUpload(
   service: SupabaseClient,
   done: MediaUploadDone,
-  opts: { userId: string },
+  options: { userId: string },
 ): Promise<MediaUploadResult> {
   const path = String(done?.path ?? '');
   if (!PATH.test(path) || path.includes('..')) return { ok: false, message: 'That upload path isn’t valid.' };
 
   const bucket = service.storage.from(MEDIA_BUCKET);
-  const info = await bucket.info(path);
-  if (info.error || !info.data) return { ok: false, message: 'The upload didn’t arrive. Try again.' };
+  const details = await bucket.info(path);
+  if (details.error || !details.data) return { ok: false, message: 'The upload didn’t arrive. Try again.' };
 
   // Storage enforces the bucket's limits, but check what actually arrived.
-  const type = String(info.data.contentType ?? '').split(';')[0]!.trim();
-  const size = Number(info.data.size ?? 0);
+  const type = String(details.data.contentType ?? '').split(';')[0]!.trim();
+  const size = Number(details.data.size ?? 0);
   const problem = !isMediaMimeType(type) ? `That file type can’t be uploaded. Use ${TYPE_LIST}.` : tooLarge(MEDIA_TYPES[type].kind, size);
   if (problem) {
     await bucket.remove([path]);
@@ -123,7 +123,7 @@ export async function finishMediaUpload(
       height: dimension(done.height),
       sizeBytes: size,
     },
-    p_user: opts.userId,
+    p_user: options.userId,
   });
   if (error) {
     if (error.code === '42501') return { ok: false, message: 'Your account can’t upload media.' };
@@ -154,11 +154,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * already use the file keep their own alt text. `service` must use the
  * secret key; `userId` must come from a verified session.
  */
-export async function updateMedia(service: SupabaseClient, update: MediaUpdate, opts: { userId: string }): Promise<MediaUploadResult> {
+export async function updateMedia(service: SupabaseClient, update: MediaUpdate, options: { userId: string }): Promise<MediaUploadResult> {
   const id = String(update?.id ?? '');
   if (!UUID.test(id)) return { ok: false, message: 'That file isn’t in the library.' };
   const alt = typeof update.alt === 'string' ? update.alt.trim().slice(0, MAX_ALT) : '';
-  const { data, error } = await service.rpc('cera_update_media', { p_id: id, p_media: { alt }, p_user: opts.userId });
+  const { data, error } = await service.rpc('cera_update_media', { p_id: id, p_media: { alt }, p_user: options.userId });
   if (error) {
     if (error.code === '42501') return { ok: false, message: 'Your account can’t change media.' };
     if (error.code === 'CE404') return { ok: false, message: 'That file isn’t in the library any more.' };
@@ -195,9 +195,9 @@ export async function mediaUsage(client: SupabaseClient, path: string): Promise<
  * the usage. If removing the object from Storage then fails, the file stays
  * reachable at its old URL but is no longer in the library.
  */
-export async function deleteMedia(service: SupabaseClient, id: string, opts: { userId: string }): Promise<MediaDeleteResult> {
+export async function deleteMedia(service: SupabaseClient, id: string, options: { userId: string }): Promise<MediaDeleteResult> {
   if (!UUID.test(String(id ?? ''))) return { ok: false, message: 'That file isn’t in the library.' };
-  const { data, error } = await service.rpc('cera_delete_media', { p_id: id, p_user: opts.userId });
+  const { data, error } = await service.rpc('cera_delete_media', { p_id: id, p_user: options.userId });
   if (error) {
     if (error.code === '42501') return { ok: false, message: 'Your account can’t delete media.' };
     if (error.code === 'CE404') return { ok: false, message: 'That file isn’t in the library any more.' };
@@ -214,17 +214,17 @@ export async function deleteMedia(service: SupabaseClient, id: string, opts: { u
 }
 
 function toItem(row: Record<string, unknown>): MediaItem {
-  const str = (value: unknown) => (typeof value === 'string' && value !== '' ? value : undefined);
-  const num = (value: unknown) => (value === null || value === undefined || value === '' ? undefined : Number(value));
+  const asText = (value: unknown) => (typeof value === 'string' && value !== '' ? value : undefined);
+  const asNumber = (value: unknown) => (value === null || value === undefined || value === '' ? undefined : Number(value));
   return {
     id: String(row.id),
     path: String(row.path),
     kind: (row.kind as MediaKind) ?? 'image',
-    mimeType: str(row.mimeType ?? row.mime_type),
-    alt: str(row.alt),
-    width: num(row.width),
-    height: num(row.height),
-    sizeBytes: num(row.sizeBytes ?? row.size_bytes),
-    createdAt: str(row.createdAt ?? row.created_at),
+    mimeType: asText(row.mimeType ?? row.mime_type),
+    alt: asText(row.alt),
+    width: asNumber(row.width),
+    height: asNumber(row.height),
+    sizeBytes: asNumber(row.sizeBytes ?? row.size_bytes),
+    createdAt: asText(row.createdAt ?? row.created_at),
   };
 }

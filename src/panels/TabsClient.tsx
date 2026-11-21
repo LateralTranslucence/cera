@@ -56,8 +56,8 @@ export function TabsClient({ items, baseId }: { items: TabItem[]; baseId: string
         {items.map((tab, i) => (
           <button
             key={tab.id}
-            ref={(el) => {
-              tabRefs.current[i] = el;
+            ref={(element) => {
+              tabRefs.current[i] = element;
             }}
             type="button"
             role="tab"

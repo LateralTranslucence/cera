@@ -73,7 +73,7 @@ const RAIL_QUERY = '(max-width: 900px)';
 const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export function AdminSidebar({ homeHref, sections, user, userLinks = [], signOut }: AdminSidebarProps) {
-  const navRef = useRef<HTMLElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const bodyId = useId();
@@ -86,19 +86,19 @@ export function AdminSidebar({ homeHref, sections, user, userLinks = [], signOut
   // rail size, so it can be measured; while the menu is open it's laid out as
   // a panel instead, so the last answer stands.
   useBrowserLayoutEffect(() => {
-    const nav = navRef.current;
+    const sidebar = sidebarRef.current;
     const body = bodyRef.current;
-    if (!nav || !body) return;
+    if (!sidebar || !body) return;
     const rail = window.matchMedia(RAIL_QUERY);
     const measure = () => {
       if (!rail.matches) return setCompact(false);
-      if (nav.classList.contains('is-open')) return;
-      const navStyle = getComputedStyle(nav);
+      if (sidebar.classList.contains('is-open')) return;
+      const sidebarStyle = getComputedStyle(sidebar);
       const children = [...body.children] as HTMLElement[];
       const gaps = parseFloat(getComputedStyle(body).rowGap) || 0;
       const content = children.reduce((total, child) => total + child.offsetHeight, 0) + gaps * Math.max(children.length - 1, 0);
-      const lockup = nav.querySelector<HTMLElement>('.cera-lockup')?.offsetHeight ?? 0;
-      const needed = parseFloat(navStyle.paddingTop) + lockup + (parseFloat(navStyle.rowGap) || 0) + content + parseFloat(navStyle.paddingBottom);
+      const lockup = sidebar.querySelector<HTMLElement>('.cera-lockup')?.offsetHeight ?? 0;
+      const needed = parseFloat(sidebarStyle.paddingTop) + lockup + (parseFloat(sidebarStyle.rowGap) || 0) + content + parseFloat(sidebarStyle.paddingBottom);
       setCompact(needed > window.innerHeight);
     };
     measure();
@@ -123,7 +123,7 @@ export function AdminSidebar({ homeHref, sections, user, userLinks = [], signOut
       setMenuOpen(false);
       menuButtonRef.current?.focus();
     };
-    const onClick = (event: MouseEvent) => !navRef.current?.contains(event.target as Node) && setMenuOpen(false);
+    const onClick = (event: MouseEvent) => !sidebarRef.current?.contains(event.target as Node) && setMenuOpen(false);
     document.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onClick);
     return () => {
@@ -133,7 +133,7 @@ export function AdminSidebar({ homeHref, sections, user, userLinks = [], signOut
   }, [menuOpen]);
 
   return (
-    <nav ref={navRef} className={`cera-sidebar${compact ? ' is-compact' : ''}${menuOpen ? ' is-open' : ''}`} aria-label="Main">
+    <nav ref={sidebarRef} className={`cera-sidebar${compact ? ' is-compact' : ''}${menuOpen ? ' is-open' : ''}`} aria-label="Main">
       <CeraLockup href={homeHref} />
       <button
         ref={menuButtonRef}
@@ -219,10 +219,10 @@ function ExpandableItem({ item }: { item: NavItem }) {
         )}
         <ul className="cera-nav__list" aria-label={item.label}>
           {expand.items.length === 0 && <li className="cera-nav__empty">None yet</li>}
-          {expand.items.map((sub) => (
-            <li key={sub.href}>
-              <a href={sub.href} aria-current={sub.current ? 'page' : undefined} title={sub.label}>
-                {sub.label}
+          {expand.items.map((subItem) => (
+            <li key={subItem.href}>
+              <a href={subItem.href} aria-current={subItem.current ? 'page' : undefined} title={subItem.label}>
+                {subItem.label}
               </a>
             </li>
           ))}

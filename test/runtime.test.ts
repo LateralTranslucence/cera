@@ -28,11 +28,11 @@ test('sample page validates and defaults are filled in', () => {
 
 test('migrations upgrade old panel data before validation', () => {
   const page = load(sample);
-  const tm = page.panels[1];
-  if (tm?.type !== 'cera/text-media') throw new Error('expected text-media');
-  assert.equal(tm.v, 2);
-  assert.equal(tm.data.alignment, 'right');
-  assert.equal('mediaAlignment' in tm.data, false);
+  const textMedia = page.panels[1];
+  if (textMedia?.type !== 'cera/text-media') throw new Error('expected text-media');
+  assert.equal(textMedia.v, 2);
+  assert.equal(textMedia.data.alignment, 'right');
+  assert.equal('mediaAlignment' in textMedia.data, false);
 });
 
 test('seo + jsonLd + hooks read typed page data', async () => {

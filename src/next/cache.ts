@@ -5,7 +5,7 @@
  * database reads behind the live site go through Next's data cache, tagged
  * `cera:pages`:
  *
- *   const getLive = cacheLive('published-page', (slug: string) => getPublishedPage(publicClient(), ct, slug));
+ *   const getLive = cacheLive('published-page', (slug: string) => getPublishedPage(publicClient(), contentType, slug));
  *
  * After a publish or unpublish, call `pagesChanged()` from the Server Action
  * that did it: the next request reads fresh data (Next's `updateTag`, built
@@ -27,8 +27,8 @@ export const CERA_PAGES_TAG = 'cera:pages';
 export const DEFAULT_REVALIDATE_SECONDS = 300;
 
 /** Wraps a live (published-only) read in Next's data cache. Its arguments become part of the cache key. */
-export function cacheLive<Args extends unknown[], Result>(name: string, read: (...args: Args) => Promise<Result>, opts: { revalidate?: number } = {}): (...args: Args) => Promise<Result> {
-  return unstable_cache(read, ['cera', name], { tags: [CERA_PAGES_TAG], revalidate: opts.revalidate ?? DEFAULT_REVALIDATE_SECONDS });
+export function cacheLive<Args extends unknown[], Result>(name: string, read: (...callArguments: Args) => Promise<Result>, options: { revalidate?: number } = {}): (...callArguments: Args) => Promise<Result> {
+  return unstable_cache(read, ['cera', name], { tags: [CERA_PAGES_TAG], revalidate: options.revalidate ?? DEFAULT_REVALIDATE_SECONDS });
 }
 
 /** Call from a Server Action after publishing or unpublishing: the next request reads fresh pages. */

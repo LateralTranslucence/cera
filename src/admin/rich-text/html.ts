@@ -24,12 +24,12 @@ function parse(html: string): DocumentFragment {
 
 const isElement = (node: Node): node is Element => node.nodeType === 1;
 const isText = (node: Node) => node.nodeType === 3;
-const tagOf = (el: Element) => el.tagName.toLowerCase();
+const tagOf = (element: Element) => element.tagName.toLowerCase();
 const isInline = (node: Node) => isText(node) || (isElement(node) && (MARKS.has(tagOf(node)) || INLINE_ATOMS.has(tagOf(node))));
 const isBlank = (node: Node) => isText(node) && !/\S/.test(node.nodeValue ?? '');
 
-function attrKey(el: Element): string {
-  return [...el.attributes]
+function attributeKey(element: Element): string {
+  return [...element.attributes]
     .map((attribute) => `${attribute.name}=${attribute.value.trim()}`)
     .sort()
     .join(' ');
@@ -46,10 +46,10 @@ function attrKey(el: Element): string {
  */
 export function tidyEditorHtml(html: string): string {
   const root = parse(html);
-  for (const el of root.querySelectorAll([...UNWRAP].join(','))) {
-    const kids = [...el.childNodes].filter((node) => !isBlank(node));
-    const only = kids[0];
-    if (kids.length === 1 && only && isElement(only) && tagOf(only) === 'p' && only.attributes.length === 0) {
+  for (const element of root.querySelectorAll([...UNWRAP].join(','))) {
+    const children = [...element.childNodes].filter((node) => !isBlank(node));
+    const only = children[0];
+    if (children.length === 1 && only && isElement(only) && tagOf(only) === 'p' && only.attributes.length === 0) {
       only.replaceWith(...only.childNodes);
     }
   }
@@ -68,7 +68,7 @@ export function tidyEditorHtml(html: string): string {
 /* ------------------------------------------------------------------ */
 
 type Inline = { text: string; marks: string } | { atom: string };
-type Block = { tag: string; attrs: string; blocks?: Block[]; inline?: Inline[] };
+type Block = { tag: string; attributes: string; blocks?: Block[]; inline?: Inline[] };
 
 function inlineOf(nodes: Iterable<Node>, marks: string[] = [], out: Inline[] = []): Inline[] {
   for (const node of nodes) {
@@ -76,8 +76,8 @@ function inlineOf(nodes: Iterable<Node>, marks: string[] = [], out: Inline[] = [
       out.push({ text: node.nodeValue ?? '', marks: [...marks].sort().join('|') });
     } else if (isElement(node)) {
       const tag = tagOf(node);
-      if (INLINE_ATOMS.has(tag)) out.push({ atom: `${tag} ${attrKey(node)}` });
-      else inlineOf(node.childNodes, [...marks, `${SYNONYMS[tag] ?? tag} ${attrKey(node)}`], out);
+      if (INLINE_ATOMS.has(tag)) out.push({ atom: `${tag} ${attributeKey(node)}` });
+      else inlineOf(node.childNodes, [...marks, `${SYNONYMS[tag] ?? tag} ${attributeKey(node)}`], out);
     }
   }
   return out;
@@ -87,8 +87,8 @@ function inlineOf(nodes: Iterable<Node>, marks: string[] = [], out: Inline[] = [
 function normalizeInline(items: Inline[]): Inline[] {
   const merged: Inline[] = [];
   for (const item of items) {
-    const prev = merged[merged.length - 1];
-    if ('text' in item && prev && 'text' in prev && prev.marks === item.marks) prev.text += item.text;
+    const previous = merged[merged.length - 1];
+    if ('text' in item && previous && 'text' in previous && previous.marks === item.marks) previous.text += item.text;
     else merged.push({ ...item });
   }
   for (const item of merged) if ('text' in item) item.text = item.text.replace(/\s+/g, ' ');
@@ -107,7 +107,7 @@ function blocksOf(nodes: Iterable<Node>): Block[] {
   let run: Node[] = [];
   const flush = () => {
     const inline = normalizeInline(inlineOf(run));
-    if (inline.length) blocks.push({ tag: 'p', attrs: '', inline });
+    if (inline.length) blocks.push({ tag: 'p', attributes: '', inline });
     run = [];
   };
   for (const node of nodes) {
@@ -127,15 +127,15 @@ function blocksOf(nodes: Iterable<Node>): Block[] {
   return blocks;
 }
 
-function blockOf(el: Element): Block {
-  const tag = tagOf(el);
-  const attrs = attrKey(el);
-  const hasBlocks = [...el.childNodes].some((child) => isElement(child) && !isInline(child));
-  if (!hasBlocks) return { tag, attrs, inline: normalizeInline(inlineOf(el.childNodes)) };
-  const blocks = blocksOf(el.childNodes);
+function blockOf(element: Element): Block {
+  const tag = tagOf(element);
+  const attributes = attributeKey(element);
+  const hasBlocks = [...element.childNodes].some((child) => isElement(child) && !isInline(child));
+  if (!hasBlocks) return { tag, attributes, inline: normalizeInline(inlineOf(element.childNodes)) };
+  const blocks = blocksOf(element.childNodes);
   const only = blocks[0];
-  if (UNWRAP_TO_COMPARE.has(tag) && blocks.length === 1 && only?.tag === 'p' && only.attrs === '' && only.inline) return { tag, attrs, inline: only.inline };
-  return { tag, attrs, blocks };
+  if (UNWRAP_TO_COMPARE.has(tag) && blocks.length === 1 && only?.tag === 'p' && only.attributes === '' && only.inline) return { tag, attributes, inline: only.inline };
+  return { tag, attributes, blocks };
 }
 
 /** A comparable form of some HTML: what it shows, not how it's spelled. */

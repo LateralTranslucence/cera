@@ -85,8 +85,8 @@ function finish(svg: string): string {
   let out = svg
     .replace(new RegExp(String.raw`\b(fill|stroke)="${BLACK}"`, 'gi'), '$1="currentColor"')
     .replace(new RegExp(String.raw`\b(fill|stroke)\s*:\s*${BLACK}`, 'gi'), '$1:currentColor');
-  out = out.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
-    let attributes = attrs;
+  out = out.replace(/<svg\b([^>]*)>/, (_match, rootAttributes: string) => {
+    let attributes = rootAttributes;
     const width = /\swidth="([\d.]+)(?:px)?"/.exec(attributes)?.[1];
     const height = /\sheight="([\d.]+)(?:px)?"/.exec(attributes)?.[1];
     attributes = attributes.replace(/\s(?:width|height)="[^"]*"/g, '');

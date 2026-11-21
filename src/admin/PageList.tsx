@@ -40,8 +40,8 @@ const dayYear = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric
 const dateTime = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 /** "Just now", "5 min ago", "3 hr ago", "Yesterday", "Nov 12", "Nov 12, 2025". */
-export function formatWhen(iso: string, now = Date.now()): string {
-  const timestamp = new Date(iso).getTime();
+export function formatWhen(isoTime: string, now = Date.now()): string {
+  const timestamp = new Date(isoTime).getTime();
   const minutes = Math.round((now - timestamp) / 60_000);
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes} min ago`;
@@ -52,8 +52,8 @@ export function formatWhen(iso: string, now = Date.now()): string {
   return date.getFullYear() === new Date(now).getFullYear() ? day.format(date) : dayYear.format(date);
 }
 
-export function formatScheduled(iso: string): string {
-  return dateTime.format(new Date(iso));
+export function formatScheduled(isoTime: string): string {
+  return dateTime.format(new Date(isoTime));
 }
 
 /** Published / Draft / Scheduled, by shape as well as color; plus what's pending. */

@@ -39,8 +39,8 @@ export const loadPage = cache(async (slug: string) => {
   const found = draft ? await findDraftPage(serviceClient(), routedTypes, slug, { onIssue: logIssue(slug) }) : await publishedPage(slug);
 
   if (!found) return null;
-  const ct = routedTypes.find((routedType) => routedType.name === found.type)!;
-  if (!draft && ct.hidden?.(found.page as never)) return null;
+  const contentType = routedTypes.find((routedType) => routedType.name === found.type)!;
+  if (!draft && contentType.hidden?.(found.page as never)) return null;
   return { ...found, draft };
 });
 

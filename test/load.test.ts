@@ -36,8 +36,8 @@ function pageWithFeatured(data: Record<string, unknown>) {
 }
 
 async function render(page: ReturnType<typeof pageWithFeatured>, pages: PageResolver | undefined, errors: string[] = []) {
-  const el = await Panels({ contentType: landingPage, page, loadContext: pages && { pages, draft: false }, onError: (error) => errors.push(String(error)) });
-  return renderToStaticMarkup(el);
+  const element = await Panels({ contentType: landingPage, page, loadContext: pages && { pages, draft: false }, onError: (error) => errors.push(String(error)) });
+  return renderToStaticMarkup(element);
 }
 
 test('Featured Post shows the linked page: type, title, description and link', async () => {
@@ -93,24 +93,24 @@ test('a load that fails, or no loadContext, skips just that panel', async () => 
 });
 
 test('load gets the panel data and context (page, panel, draft)', async () => {
-  let seen: { data: unknown; ctx: Omit<LoadContext, 'pages'> } | undefined;
+  let seen: { data: unknown; context: Omit<LoadContext, 'pages'> } | undefined;
   const probe = definePanel({
     type: 'probe',
     label: 'Probe',
     fields: { n: field.number({ default: 7 }) },
-    load: (data, ctx) => {
-      seen = { data, ctx: { draft: ctx.draft, page: ctx.page, panel: ctx.panel } };
+    load: (data, context) => {
+      seen = { data, context: { draft: context.draft, page: context.page, panel: context.panel } };
       return { doubled: data.n * 2 };
     },
     component: async () => ({ default: ({ loaded }: { loaded: { doubled: number } }) => createElement('b', null, loaded.doubled) }),
   });
-  const ct = defineContentType({ name: 'landing_page', label: 'x', route: '/[slug]', boxes: {}, panels: [probe] });
-  const page = readPage(ct, { id: 'p1', contentType: 'landing_page', slug: 'x', panels: [{ id: 'a', type: 'probe', v: 1, data: {} }] }).page;
-  const html = renderToStaticMarkup(await Panels({ contentType: ct, page, loadContext: { pages: resolver([]), draft: true } }));
+  const contentType = defineContentType({ name: 'landing_page', label: 'x', route: '/[slug]', boxes: {}, panels: [probe] });
+  const page = readPage(contentType, { id: 'p1', contentType: 'landing_page', slug: 'x', panels: [{ id: 'a', type: 'probe', v: 1, data: {} }] }).page;
+  const html = renderToStaticMarkup(await Panels({ contentType, page, loadContext: { pages: resolver([]), draft: true } }));
   assert.equal(html, '<b>14</b>');
   assert.deepEqual(seen, {
     data: { n: 7 },
-    ctx: { draft: true, page: { id: 'p1', contentType: 'landing_page', slug: 'x' }, panel: { pageId: 'p1', panelId: 'a', index: 0, contentType: 'landing_page' } },
+    context: { draft: true, page: { id: 'p1', contentType: 'landing_page', slug: 'x' }, panel: { pageId: 'p1', panelId: 'a', index: 0, contentType: 'landing_page' } },
   });
 });
 

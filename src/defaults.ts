@@ -13,8 +13,8 @@ export const panelDefaults = {
   anchorId: field.text({ label: 'ID', note: 'Anchor id for in-page links (no #).' }),
 };
 
-export function omit<Source extends object, Key extends keyof Source>(obj: Source, ...keys: Key[]): Omit<Source, Key> {
-  const out = { ...obj };
+export function omit<Source extends object, Key extends keyof Source>(source: Source, ...keys: Key[]): Omit<Source, Key> {
+  const out = { ...source };
   for (const key of keys) delete out[key];
   return out;
 }

@@ -22,11 +22,11 @@ export interface MetadataOptions {
   mediaUrl?: (ref: MediaRef) => string;
 }
 
-export function pageMetadata<Type extends AnyContentType>(ct: Type, page: PageOf<Type>, opts: MetadataOptions = {}): PageMetadata {
-  const title = ct.seo?.title?.(page) || page.title;
-  const description = ct.seo?.description?.(page) || undefined;
-  const image = ct.seo?.image?.(page);
-  const noindex = Boolean(ct.seo?.noindex?.(page) || ct.hidden?.(page));
+export function pageMetadata<Type extends AnyContentType>(contentType: Type, page: PageOf<Type>, options: MetadataOptions = {}): PageMetadata {
+  const title = contentType.seo?.title?.(page) || page.title;
+  const description = contentType.seo?.description?.(page) || undefined;
+  const image = contentType.seo?.image?.(page);
+  const noindex = Boolean(contentType.seo?.noindex?.(page) || contentType.hidden?.(page));
 
   const meta: PageMetadata = { title, openGraph: { title } };
   if (description) {
@@ -34,7 +34,7 @@ export function pageMetadata<Type extends AnyContentType>(ct: Type, page: PageOf
     meta.openGraph.description = description;
   }
   if (image) {
-    meta.openGraph.images = [{ url: opts.mediaUrl ? opts.mediaUrl(image) : image.path, width: image.width, height: image.height, alt: image.alt }];
+    meta.openGraph.images = [{ url: options.mediaUrl ? options.mediaUrl(image) : image.path, width: image.width, height: image.height, alt: image.alt }];
   }
   if (noindex) meta.robots = { index: false, follow: false };
   return meta;
@@ -45,8 +45,8 @@ export function pageMetadata<Type extends AnyContentType>(ct: Type, page: PageOf
  * `<script type="application/ld+json">` (`<` is escaped, so content can't
  * close the script tag). `undefined` if the content type defines none.
  */
-export function jsonLdString<Type extends AnyContentType>(ct: Type, page: PageOf<Type>): string | undefined {
-  const data = ct.jsonLd?.(page);
+export function jsonLdString<Type extends AnyContentType>(contentType: Type, page: PageOf<Type>): string | undefined {
+  const data = contentType.jsonLd?.(page);
   if (!data) return undefined;
   return JSON.stringify(data).replace(/</g, '\\u003c');
 }

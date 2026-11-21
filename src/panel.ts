@@ -63,7 +63,7 @@ export interface LoadContext {
 }
 
 /** Runs on the server before the panel renders; its result arrives as the component's `loaded` prop. */
-export type PanelLoad<Data, Loaded> = (data: Data, ctx: LoadContext) => Loaded | Promise<Loaded>;
+export type PanelLoad<Data, Loaded> = (data: Data, context: LoadContext) => Loaded | Promise<Loaded>;
 
 /* ------------------------------------------------------------------ */
 /* Props                                                               */

@@ -6,9 +6,9 @@ import type { IconGlyph } from '../icons/library.ts';
 import type { LoadContext } from '../panel.ts';
 import type { blocksFields } from './blocks.fields.ts';
 
-export async function loadBlocks(data: InferFields<typeof blocksFields>, ctx: LoadContext) {
+export async function loadBlocks(data: InferFields<typeof blocksFields>, context: LoadContext) {
   const values = data.blocks.filter((block) => !block.hidden && block.icon).map((block) => block.icon!);
-  const found = values.length > 0 && ctx.icons ? await ctx.icons.byValues(values) : new Map<string, IconGlyph>();
+  const found = values.length > 0 && context.icons ? await context.icons.byValues(values) : new Map<string, IconGlyph>();
   return { icons: Object.fromEntries(found) as Record<string, IconGlyph> };
 }
 

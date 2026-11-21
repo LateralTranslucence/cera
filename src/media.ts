@@ -41,7 +41,7 @@ export function formatBytes(bytes: number): string {
 export function mediaAccept(kinds: readonly MediaKind[]): string {
   return Object.entries(MEDIA_TYPES)
     .filter(([, mediaType]) => kinds.includes(mediaType.kind))
-    .map(([mime]) => mime)
+    .map(([mimeType]) => mimeType)
     .join(',');
 }
 

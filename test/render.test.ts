@@ -36,13 +36,13 @@ test('a panel whose component fails to load is skipped; the rest render', async 
       throw new Error('chunk failed');
     },
   });
-  const ct = defineContentType({ name: 'landing_page', label: 'x', route: '/[slug]', boxes: landingPage.boxes, panels: [...landingPage.panels, broken] });
+  const contentType = defineContentType({ name: 'landing_page', label: 'x', route: '/[slug]', boxes: landingPage.boxes, panels: [...landingPage.panels, broken] });
   const raw = clone();
   raw.panels.unshift({ id: 'b', type: 'broken', v: 1, data: {} });
-  const { page } = readPage(ct, raw);
+  const { page } = readPage(contentType, raw);
 
   const errors: string[] = [];
-  const html = renderToStaticMarkup(await Panels({ contentType: ct, page, loadContext, onError: (_e, panel) => errors.push(panel.id) }));
+  const html = renderToStaticMarkup(await Panels({ contentType: contentType, page, loadContext, onError: (_e, panel) => errors.push(panel.id) }));
   assert.deepEqual(errors, ['b']);
   assert.match(html, /panel--blocks/);
 });

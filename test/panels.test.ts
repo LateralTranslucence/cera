@@ -63,12 +63,12 @@ test('quotes: empty quotes are skipped; two or more become a slider', async () =
 });
 
 test('featured media: image with size and link; video with controls; full width', async () => {
-  const img = await render('cera/featured-media', { media: image, imageLink: 'https://mars.test', fullWidth: true });
-  assert.match(img, /class="panel panel--featured-media is-full-width"/);
-  assert.match(img, /<figure class="featured-media"><a href="https:\/\/mars\.test"><img src="[^"]*abc-mars\.png" alt="Mars" width="800" height="500" loading="lazy"\/><\/a><\/figure>/);
-  const vid = await render('cera/featured-media', { media: { ...image, kind: 'video' }, imageLink: 'https://ignored.test' });
-  assert.match(vid, /<figure class="featured-media"><video [^>]*controls=""/);
-  assert.doesNotMatch(vid, /ignored\.test/);
+  const imageHtml = await render('cera/featured-media', { media: image, imageLink: 'https://mars.test', fullWidth: true });
+  assert.match(imageHtml, /class="panel panel--featured-media is-full-width"/);
+  assert.match(imageHtml, /<figure class="featured-media"><a href="https:\/\/mars\.test"><img src="[^"]*abc-mars\.png" alt="Mars" width="800" height="500" loading="lazy"\/><\/a><\/figure>/);
+  const videoHtml = await render('cera/featured-media', { media: { ...image, kind: 'video' }, imageLink: 'https://ignored.test' });
+  assert.match(videoHtml, /<figure class="featured-media"><video [^>]*controls=""/);
+  assert.doesNotMatch(videoHtml, /ignored\.test/);
 });
 
 test('tabs: accessible markup, every tab in the HTML, the first one open, ids from labels', async () => {

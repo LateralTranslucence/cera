@@ -42,11 +42,11 @@ import { serviceClient } from '@/lib/supabase.ts';
  */
 export async function savePageAction(input: SaveInput): Promise<SaveResult> {
   const { user } = await requireStaff('editor');
-  const ct = contentTypes.find((contentType) => contentType.name === input.page?.contentType);
-  if (!ct) {
+  const contentType = contentTypes.find((candidate) => candidate.name === input.page?.contentType);
+  if (!contentType) {
     return { ok: false, reason: 'invalid', issues: [{ severity: 'error', code: 'invalid-page', path: ['contentType'], message: 'Unknown content type.' }] };
   }
-  const result = await savePage(serviceClient(), ct, input.page, { mode: input.mode, publishAt: input.publishAt, expectedVersion: input.expectedVersion, userId: user.id });
+  const result = await savePage(serviceClient(), contentType, input.page, { mode: input.mode, publishAt: input.publishAt, expectedVersion: input.expectedVersion, userId: user.id });
   // Publishing changes the live site; a draft save doesn't, so it keeps the cache.
   if (result.ok && input.mode === 'publish') pagesChanged();
   return result;
@@ -131,9 +131,9 @@ export async function pageHistoryAction(input: { pageId: string; before?: number
 /** Restores an old version as a new draft. Drafts don't change the live site, so the cache stays. */
 export async function restoreRevisionAction(input: { pageId: string; contentType: string; version: number; expectedVersion: number }): Promise<SaveResult> {
   const { user } = await requireStaff('editor');
-  const ct = contentTypes.find((contentType) => contentType.name === input.contentType);
-  if (!ct) return { ok: false, reason: 'not-found', message: 'Unknown content type.', issues: [] };
-  return restoreRevision(serviceClient(), ct, input.pageId, input.version, { expectedVersion: input.expectedVersion, userId: user.id });
+  const contentType = contentTypes.find((candidate) => candidate.name === input.contentType);
+  if (!contentType) return { ok: false, reason: 'not-found', message: 'Unknown content type.', issues: [] };
+  return restoreRevision(serviceClient(), contentType, input.pageId, input.version, { expectedVersion: input.expectedVersion, userId: user.id });
 }
 
 /** Deletes submissions: the given ids, or all of a form's. Admins and editors; the database checks again. */
@@ -198,7 +198,7 @@ export async function setUserRoleAction(input: { userId: string; role: CeraRole 
 export type PasswordState = { ok?: boolean; error?: string };
 
 /** Changes the signed-in user's own password (Account page). */
-export async function changePasswordAction(_prev: PasswordState, form: FormData): Promise<PasswordState> {
+export async function changePasswordAction(_previousState: PasswordState, form: FormData): Promise<PasswordState> {
   const staff = await requireStaff();
   const password = String(form.get('password') ?? '');
   const confirm = String(form.get('confirm') ?? '');
@@ -211,7 +211,7 @@ export async function changePasswordAction(_prev: PasswordState, form: FormData)
 
 export type SignInState = { error?: string };
 
-export async function signInAction(_prev: SignInState, form: FormData): Promise<SignInState> {
+export async function signInAction(_previousState: SignInState, form: FormData): Promise<SignInState> {
   const email = String(form.get('email') ?? '');
   const password = String(form.get('password') ?? '');
   const client = await userClient();

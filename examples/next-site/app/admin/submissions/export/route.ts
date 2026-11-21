@@ -12,8 +12,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(request: Request): Promise<Response> {
   const staff = await requireStaff('editor');
-  const param = new URL(request.url).searchParams.get('form') ?? '';
-  const formId = UUID.test(param) ? param : undefined;
+  const formParameter = new URL(request.url).searchParams.get('form') ?? '';
+  const formId = UUID.test(formParameter) ? formParameter : undefined;
 
   const forms = new Map((await listPages(staff.client, { contentType: formType.name })).map((form) => [form.id, form]));
   const all: Submission[] = [];

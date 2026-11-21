@@ -4,8 +4,8 @@ import type { InferFields } from '../fields.ts';
 import type { LoadContext } from '../panel.ts';
 import type { featuredPostFields } from './featured-post.fields.ts';
 
-export async function loadFeaturedPost(data: InferFields<typeof featuredPostFields>, ctx: LoadContext) {
-  const [page] = data.post.length > 0 ? await ctx.pages.byIds(data.post.slice(0, 1)) : [];
+export async function loadFeaturedPost(data: InferFields<typeof featuredPostFields>, context: LoadContext) {
+  const [page] = data.post.length > 0 ? await context.pages.byIds(data.post.slice(0, 1)) : [];
   return { page: page ?? null };
 }
 

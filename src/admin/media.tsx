@@ -43,21 +43,21 @@ export function mediaUploader(actions: {
   return async (file) => {
     const [size, ticket] = await Promise.all([measure(file), actions.prepare({ name: file.name, type: file.type, size: file.size })]);
     if (!ticket.ok) return ticket;
-    const res = await fetch(ticket.signedUrl, {
+    const response = await fetch(ticket.signedUrl, {
       method: 'PUT',
       headers: { 'content-type': file.type, 'cache-control': 'max-age=31536000', 'x-upsert': 'false' },
       body: file,
     }).catch(() => null);
-    if (!res?.ok) return { ok: false, message: await uploadError(res) };
+    if (!response?.ok) return { ok: false, message: await uploadError(response) };
     return actions.finish({ path: ticket.path, ...size });
   };
 }
 
-async function uploadError(res: Response | null): Promise<string> {
-  if (!res) return 'The upload didn’t reach the server. Check your connection and try again.';
-  const body = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
+async function uploadError(response: Response | null): Promise<string> {
+  if (!response) return 'The upload didn’t reach the server. Check your connection and try again.';
+  const body = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
   const detail = body?.message ?? body?.error;
-  return detail ? `Storage refused the file: ${detail}` : `The upload failed (HTTP ${res.status}).`;
+  return detail ? `Storage refused the file: ${detail}` : `The upload failed (HTTP ${response.status}).`;
 }
 
 /** Image or video dimensions, measured in the browser. Missing when they can't be read. */

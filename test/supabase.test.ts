@@ -14,7 +14,7 @@ let editor: string;
 let viewer: string;
 let server: SupabaseClient; // service role
 let staff: SupabaseClient; // signed-in editor
-let anon: SupabaseClient;
+let anonymous: SupabaseClient;
 
 before(async () => {
   db = await createTestDb();
@@ -22,7 +22,7 @@ before(async () => {
   viewer = await addUser(db, 'viewer');
   server = fakeSupabase(db, 'service_role');
   staff = fakeSupabase(db, 'authenticated', { sub: editor, app_metadata: { cera_role: 'editor' } });
-  anon = fakeSupabase(db, 'anon');
+  anonymous = fakeSupabase(db, 'anon');
 });
 
 function newPage(slug: string): StoredPage {
@@ -38,7 +38,7 @@ test('publish, then read the live page as an anonymous visitor', async () => {
   // The result carries what was stored, so the editor can show it.
   if (saved.ok) assert.equal(saved.page.panels[1]?.v, 2);
 
-  const live = await getPublishedPage(anon, landingPage, 'about');
+  const live = await getPublishedPage(anonymous, landingPage, 'about');
   assert.ok(live);
   assert.equal(live.page.status, 'published');
   assert.deepEqual(live.issues, []);
@@ -48,7 +48,7 @@ test('publish, then read the live page as an anonymous visitor', async () => {
   assert.equal(textMedia.v, 2); // migrated on save
   assert.equal(textMedia.data.alignment, 'right');
 
-  assert.equal(await getPublishedPage(anon, landingPage, 'missing'), null);
+  assert.equal(await getPublishedPage(anonymous, landingPage, 'missing'), null);
 });
 
 test('editing round trip: unknown panels and keys survive, the live page waits for publish', async () => {
@@ -76,7 +76,7 @@ test('editing round trip: unknown panels and keys survive, the live page waits f
   assert.equal(reloaded!.page.panels[0]!.data.legacy, 'keep me');
 
   // Visitors still see the published title; preview shows the draft.
-  assert.equal((await getPublishedPage(anon, landingPage, 'services'))!.page.title, 'About');
+  assert.equal((await getPublishedPage(anonymous, landingPage, 'services'))!.page.title, 'About');
   assert.equal((await getDraftPage(staff, landingPage, 'services'))!.page.title, 'Services (new)');
 });
 
@@ -105,7 +105,7 @@ test('unpublish removes the live page', async () => {
   const page = newPage('temporary');
   await savePage(server, landingPage, page, { mode: 'publish', expectedVersion: 0, userId: editor });
   await unpublishPage(server, page.id, editor);
-  assert.equal(await getPublishedPage(anon, landingPage, 'temporary'), null);
+  assert.equal(await getPublishedPage(anonymous, landingPage, 'temporary'), null);
 });
 
 test('listPages shows staff every working copy with its live status; visitors are refused', async () => {
@@ -126,7 +126,7 @@ test('listPages shows staff every working copy with its live status; visitors ar
     ],
   );
   // Visitors can't list pages at all.
-  await assert.rejects(listPages(anon), { code: '42501' });
+  await assert.rejects(listPages(anonymous), { code: '42501' });
 });
 
 test('page resolver: the live site sees only published, visible pages; preview sees working copies', async () => {
@@ -143,7 +143,7 @@ test('page resolver: the live site sees only published, visible pages; preview s
 
   const ids = [hidden.id, draftOnly.id, live.id, 'not-a-uuid'];
 
-  const publicPages = await createPageResolver(anon, [landingPage], { draft: false }).byIds(ids);
+  const publicPages = await createPageResolver(anonymous, [landingPage], { draft: false }).byIds(ids);
   assert.deepEqual(publicPages, [
     {
       id: live.id,
@@ -160,6 +160,6 @@ test('page resolver: the live site sees only published, visible pages; preview s
   const preview = await createPageResolver(staff, [landingPage], { draft: true }).byIds(ids);
   assert.deepEqual(preview.map((page) => page.title), [hidden.title, draftOnly.title, 'Draft title']); // in the order asked
 
-  assert.deepEqual(await createPageResolver(anon, [], { draft: false }).byIds([live.id]), []); // unknown content type
-  assert.deepEqual(await createPageResolver(anon, [landingPage], { draft: false }).byIds([]), []);
+  assert.deepEqual(await createPageResolver(anonymous, [], { draft: false }).byIds([live.id]), []); // unknown content type
+  assert.deepEqual(await createPageResolver(anonymous, [landingPage], { draft: false }).byIds([]), []);
 });
