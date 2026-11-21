@@ -8,7 +8,7 @@
  * that calls `savePage`), so validation and the database checks all happen
  * on the server.
  */
-import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, useTransition, type CSSProperties, type ReactNode } from 'react';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -460,6 +460,12 @@ export function PageEditor({
     else setAnnouncement(`${nameAt(from)} dropped.`);
   };
 
+  const previewUrl = previewHref && version > 0 ? previewHref(page.slug) : undefined;
+  const openSchedule = () => {
+    setScheduleAt(schedule ? toLocalInput(new Date(schedule.at)) : defaultScheduleTime());
+    setDialog('schedule');
+  };
+
   return (
     <div className="cera-editor">
       <header className="cera-topbar">
@@ -481,41 +487,44 @@ export function PageEditor({
           )}
           {!readOnly && published && onUnpublish && (
             <>
-              <button type="button" className="cera-button cera-button--lg cera-button--danger" disabled={saving} onClick={() => setDialog('unpublish')}>
+              <button type="button" className="cera-button cera-button--lg cera-button--danger cera-topbar__wide" disabled={saving} onClick={() => setDialog('unpublish')}>
                 Unpublish
               </button>
-              <span className="cera-divider" aria-hidden="true" />
+              <span className="cera-divider cera-topbar__wide" aria-hidden="true" />
             </>
           )}
-          {previewHref && version > 0 && (
-            <a className="cera-button cera-button--lg" href={previewHref(page.slug)} target="_blank" rel="noreferrer" title={dirty ? 'Preview shows the last saved draft' : undefined}>
+          {previewUrl && (
+            <a className="cera-button cera-button--lg cera-topbar__wide" href={previewUrl} target="_blank" rel="noreferrer" title={dirty ? 'Preview shows the last saved draft' : undefined}>
               <Icon name="eye" />
               Preview
             </a>
           )}
           {!readOnly && (
             <>
-              <button type="button" className="cera-button cera-button--lg" disabled={saving || (!dirty && version > 0)} onClick={() => save('draft')}>
+              <button type="button" className="cera-button cera-button--lg cera-topbar__wide" disabled={saving || (!dirty && version > 0)} onClick={() => save('draft')}>
                 Save draft
               </button>
               {onCancelSchedule && (
-                <button
-                  type="button"
-                  className="cera-button cera-button--lg"
-                  disabled={saving}
-                  onClick={() => {
-                    setScheduleAt(schedule ? toLocalInput(new Date(schedule.at)) : defaultScheduleTime());
-                    setDialog('schedule');
-                  }}
-                >
+                <button type="button" className="cera-button cera-button--lg cera-topbar__wide" disabled={saving} onClick={openSchedule}>
                   <Icon name="clock" />
                   Schedule
                 </button>
               )}
-              <button type="button" className="cera-button cera-button--lg cera-button--primary" disabled={saving || (published && !changes)} onClick={() => save('publish')}>
-                {published ? 'Publish changes' : 'Publish'}
-              </button>
             </>
+          )}
+          {/* The other actions as one menu, shown instead of their buttons on narrow screens (admin.css). */}
+          <ActionsMenu
+            actions={[
+              ...(!readOnly ? [{ label: 'Save draft', disabled: saving || (!dirty && version > 0), onSelect: () => save('draft') }] : []),
+              ...(!readOnly && onCancelSchedule ? [{ label: 'Schedule', disabled: saving, onSelect: openSchedule }] : []),
+              ...(previewUrl ? [{ label: 'Preview', href: previewUrl }] : []),
+              ...(!readOnly && published && onUnpublish ? [{ label: 'Unpublish', danger: true, disabled: saving, onSelect: () => setDialog('unpublish') }] : []),
+            ]}
+          />
+          {!readOnly && (
+            <button type="button" className="cera-button cera-button--lg cera-button--primary" disabled={saving || (published && !changes)} onClick={() => save('publish')}>
+              {published ? 'Publish changes' : 'Publish'}
+            </button>
           )}
         </div>
       </header>
@@ -1036,4 +1045,79 @@ function SortableCard({
     </>
   );
   return <Card {...props} ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} dragging={isDragging} grip={grip} />;
+}
+
+interface MenuAction {
+  label: string;
+  /** A link (opened in a new tab), or else a button that calls onSelect. */
+  href?: string;
+  onSelect?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}
+
+/**
+ * The top bar's actions as one "Actions" menu, for narrow screens. Choosing
+ * one closes the menu and puts focus back on its button first, so a dialog
+ * the action opens returns focus there when it closes.
+ */
+function ActionsMenu({ actions }: { actions: MenuAction[] }) {
+  const [open, setOpen] = useState(false);
+  const menuId = useId();
+  const root = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+
+  // Close on Escape (back to the button) or a click elsewhere.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      button.current?.focus();
+    };
+    const onClick = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onClick);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onClick);
+    };
+  }, [open]);
+
+  if (actions.length === 0) return null;
+  const close = () => {
+    setOpen(false);
+    button.current?.focus();
+  };
+
+  return (
+    <div className="cera-topbar__more" ref={root}>
+      <button ref={button} type="button" className="cera-button cera-button--lg" aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(!open)}>
+        Actions
+        <Icon name="chevronDown" size={16} strokeWidth={2} />
+      </button>
+      <div className="cera-menu cera-menu--down" id={menuId} hidden={!open}>
+        {actions.map((a) =>
+          a.href ? (
+            <a key={a.label} href={a.href} target="_blank" rel="noreferrer" onClick={close}>
+              {a.label}
+            </a>
+          ) : (
+            <button
+              key={a.label}
+              type="button"
+              className={a.danger ? 'is-danger' : undefined}
+              disabled={a.disabled}
+              onClick={() => {
+                close();
+                a.onSelect?.();
+              }}
+            >
+              {a.label}
+            </button>
+          ),
+        )}
+      </div>
+    </div>
+  );
 }

@@ -7,6 +7,10 @@
  * An expandable item (e.g. Pages) has two targets: its label goes to the
  * section's index, and a chevron button shows its items, with "+ New" on
  * top. Whether each one is open is remembered per browser.
+ *
+ * At 900px and narrower the sidebar collapses to a rail of icons (admin.css):
+ * labels stay for screen readers and show as a tooltip on hover or focus, and
+ * expandable items' lists are hidden.
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CeraLockup, Icon, type IconName } from './icons.tsx';
@@ -78,9 +82,12 @@ function ItemLink({ item, children }: { item: NavItem; children?: ReactNode }) {
   return (
     <a className="cera-nav__link" href={item.href} aria-current={item.active ? 'page' : undefined}>
       <Icon name={item.icon} />
-      <span>{item.label}</span>
+      <span className="cera-nav__text">{item.label}</span>
       {item.count !== undefined && <span className="cera-nav__count">{item.count}</span>}
       {children}
+      <span className="cera-nav__tip" aria-hidden="true">
+        {item.label}
+      </span>
     </a>
   );
 }
@@ -121,7 +128,7 @@ function ExpandableItem({ item }: { item: NavItem }) {
           <Icon name="chevronRight" size={16} strokeWidth={2} />
         </button>
       </div>
-      <div id={listId} hidden={!open}>
+      <div id={listId} className="cera-nav__sub" hidden={!open}>
         {expand.newHref && (
           <a className="cera-text-button cera-nav__new" href={expand.newHref} aria-label={expand.newLabel}>
             <Icon name="plus" size={16} strokeWidth={2} />
@@ -186,6 +193,9 @@ function UserChip({ user, links, signOut }: { user: AdminSidebarProps['user']; l
         <span className="cera-user__text">
           <span className="cera-user__name">{user.name}</span>
           <span className="cera-user__role">{user.role}</span>
+        </span>
+        <span className="cera-nav__tip" aria-hidden="true">
+          {user.name}
         </span>
       </button>
     </div>
