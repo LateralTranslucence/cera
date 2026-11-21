@@ -23,6 +23,6 @@ const liveGlyphs = cacheLive('icons', async (values: string[]): Promise<IconGlyp
 export const liveIcons: IconResolver = {
   async byValues(values) {
     const sorted = [...new Set(values)].sort();
-    return new Map((await liveGlyphs(sorted)).map((g) => [g.value, g]));
+    return new Map((await liveGlyphs(sorted)).map((glyph) => [glyph.value, glyph]));
   },
 };

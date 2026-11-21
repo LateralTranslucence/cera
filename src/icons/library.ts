@@ -1,7 +1,7 @@
 /**
  * Icon sets and the library that combines them (decision 21).
  *
- * An `f.icon()` field stores `set:name`: `lucide:arrow-right` for the bundled
+ * An `field.icon()` field stores `set:name`: `lucide:arrow-right` for the bundled
  * Lucide set, `custom:<id>` for a site's own icon (the Icon content type),
  * or any prefix a site's own set uses (e.g. `fa-solid:house` for Font
  * Awesome). The prefix keeps stored values meaning the same icon when sets
@@ -12,7 +12,7 @@
  */
 
 export interface IconGlyph {
-  /** What an `f.icon()` field stores, e.g. `lucide:arrow-right`. */
+  /** What an `field.icon()` field stores, e.g. `lucide:arrow-right`. */
   value: string;
   /** A readable name, e.g. "Arrow right". */
   label: string;
@@ -52,28 +52,28 @@ const SET_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** `lucide:arrow-right` → { set: 'lucide', name: 'arrow-right' }; null when it isn't `set:name`. */
 export function parseIconValue(value: string): { set: string; name: string } | null {
-  const i = value.indexOf(':');
-  if (i <= 0 || i === value.length - 1) return null;
-  const set = value.slice(0, i);
-  return SET_NAME.test(set) ? { set, name: value.slice(i + 1) } : null;
+  const colonIndex = value.indexOf(':');
+  if (colonIndex <= 0 || colonIndex === value.length - 1) return null;
+  const set = value.slice(0, colonIndex);
+  return SET_NAME.test(set) ? { set, name: value.slice(colonIndex + 1) } : null;
 }
 
 /** Combines icon sets. Order matters: the admin's picker shows them in this order. */
 export function createIconLibrary(sets: readonly IconSet[]): IconLibrary {
   const byName = new Map<string, IconSet>();
-  for (const s of sets) {
-    if (!SET_NAME.test(s.name)) throw new Error(`cera: icon set name "${s.name}" must be lowercase letters, digits and dashes.`);
-    if (byName.has(s.name)) throw new Error(`cera: two icon sets are named "${s.name}".`);
-    byName.set(s.name, s);
+  for (const iconSet of sets) {
+    if (!SET_NAME.test(iconSet.name)) throw new Error(`cera: icon set name "${iconSet.name}" must be lowercase letters, digits and dashes.`);
+    if (byName.has(iconSet.name)) throw new Error(`cera: two icon sets are named "${iconSet.name}".`);
+    byName.set(iconSet.name, iconSet);
   }
 
   return {
-    sets: sets.map((s) => ({ name: s.name, label: s.label })),
+    sets: sets.map((iconSet) => ({ name: iconSet.name, label: iconSet.label })),
 
     async search(query, opts = {}) {
       const limit = Math.min(Math.max(opts.limit ?? 48, 1), 200);
-      const chosen = opts.set ? sets.filter((s) => s.name === opts.set) : sets;
-      const found = await Promise.all(chosen.map((s) => Promise.resolve(s.search(query.trim(), limit)).then((r) => r.slice(0, limit))));
+      const chosen = opts.set ? sets.filter((iconSet) => iconSet.name === opts.set) : sets;
+      const found = await Promise.all(chosen.map((iconSet) => Promise.resolve(iconSet.search(query.trim(), limit)).then((matches) => matches.slice(0, limit))));
       return found.flat();
     },
 
@@ -110,11 +110,11 @@ export function matchScore(name: string, keywords: readonly string[], words: rea
   if (name.startsWith(query)) return 1;
   const parts = name.split('-');
   let score = 2;
-  for (const w of words) {
-    if (parts.some((p) => p.startsWith(w))) continue;
-    if (name.includes(w)) continue;
+  for (const word of words) {
+    if (parts.some((part) => part.startsWith(word))) continue;
+    if (name.includes(word)) continue;
     // Keywords match at the start of a word: "rocket" finds "rocket science", not "sprocket".
-    if (keywords.some((k) => k.split(/[\s-]+/).some((part) => part.startsWith(w)))) {
+    if (keywords.some((keyword) => keyword.split(/[\s-]+/).some((part) => part.startsWith(word)))) {
       score = 3;
       continue;
     }

@@ -12,8 +12,8 @@ export type Path = IssuePath;
 
 type Container = Record<string, unknown> | unknown[];
 
-function isContainer(v: unknown): v is Container {
-  return typeof v === 'object' && v !== null;
+function isContainer(value: unknown): value is Container {
+  return typeof value === 'object' && value !== null;
 }
 
 export function getIn(value: unknown, path: Path): unknown {
@@ -30,8 +30,8 @@ export function getIn(value: unknown, path: Path): unknown {
  * is a number). Setting an object key to `undefined` removes the key, so
  * cleared optional fields don't linger as `undefined` in stored JSON.
  */
-export function setIn<T>(value: T, path: Path, next: unknown): T {
-  if (path.length === 0) return next as T;
+export function setIn<Value>(value: Value, path: Path, next: unknown): Value {
+  if (path.length === 0) return next as Value;
   const [key, ...rest] = path as [string | number, ...Path];
   const base: Container = isContainer(value) ? value : typeof key === 'number' ? [] : {};
   const child = setIn((base as Record<string | number, unknown>)[key], rest, next);
@@ -39,37 +39,37 @@ export function setIn<T>(value: T, path: Path, next: unknown): T {
   if (Array.isArray(base)) {
     const copy = [...base];
     copy[key as number] = child;
-    return copy as T;
+    return copy as Value;
   }
   const copy: Record<string, unknown> = { ...base };
   if (child === undefined && rest.length === 0) delete copy[key as string];
   else copy[key as string] = child;
-  return copy as T;
+  return copy as Value;
 }
 
-export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
+export function moveItem<Item>(list: readonly Item[], from: number, to: number): Item[] {
   if (to < 0 || to >= list.length || from === to) return [...list];
   const copy = [...list];
   const [item] = copy.splice(from, 1);
-  copy.splice(to, 0, item as T);
+  copy.splice(to, 0, item as Item);
   return copy;
 }
 
-export function removeItem<T>(list: readonly T[], index: number): T[] {
+export function removeItem<Item>(list: readonly Item[], index: number): Item[] {
   return list.filter((_, i) => i !== index);
 }
 
 /** The value a field takes when nothing is stored (its default), or `undefined`. */
 export function fieldDefault(field: AnyField): unknown {
-  const r = (field.schema as z.ZodType).safeParse(undefined);
-  return r.success ? r.data : undefined;
+  const result = (field.schema as z.ZodType).safeParse(undefined);
+  return result.success ? result.data : undefined;
 }
 
 export function defaultsFor(fields: FieldMap): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, field] of Object.entries(fields)) {
-    const d = fieldDefault(field);
-    if (d !== undefined) out[key] = d;
+    const defaultValue = fieldDefault(field);
+    if (defaultValue !== undefined) out[key] = defaultValue;
   }
   return out;
 }
@@ -88,12 +88,12 @@ export function newRepeaterItem(fields: FieldMap, id = newId()): Record<string, 
 }
 
 function startsWith(path: Path, prefix: Path): boolean {
-  return prefix.length <= path.length && prefix.every((k, i) => String(path[i]) === String(k));
+  return prefix.length <= path.length && prefix.every((key, i) => String(path[i]) === String(key));
 }
 
 /** Issues at `path` or below it. With `exact`, only issues at `path` itself. */
 export function issuesAt(issues: readonly PageIssue[], path: Path, exact = false): PageIssue[] {
-  return issues.filter((i) => (exact ? i.path.length === path.length && startsWith(i.path, path) : startsWith(i.path, path)));
+  return issues.filter((issue) => (exact ? issue.path.length === path.length && startsWith(issue.path, path) : startsWith(issue.path, path)));
 }
 
 export function slugify(text: string): string {
@@ -128,8 +128,8 @@ const plainText = (html: string) =>
 export function panelName(def: AnyPanel | undefined, data: Record<string, unknown>, type: string): string {
   // Panels have titles; form fields have labels (or a section's legend).
   for (const key of ['title', 'label', 'legend']) {
-    const v = data[key];
-    if (typeof v === 'string' && v.trim()) return plainText(v);
+    const value = data[key];
+    if (typeof value === 'string' && value.trim()) return plainText(value);
   }
   return def?.label ?? type;
 }

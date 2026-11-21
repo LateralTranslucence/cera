@@ -94,12 +94,12 @@ async function measure(file: File): Promise<{ width?: number; height?: number }>
   return {};
 }
 
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
 const fileName = (path: string) => path.split('/').pop() ?? path;
 
 /** A media reference typed by hand uses its path as its id. */
-const isManual = (m: Record<string, unknown>) => !m.id || m.id === m.path;
+const isManual = (reference: Record<string, unknown>) => !reference.id || reference.id === reference.path;
 
 type Mode = 'idle' | 'library' | 'manual';
 
@@ -118,22 +118,22 @@ export function MediaInput({
   media?: MediaContext;
   labelledBy?: string;
 }) {
-  const m = isObject(value) && asString(value.path) ? value : undefined;
-  const uploadable = accept.filter((k): k is 'image' | 'video' => k !== 'embed');
+  const mediaValue = isObject(value) && asString(value.path) ? value : undefined;
+  const uploadable = accept.filter((kind): kind is 'image' | 'video' => kind !== 'embed');
   const canUpload = Boolean(media) && uploadable.length > 0;
-  const [mode, setMode] = useState<Mode>(m && isManual(m) ? 'manual' : 'idle');
+  const [mode, setMode] = useState<Mode>(mediaValue && isManual(mediaValue) ? 'manual' : 'idle');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const id = useId();
 
-  const set = (key: string, v: unknown) => {
-    const next: Record<string, unknown> = { kind: 'image', ...(m ?? {}), [key]: v };
-    if (v === undefined || v === '') delete next[key];
+  const set = (key: string, newValue: unknown) => {
+    const next: Record<string, unknown> = { kind: 'image', ...(mediaValue ?? {}), [key]: newValue };
+    if (newValue === undefined || newValue === '') delete next[key];
     if (!asString(next.path)) return onChange(undefined);
     // A typed path no longer points at a library row, so it becomes its own id.
-    onChange(key === 'path' || isManual(m ?? {}) ? { ...next, id: next.path } : next);
+    onChange(key === 'path' || isManual(mediaValue ?? {}) ? { ...next, id: next.path } : next);
   };
 
   async function upload(file: File) {
@@ -145,7 +145,7 @@ export function MediaInput({
       if (result.ok) {
         // Keep alt text the editor already wrote for this spot.
         const ref = toMediaRef(result.item);
-        onChange(m && asString(m.alt) && !ref.alt ? { ...ref, alt: m.alt } : ref);
+        onChange(mediaValue && asString(mediaValue.alt) && !ref.alt ? { ...ref, alt: mediaValue.alt } : ref);
         setMode('idle');
       } else {
         setError(result.message);
@@ -158,10 +158,10 @@ export function MediaInput({
     }
   }
 
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
+  const onDrop = (event: DragEvent) => {
+    event.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
+    const file = event.dataTransfer.files[0];
     if (file && canUpload && !readOnly && !busy) void upload(file);
   };
 
@@ -169,25 +169,25 @@ export function MediaInput({
     <div
       className={`cera-group cera-media${dragging ? ' cera-media--drop' : ''}`}
       aria-labelledby={labelledBy}
-      onDragOver={(e) => {
+      onDragOver={(event) => {
         if (!canUpload || readOnly) return;
-        e.preventDefault();
+        event.preventDefault();
         setDragging(true);
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      {m && <MediaPreview media={m as unknown as MediaRef} />}
+      {mediaValue && <MediaPreview media={mediaValue as unknown as MediaRef} />}
 
-      {m && (
+      {mediaValue && (
         <label className="cera-inline">
           Alt text
           <input
             type="text"
-            value={asString(m.alt)}
+            value={asString(mediaValue.alt)}
             readOnly={readOnly}
-            placeholder={m.kind === 'image' ? 'Describe the image for people who can’t see it' : ''}
-            onChange={(e) => set('alt', e.target.value)}
+            placeholder={mediaValue.kind === 'image' ? 'Describe the image for people who can’t see it' : ''}
+            onChange={(event) => set('alt', event.target.value)}
           />
         </label>
       )}
@@ -196,15 +196,15 @@ export function MediaInput({
         <>
           <label className="cera-inline">
             Path or URL
-            <input type="text" value={asString(m?.path)} placeholder="https://vimeo.com/… or a path in cera-media" readOnly={readOnly} onChange={(e) => set('path', e.target.value.trim())} />
+            <input type="text" value={asString(mediaValue?.path)} placeholder="https://vimeo.com/… or a path in cera-media" readOnly={readOnly} onChange={(event) => set('path', event.target.value.trim())} />
           </label>
-          {m && (
+          {mediaValue && (
             <label className="cera-inline">
               Kind
-              <select value={asString(m.kind) || 'image'} disabled={readOnly} onChange={(e) => set('kind', e.target.value)}>
-                {accept.map((k) => (
-                  <option key={k} value={k}>
-                    {k === 'image' ? 'Image' : k === 'video' ? 'Video' : 'Embed'}
+              <select value={asString(mediaValue.kind) || 'image'} disabled={readOnly} onChange={(event) => set('kind', event.target.value)}>
+                {accept.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : 'Embed'}
                   </option>
                 ))}
               </select>
@@ -224,13 +224,13 @@ export function MediaInput({
                 className="cera-visually-hidden"
                 accept={mediaAccept(uploadable)}
                 disabled={Boolean(busy)}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
                   if (file) void upload(file);
                 }}
               />
               <button type="button" className="cera-button cera-button--small" disabled={Boolean(busy)} onClick={() => fileInput.current?.click()}>
-                {m ? 'Upload a new file' : 'Upload a file'}
+                {mediaValue ? 'Upload a new file' : 'Upload a file'}
               </button>
               <button
                 type="button"
@@ -248,7 +248,7 @@ export function MediaInput({
               Use a path or URL
             </button>
           )}
-          {m && (
+          {mediaValue && (
             <button type="button" className="cera-link-button cera-danger" onClick={() => onChange(undefined)}>
               Remove
             </button>
@@ -266,16 +266,16 @@ export function MediaInput({
           {error}
         </p>
       )}
-      {canUpload && !readOnly && !m && !busy && <p className="cera-note">Or drop a file here.</p>}
+      {canUpload && !readOnly && !mediaValue && !busy && <p className="cera-note">Or drop a file here.</p>}
 
       {mode === 'library' && media && (
         <MediaLibrary
           find={media.find}
           kinds={uploadable}
-          isSelected={(id) => id === asString(m?.id)}
+          isSelected={(id) => id === asString(mediaValue?.id)}
           onPick={(item) => {
             const ref = toMediaRef(item);
-            onChange(m && asString(m.alt) && !ref.alt ? { ...ref, alt: m.alt } : ref);
+            onChange(mediaValue && asString(mediaValue.alt) && !ref.alt ? { ...ref, alt: mediaValue.alt } : ref);
             setMode('idle');
           }}
         />
@@ -351,7 +351,7 @@ export function MediaLibrary({
 
   return (
     <div className="cera-media__library">
-      <input type="search" value={search} placeholder="Search by file name or alt text" aria-label="Search the media library" onChange={(e) => setSearch(e.target.value)} />
+      <input type="search" value={search} placeholder="Search by file name or alt text" aria-label="Search the media library" onChange={(event) => setSearch(event.target.value)} />
       {error ? (
         <p className="cera-status cera-status--error">The library couldn’t be loaded.</p>
       ) : items === null ? (
@@ -407,10 +407,10 @@ export function GalleryInput({
     latest.current = next;
     onChange(next);
   };
-  const move = (i: number, by: number) => {
+  const move = (index: number, by: number) => {
     const next = [...items];
-    const [item] = next.splice(i, 1);
-    next.splice(i + by, 0, item!);
+    const [item] = next.splice(index, 1);
+    next.splice(index + by, 0, item!);
     set(next);
   };
 
@@ -420,8 +420,8 @@ export function GalleryInput({
     const room = limit === undefined ? files.length : Math.max(limit - latest.current.length, 0);
     const queue = files.slice(0, room);
     const failures: string[] = [];
-    for (const [n, file] of queue.entries()) {
-      setBusy(`Uploading ${n + 1} of ${queue.length}: ${file.name}…`);
+    for (const [index, file] of queue.entries()) {
+      setBusy(`Uploading ${index + 1} of ${queue.length}: ${file.name}…`);
       try {
         const result = await media.upload(file);
         if (result.ok) set([...latest.current, toMediaRef(result.item) as unknown as Record<string, unknown>]);
@@ -439,16 +439,16 @@ export function GalleryInput({
   return (
     <div
       className={`cera-group cera-media cera-gallery${dragging ? ' cera-media--drop' : ''}`}
-      onDragOver={(e) => {
+      onDragOver={(event) => {
         if (!media || readOnly || full) return;
-        e.preventDefault();
+        event.preventDefault();
         setDragging(true);
       }}
       onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
+      onDrop={(event) => {
+        event.preventDefault();
         setDragging(false);
-        const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
+        const files = [...event.dataTransfer.files].filter((file) => file.type.startsWith('image/'));
         if (files.length && media && !readOnly && !busy && !full) void uploadAll(files);
       }}
     >
@@ -466,10 +466,10 @@ export function GalleryInput({
                   value={asString(item.alt)}
                   readOnly={readOnly}
                   placeholder="Describe the image"
-                  onChange={(e) => {
+                  onChange={(event) => {
                     const next = [...items];
-                    next[i] = { ...item, alt: e.target.value };
-                    if (!e.target.value) delete next[i]!.alt;
+                    next[i] = { ...item, alt: event.target.value };
+                    if (!event.target.value) delete next[i]!.alt;
                     set(next);
                   }}
                 />
@@ -501,8 +501,8 @@ export function GalleryInput({
             className="cera-visually-hidden"
             accept={mediaAccept(['image'])}
             disabled={Boolean(busy) || full}
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
+            onChange={(event) => {
+              const files = [...(event.target.files ?? [])];
               if (files.length) void uploadAll(files);
             }}
           />

@@ -4,28 +4,28 @@
 // switch. A Section starts a fieldset (theme: the Fieldsets box of
 // comma-separated field IDs).
 import { defineCorePanel } from '../define-panel.ts';
-import { f } from '../fields.ts';
+import { field } from '../fields.ts';
 
 const component = () => import('./NoComponent.tsx');
 
 /** What every field has (theme: Label, ID, Required, Hide Label). */
 const common = {
-  label: f.text({ label: 'Label', required: true }),
-  name: f.text({ label: 'Field ID', note: 'The name its answer is saved under. Default: made from the label.' }),
-  required: f.toggle({ label: 'Required' }),
-  hideLabel: f.toggle({ label: 'Hide label', note: 'Hidden on screen; screen readers still read it.' }),
-  note: f.text({ label: 'Help text', note: 'Shown under the field.' }),
+  label: field.text({ label: 'Label', required: true }),
+  name: field.text({ label: 'Field ID', note: 'The name its answer is saved under. Default: made from the label.' }),
+  required: field.toggle({ label: 'Required' }),
+  hideLabel: field.toggle({ label: 'Hide label', note: 'Hidden on screen; screen readers still read it.' }),
+  note: field.text({ label: 'Help text', note: 'Shown under the field.' }),
 };
 
 const options = (opts: { describe?: boolean } = {}) =>
-  f.repeater({
+  field.repeater({
     label: 'Options',
     itemTitle: 'label',
     min: 1,
     fields: {
-      label: f.text({ label: 'Label', required: true }),
-      value: f.text({ label: 'Value', note: 'Saved with the answer. Default: the label.' }),
-      ...(opts.describe ? { description: f.text({ label: 'Description' }) } : {}),
+      label: field.text({ label: 'Label', required: true }),
+      value: field.text({ label: 'Value', note: 'Saved with the answer. Default: the label.' }),
+      ...(opts.describe ? { description: field.text({ label: 'Description' }) } : {}),
     },
   });
 
@@ -52,7 +52,7 @@ export const textField = defineCorePanel({
   type: 'cera/field-text',
   label: 'Text',
   description: 'One line of text.',
-  fields: { ...common, autocomplete: f.select({ label: 'Autocomplete', options: AUTOCOMPLETE, default: 'none', note: 'Lets browsers fill it in.' }) },
+  fields: { ...common, autocomplete: field.select({ label: 'Autocomplete', options: AUTOCOMPLETE, default: 'none', note: 'Lets browsers fill it in.' }) },
   component,
 });
 
@@ -126,8 +126,8 @@ export const toggleField = defineCorePanel({
   description: 'An on/off switch.',
   fields: {
     ...common,
-    offLabel: f.text({ label: 'Off answer', note: 'Default: “No”.' }),
-    onLabel: f.text({ label: 'On answer', note: 'Default: “Yes”.' }),
+    offLabel: field.text({ label: 'Off answer', note: 'Default: “No”.' }),
+    onLabel: field.text({ label: 'On answer', note: 'Default: “Yes”.' }),
   },
   component,
 });
@@ -138,9 +138,9 @@ export const rangeField = defineCorePanel({
   description: 'A whole number on a slider.',
   fields: {
     ...common,
-    min: f.number({ label: 'Minimum', int: true, default: 0 }),
-    max: f.number({ label: 'Maximum', int: true, default: 100 }),
-    step: f.number({ label: 'Step', int: true, min: 1, default: 1 }),
+    min: field.number({ label: 'Minimum', int: true, default: 0 }),
+    max: field.number({ label: 'Maximum', int: true, default: 100 }),
+    step: field.number({ label: 'Step', int: true, min: 1, default: 1 }),
   },
   component,
 });
@@ -152,8 +152,8 @@ export const hiddenField = defineCorePanel({
   fields: {
     label: common.label,
     name: common.name,
-    value: f.text({ label: 'Value', note: 'Sent when nothing below fills it in.' }),
-    fromQuery: f.text({ label: 'From the address', note: 'A query parameter to fill it from, e.g. utm_source for ?utm_source=newsletter.' }),
+    value: field.text({ label: 'Value', note: 'Sent when nothing below fills it in.' }),
+    fromQuery: field.text({ label: 'From the address', note: 'A query parameter to fill it from, e.g. utm_source for ?utm_source=newsletter.' }),
   },
   component,
 });
@@ -163,8 +163,8 @@ export const sectionField = defineCorePanel({
   label: 'Section',
   description: 'Groups the fields after it under a heading, until the next section.',
   fields: {
-    legend: f.text({ label: 'Heading', note: 'Leave empty to end the section above without starting a new one.' }),
-    note: f.text({ label: 'Help text' }),
+    legend: field.text({ label: 'Heading', note: 'Leave empty to end the section above without starting a new one.' }),
+    note: field.text({ label: 'Help text' }),
   },
   component,
 });

@@ -10,19 +10,19 @@ import type { tabsFields } from './tabs.fields.ts';
 export default function Tabs({ data, panel }: PanelPropsOf<typeof tabsFields>) {
   const seen = new Set<string>();
   const items: TabItem[] = data.tabs
-    .filter((t) => t.navLabel)
-    .map((t, i) => {
+    .filter((tab) => tab.navLabel)
+    .map((tab, i) => {
       // Unique per page, so a link to #label opens the right tab.
-      let id = slugForId(t.navLabel!) || `tab-${i + 1}`;
+      let id = slugForId(tab.navLabel!) || `tab-${i + 1}`;
       if (seen.has(id)) id = `${id}-${i + 1}`;
       seen.add(id);
       return {
         id,
-        navLabel: t.navLabel!,
-        title: t.title,
-        copy: t.copy,
-        cta: t.cta,
-        media: t.media && t.media.kind !== 'embed' ? { kind: t.media.kind, src: mediaUrl(t.media), alt: t.media.alt ?? '', width: t.media.width, height: t.media.height } : undefined,
+        navLabel: tab.navLabel!,
+        title: tab.title,
+        copy: tab.copy,
+        cta: tab.cta,
+        media: tab.media && tab.media.kind !== 'embed' ? { kind: tab.media.kind, src: mediaUrl(tab.media), alt: tab.media.alt ?? '', width: tab.media.width, height: tab.media.height } : undefined,
       };
     });
 

@@ -23,8 +23,8 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
   ]);
   const shown = submissions.slice(0, BATCH);
   const query = (extra: Record<string, string | undefined>) => {
-    const q = new URLSearchParams(Object.entries({ form: formId, ...extra }).filter((e): e is [string, string] => Boolean(e[1])));
-    return q.size ? `?${q}` : '';
+    const searchParameters = new URLSearchParams(Object.entries({ form: formId, ...extra }).filter((entry): entry is [string, string] => Boolean(entry[1])));
+    return searchParameters.size ? `?${searchParameters}` : '';
   };
 
   return (
@@ -39,7 +39,7 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
         <SubmissionsClient
           key={`${formId ?? ''}-${before ?? ''}`}
           submissions={shown}
-          forms={forms.map((f) => ({ id: f.id, title: f.title, slug: f.slug }))}
+          forms={forms.map((form) => ({ id: form.id, title: form.title, slug: form.slug }))}
           formId={formId}
           csvHref={`/admin/submissions/export${query({})}`}
           olderHref={submissions.length > BATCH ? `/admin/submissions${query({ before: shown[shown.length - 1]!.createdAt })}` : undefined}

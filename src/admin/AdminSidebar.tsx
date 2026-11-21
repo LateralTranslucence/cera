@@ -60,7 +60,7 @@ function readOpen(): Record<string, boolean> {
 /** "Ada Lovelace" → "AL"; "ada.lovelace@x" → "AL"; "admin@x" → "A". */
 export function initials(name: string): string {
   const words = name.split('@')[0]!.split(/[\s._-]+/).filter(Boolean);
-  return words.slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+  return words.slice(0, 2).map((word) => word[0]!.toUpperCase()).join('') || '?';
 }
 
 export function AdminSidebar({ homeHref, sections, user, userLinks = [], signOut }: AdminSidebarProps) {
@@ -158,8 +158,8 @@ function UserChip({ user, links, signOut }: { user: AdminSidebarProps['user']; l
   // Close on Escape or a click elsewhere.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    const onClick = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
+    const onClick = (event: MouseEvent) => !root.current?.contains(event.target as Node) && setOpen(false);
     document.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onClick);
     return () => {
@@ -171,10 +171,10 @@ function UserChip({ user, links, signOut }: { user: AdminSidebarProps['user']; l
   return (
     <div className="cera-user" ref={root}>
       <div className="cera-menu" id={menuId} hidden={!open}>
-        {links.map((l) => (
-          <a key={l.href} href={l.href}>
-            <Icon name={l.icon} />
-            {l.label}
+        {links.map((link) => (
+          <a key={link.href} href={link.href}>
+            <Icon name={link.icon} />
+            {link.label}
           </a>
         ))}
         {signOut && (

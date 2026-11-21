@@ -10,7 +10,7 @@
 import { useState, useTransition, type FormEvent } from 'react';
 import { CERA_ROLE_LABELS, CERA_ROLES, type CeraRole, type CeraUser } from '../roles.ts';
 
-type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
+type Result<Extra = object> = ({ ok: true } & Extra) | { ok: false; message: string };
 
 export interface UsersManagerProps {
   users: CeraUser[];
@@ -38,7 +38,7 @@ export function UsersManager({ users: initial, currentUserId, onCreate, onSetRol
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<CeraRole>('editor');
 
-  const replace = (user: CeraUser) => setUsers((list) => list.map((u) => (u.id === user.id ? user : u)));
+  const replace = (user: CeraUser) => setUsers((list) => list.map((existing) => (existing.id === user.id ? user : existing)));
 
   function changeRole(user: CeraUser, next: CeraRole | null) {
     if (next === null && !window.confirm(`Remove ${user.email}’s access to the admin? Their account stays; you can give access again later.`)) return;
@@ -55,8 +55,8 @@ export function UsersManager({ users: initial, currentUserId, onCreate, onSetRol
     });
   }
 
-  function add(e: FormEvent) {
-    e.preventDefault();
+  function add(event: FormEvent) {
+    event.preventDefault();
     setStatus(null);
     setCreated(null);
     startTransition(async () => {
@@ -72,8 +72,8 @@ export function UsersManager({ users: initial, currentUserId, onCreate, onSetRol
     });
   }
 
-  const withAccess = users.filter((u) => u.role);
-  const without = users.filter((u) => !u.role);
+  const withAccess = users.filter((user) => user.role);
+  const without = users.filter((user) => !user.role);
 
   return (
     <div className="cera-users">
@@ -88,14 +88,14 @@ export function UsersManager({ users: initial, currentUserId, onCreate, onSetRol
         <form className="cera-users__add" onSubmit={add}>
           <label className="cera-inline">
             Email
-            <input type="email" required value={email} autoComplete="off" onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+            <input type="email" required value={email} autoComplete="off" onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" />
           </label>
           <label className="cera-inline">
             Role
-            <select value={role} onChange={(e) => setRole(e.target.value as CeraRole)}>
-              {CERA_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {CERA_ROLE_LABELS[r]}
+            <select value={role} onChange={(event) => setRole(event.target.value as CeraRole)}>
+              {CERA_ROLES.map((roleOption) => (
+                <option key={roleOption} value={roleOption}>
+                  {CERA_ROLE_LABELS[roleOption]}
                 </option>
               ))}
             </select>
@@ -162,35 +162,35 @@ function UserTable({
         </tr>
       </thead>
       <tbody>
-        {users.map((u) => {
-          const self = u.id === currentUserId;
+        {users.map((user) => {
+          const self = user.id === currentUserId;
           return (
-            <tr key={u.id}>
+            <tr key={user.id}>
               <td>
-                {u.email || <span className="cera-note">(no email)</span>}
+                {user.email || <span className="cera-note">(no email)</span>}
                 {self && <span className="cera-badge">You</span>}
               </td>
               <td>
                 {self ? (
-                  roleName(u.role!)
+                  roleName(user.role!)
                 ) : (
                   <select
-                    aria-label={`Role for ${u.email}`}
-                    value={u.role ?? ''}
+                    aria-label={`Role for ${user.email}`}
+                    value={user.role ?? ''}
                     disabled={pending}
-                    onChange={(e) => onRole(u, e.target.value ? (e.target.value as CeraRole) : null)}
+                    onChange={(event) => onRole(user, event.target.value ? (event.target.value as CeraRole) : null)}
                   >
-                    {!u.role && <option value="">No access</option>}
-                    {CERA_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {roleName(r)}
+                    {!user.role && <option value="">No access</option>}
+                    {CERA_ROLES.map((roleOption) => (
+                      <option key={roleOption} value={roleOption}>
+                        {roleName(roleOption)}
                       </option>
                     ))}
-                    {u.role && <option value="">Remove access</option>}
+                    {user.role && <option value="">Remove access</option>}
                   </select>
                 )}
               </td>
-              <td className="cera-hide-sm">{u.lastSignInAt ? dateFormat.format(new Date(u.lastSignInAt)) : 'Never'}</td>
+              <td className="cera-hide-sm">{user.lastSignInAt ? dateFormat.format(new Date(user.lastSignInAt)) : 'Never'}</td>
             </tr>
           );
         })}

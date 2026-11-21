@@ -16,8 +16,8 @@ const target = join(site, '.env.local');
 function parse(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of text.split('\n')) {
-    const m = line.match(/^([A-Z0-9_]+)="?(.*?)"?$/);
-    if (m) out[m[1]!] = m[2]!;
+    const match = line.match(/^([A-Z0-9_]+)="?(.*?)"?$/);
+    if (match) out[match[1]!] = match[2]!;
   }
   return out;
 }

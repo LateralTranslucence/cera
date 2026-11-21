@@ -21,10 +21,10 @@ const image = { id: 'm1', path: '2026/11/abc-mars.png', kind: 'image', alt: 'Mar
 
 test('every core panel is in the landing page, under cera/', () => {
   assert.deepEqual(
-    landingPage.panels.map((p) => p.type),
-    corePanels.map((p) => p.type),
+    landingPage.panels.map((panel) => panel.type),
+    corePanels.map((panel) => panel.type),
   );
-  for (const p of corePanels) assert.match(p.type, /^cera\/[a-z-]+$/);
+  for (const panel of corePanels) assert.match(panel.type, /^cera\/[a-z-]+$/);
 });
 
 test('the frame: anchor id, title, copy, and the background as color, image and overlay', async () => {
@@ -107,7 +107,7 @@ test('decision tree: at most two cards, details hidden until opened, links need 
   assert.match(html, /aria-expanded="false">Expand<span class="visually-hidden">: Orbit<\/span>/);
   // The field itself refuses a third card.
   const { issues } = readPage(landingPage, pageWith([{ id: 'p', type: 'cera/decision-tree', v: 1, data: { cards: [card('a', '1'), card('b', '2'), card('c', '3')] } }]));
-  assert.ok(issues.some((i) => i.path.includes('cards')), JSON.stringify(issues));
+  assert.ok(issues.some((issue) => issue.path.includes('cards')), JSON.stringify(issues));
 });
 
 test('accordion: items without a title are skipped; all closed, text in the HTML, headers are buttons', async () => {

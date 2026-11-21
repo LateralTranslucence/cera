@@ -8,17 +8,17 @@ import { PanelFrame } from './PanelFrame.tsx';
 import type { quotesFields } from './quotes.fields.ts';
 
 export default function Quotes({ data, panel }: PanelPropsOf<typeof quotesFields>) {
-  const items = data.quotes.filter((q) => q.quote);
+  const items = data.quotes.filter((quote) => quote.quote);
   return (
     <PanelFrame name="quotes" data={data} panel={panel}>
       {items.length > 0 && (
         <ul className={`quotes${items.length > 1 ? ' quotes--slider' : ''}`}>
-          {items.map((q) => (
-            <li key={q._id} className="quote">
+          {items.map((quote) => (
+            <li key={quote._id} className="quote">
               <blockquote>
-                <Html html={q.quote!} />
+                <Html html={quote.quote!} />
               </blockquote>
-              {q.attribution && <p className="quote__attribution">{q.attribution}</p>}
+              {quote.attribution && <p className="quote__attribution">{quote.attribution}</p>}
             </li>
           ))}
         </ul>

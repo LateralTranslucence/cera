@@ -19,15 +19,15 @@ export function GalleryClient({ images }: { images: GalleryImage[] }) {
   const [current, setCurrent] = useState<number | null>(null);
   const shown = current === null ? null : images[current];
 
-  const open = (i: number) => {
-    setCurrent(i);
+  const open = (index: number) => {
+    setCurrent(index);
     dialog.current?.showModal();
   };
-  const step = (by: number) => setCurrent((i) => (i === null ? i : (i + by + images.length) % images.length));
-  const onKeyDown = (e: KeyboardEvent) => {
+  const step = (by: number) => setCurrent((currentIndex) => (currentIndex === null ? currentIndex : (currentIndex + by + images.length) % images.length));
+  const onKeyDown = (event: KeyboardEvent) => {
     if (images.length < 2) return;
-    if (e.key === 'ArrowRight') step(1);
-    if (e.key === 'ArrowLeft') step(-1);
+    if (event.key === 'ArrowRight') step(1);
+    if (event.key === 'ArrowLeft') step(-1);
   };
 
   return (
@@ -48,9 +48,9 @@ export function GalleryClient({ images }: { images: GalleryImage[] }) {
         aria-label={shown?.alt || 'Image'}
         onKeyDown={onKeyDown}
         onClose={() => setCurrent(null)}
-        onClick={(e) => {
+        onClick={(event) => {
           // A click on the backdrop (the dialog itself, not its contents) closes it.
-          if (e.target === dialog.current) dialog.current.close();
+          if (event.target === dialog.current) dialog.current.close();
         }}
       >
         {shown && (

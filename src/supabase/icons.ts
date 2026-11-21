@@ -27,23 +27,23 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function supabaseIcons(client: SupabaseClient, opts: { draft: boolean; label?: string }): IconSet {
   const rows = async (ids?: readonly string[]): Promise<Array<IconRow & { live: boolean }>> => {
-    const q = opts.draft
+    const query = opts.draft
       ? client.from('cera_pages').select('id, title, boxes').eq('content_type', iconType.name)
       : client.from('cera_page_revisions').select('page_id, title, boxes').eq('content_type', iconType.name).eq('is_published', true);
-    const { data, error } = ids ? await (opts.draft ? q.in('id', ids) : q.in('page_id', ids)) : await q;
+    const { data, error } = ids ? await (opts.draft ? query.in('id', ids) : query.in('page_id', ids)) : await query;
     if (error) fail(error);
-    const found = ((data ?? []) as Array<Omit<IconRow, 'id'> & { id?: string; page_id?: string }>).map((r) => ({ ...r, id: (r.id ?? r.page_id)! }));
-    if (!opts.draft || found.length === 0) return found.map((r) => ({ ...r, live: true }));
-    const live = await client.from('cera_page_revisions').select('page_id').in('page_id', found.map((r) => r.id)).eq('is_published', true);
+    const found = ((data ?? []) as Array<Omit<IconRow, 'id'> & { id?: string; page_id?: string }>).map((row) => ({ ...row, id: (row.id ?? row.page_id)! }));
+    if (!opts.draft || found.length === 0) return found.map((row) => ({ ...row, live: true }));
+    const live = await client.from('cera_page_revisions').select('page_id').in('page_id', found.map((row) => row.id)).eq('is_published', true);
     if (live.error) fail(live.error);
-    const liveIds = new Set((live.data as Array<{ page_id: string }>).map((r) => r.page_id));
-    return found.map((r) => ({ ...r, live: liveIds.has(r.id) }));
+    const liveIds = new Set((live.data as Array<{ page_id: string }>).map((revision) => revision.page_id));
+    return found.map((row) => ({ ...row, live: liveIds.has(row.id) }));
   };
 
-  const glyph = (r: IconRow & { live: boolean }): IconGlyph | null => {
-    const svg = typeof r.boxes.icon?.svg === 'string' ? safeSvg(r.boxes.icon.svg) : '';
+  const glyph = (row: IconRow & { live: boolean }): IconGlyph | null => {
+    const svg = typeof row.boxes.icon?.svg === 'string' ? safeSvg(row.boxes.icon.svg) : '';
     if (!svg) return null;
-    return { value: `custom:${r.id}`, label: r.title || 'Untitled icon', svg, ...(!r.live && { note: 'Not published' }) };
+    return { value: `custom:${row.id}`, label: row.title || 'Untitled icon', svg, ...(!row.live && { note: 'Not published' }) };
   };
 
   return {
@@ -53,22 +53,22 @@ export function supabaseIcons(client: SupabaseClient, opts: { draft: boolean; la
     async search(query, limit) {
       const words = queryWords(query);
       const scored: Array<[number, string, IconGlyph]> = [];
-      for (const r of await rows()) {
-        if (r.boxes.icon?.hidden === true) continue;
-        const name = r.title.toLowerCase().trim().replace(/\s+/g, '-');
-        const keywords = typeof r.boxes.icon?.keywords === 'string' ? queryWords(r.boxes.icon.keywords) : [];
+      for (const row of await rows()) {
+        if (row.boxes.icon?.hidden === true) continue;
+        const name = row.title.toLowerCase().trim().replace(/\s+/g, '-');
+        const keywords = typeof row.boxes.icon?.keywords === 'string' ? queryWords(row.boxes.icon.keywords) : [];
         const score = matchScore(name, keywords, words);
-        const g = score === null ? null : glyph(r);
-        if (g) scored.push([score!, g.label, g]);
+        const iconGlyph = score === null ? null : glyph(row);
+        if (iconGlyph) scored.push([score!, iconGlyph.label, iconGlyph]);
       }
-      scored.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
-      return scored.slice(0, limit).map(([, , g]) => g);
+      scored.sort((first, second) => first[0] - second[0] || first[1].localeCompare(second[1]));
+      return scored.slice(0, limit).map(([, , iconGlyph]) => iconGlyph);
     },
 
     async get(names) {
-      const ids = names.filter((n) => UUID.test(n));
+      const ids = names.filter((name) => UUID.test(name));
       if (ids.length === 0) return [];
-      return (await rows(ids)).map(glyph).filter((g): g is IconGlyph => g !== null);
+      return (await rows(ids)).map(glyph).filter((iconGlyph): iconGlyph is IconGlyph => iconGlyph !== null);
     },
   };
 }

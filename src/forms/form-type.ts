@@ -9,7 +9,7 @@
 //     end ignored the first and the second hid the submit button.
 //   - No email settings yet: submissions are stored and read in the admin.
 import { defineContentType } from '../content-type.ts';
-import { f } from '../fields.ts';
+import { field } from '../fields.ts';
 import { formFields } from './fields.ts';
 
 export const DEFAULT_SUBMIT_TEXT = 'Submit';
@@ -20,12 +20,12 @@ export const formType = defineContentType({
   label: 'Form',
   boxes: {
     settings: {
-      submitText: f.text({ label: 'Submit button text', note: `Default: “${DEFAULT_SUBMIT_TEXT}”.` }),
-      privacyNote: f.html({ label: 'Privacy note', toolbar: 'limited', note: 'Shown above the button, e.g. how you use what people send, with a link to your privacy policy.' }),
+      submitText: field.text({ label: 'Submit button text', note: `Default: “${DEFAULT_SUBMIT_TEXT}”.` }),
+      privacyNote: field.html({ label: 'Privacy note', toolbar: 'limited', note: 'Shown above the button, e.g. how you use what people send, with a link to your privacy policy.' }),
     },
     onSubmit: {
-      thankYouText: f.html({ label: 'Thank-you message', toolbar: 'limited', note: 'Shown in place of the form once it’s sent. Default: “Thank you for reaching out, we’ll be in touch soon.”' }),
-      thankYouRedirect: f.url({ label: 'Thank-you page', note: 'Go to this page instead, e.g. /thank-you. Only addresses on this site.' }),
+      thankYouText: field.html({ label: 'Thank-you message', toolbar: 'limited', note: 'Shown in place of the form once it’s sent. Default: “Thank you for reaching out, we’ll be in touch soon.”' }),
+      thankYouRedirect: field.url({ label: 'Thank-you page', note: 'Go to this page instead, e.g. /thank-you. Only addresses on this site.' }),
     },
   },
   panels: formFields,

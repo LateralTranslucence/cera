@@ -15,7 +15,7 @@ export async function GET(request: Request): Promise<Response> {
   const param = new URL(request.url).searchParams.get('form') ?? '';
   const formId = UUID.test(param) ? param : undefined;
 
-  const forms = new Map((await listPages(staff.client, { contentType: formType.name })).map((f) => [f.id, f]));
+  const forms = new Map((await listPages(staff.client, { contentType: formType.name })).map((form) => [form.id, form]));
   const all: Submission[] = [];
   for (let before: string | undefined; ; ) {
     const batch = await listSubmissions(staff.client, { formId, before, limit: 500 });
@@ -26,7 +26,7 @@ export async function GET(request: Request): Promise<Response> {
   // Oldest first reads better in a spreadsheet.
   all.reverse();
 
-  const csv = submissionsCsv(all.map((s) => ({ ...s, formTitle: forms.get(s.formId)?.title ?? 'Deleted form' })));
+  const csv = submissionsCsv(all.map((submission) => ({ ...submission, formTitle: forms.get(submission.formId)?.title ?? 'Deleted form' })));
   const name = `${formId ? (forms.get(formId)?.slug ?? 'form') : 'all-forms'}-submissions-${new Date().toISOString().slice(0, 10)}.csv`;
   return new Response(`﻿${csv}`, {
     headers: {

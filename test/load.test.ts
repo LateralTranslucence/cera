@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { defineContentType, definePanel, f, readPage, type LinkedPage, type LoadContext, type PageResolver, type StoredPage } from '../src/index.ts';
+import { defineContentType, definePanel, field, readPage, type LinkedPage, type LoadContext, type PageResolver, type StoredPage } from '../src/index.ts';
 import { Panels } from '../src/next/index.ts';
 import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
@@ -24,7 +24,7 @@ function resolver(pages: LinkedPage[], calls: string[][] = []): PageResolver {
   return {
     async byIds(ids) {
       calls.push([...ids]);
-      return ids.map((id) => pages.find((p) => p.id === id)).filter((p): p is LinkedPage => !!p);
+      return ids.map((id) => pages.find((page) => page.id === id)).filter((page): page is LinkedPage => !!page);
     },
   };
 }
@@ -36,7 +36,7 @@ function pageWithFeatured(data: Record<string, unknown>) {
 }
 
 async function render(page: ReturnType<typeof pageWithFeatured>, pages: PageResolver | undefined, errors: string[] = []) {
-  const el = await Panels({ contentType: landingPage, page, loadContext: pages && { pages, draft: false }, onError: (e) => errors.push(String(e)) });
+  const el = await Panels({ contentType: landingPage, page, loadContext: pages && { pages, draft: false }, onError: (error) => errors.push(String(error)) });
   return renderToStaticMarkup(el);
 }
 
@@ -97,7 +97,7 @@ test('load gets the panel data and context (page, panel, draft)', async () => {
   const probe = definePanel({
     type: 'probe',
     label: 'Probe',
-    fields: { n: f.number({ default: 7 }) },
+    fields: { n: field.number({ default: 7 }) },
     load: (data, ctx) => {
       seen = { data, ctx: { draft: ctx.draft, page: ctx.page, panel: ctx.panel } };
       return { doubled: data.n * 2 };
@@ -137,7 +137,7 @@ test('Posts: one card per page, in the picked order; pages that don’t resolve 
   const html = await render(pageWithPosts({ title: 'Read next', posts: [MARS, HIDDEN, ABOUT], perRow: 2 }), resolver([about, mars], calls));
   assert.deepEqual(calls, [[MARS, HIDDEN, ABOUT]]);
   assert.match(html, /<ul class="posts" style="--per-row:2">/);
-  assert.deepEqual([...html.matchAll(/class="post-card__link">([^<]+)</g)].map((m) => m[1]), ['Mars', 'About us']);
+  assert.deepEqual([...html.matchAll(/class="post-card__link">([^<]+)</g)].map((match) => match[1]), ['Mars', 'About us']);
   assert.match(html, /<li class="post-card"><img class="post-card__image" src="[^"]*2026\/11\/mars\.png" alt="" width="800" height="500" loading="lazy"\/>/);
   assert.match(html, /<p class="post-card__type">Landing Page<\/p><h3><a href="\/about" class="post-card__link">About us<\/a><\/h3><p class="post-card__description">Who we are\.<\/p>/);
 });

@@ -25,8 +25,8 @@ test('moveItem and removeItem', () => {
 });
 
 test('new panels and repeater items start with their defaults', () => {
-  const p = newPanel(blocks, 'p1');
-  assert.deepEqual(p, {
+  const panel = newPanel(blocks, 'p1');
+  assert.deepEqual(panel, {
     id: 'p1',
     type: 'cera/blocks',
     v: 1,
@@ -73,13 +73,13 @@ test('folded panels: a name from the title, a summary from list counts or the st
 
 test('duplicatePanel puts a deep copy with a new id right after the original', async () => {
   const { duplicatePanel } = await import('../src/admin/state.ts');
-  const a = { id: 'a', type: 'cera/text', v: 1, hidden: false, data: { list: [{ _id: 'x' }] } };
-  const b = { id: 'b', type: 'cera/text', v: 1, hidden: true, data: {} };
-  const out = duplicatePanel([a, b], 0, 'a2');
-  assert.deepEqual(out.map((p) => p.id), ['a', 'a2', 'b']);
-  assert.deepEqual(out[1]!.data, a.data);
-  assert.notEqual(out[1]!.data, a.data); // a copy, not the same object
-  assert.deepEqual(duplicatePanel([a], 5).map((p) => p.id), ['a']);
+  const firstPanel = { id: 'a', type: 'cera/text', v: 1, hidden: false, data: { list: [{ _id: 'x' }] } };
+  const secondPanel = { id: 'b', type: 'cera/text', v: 1, hidden: true, data: {} };
+  const out = duplicatePanel([firstPanel, secondPanel], 0, 'a2');
+  assert.deepEqual(out.map((panel) => panel.id), ['a', 'a2', 'b']);
+  assert.deepEqual(out[1]!.data, firstPanel.data);
+  assert.notEqual(out[1]!.data, firstPanel.data); // firstPanel copy, not the same object
+  assert.deepEqual(duplicatePanel([firstPanel], 5).map((panel) => panel.id), ['a']);
 });
 
 test('initials and relative times for the admin chrome', async () => {

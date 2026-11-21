@@ -5,19 +5,19 @@ import { mediaUrl } from '../media-url.ts';
 import type { featuredMediaFields } from './featured-media.fields.ts';
 
 export default function FeaturedMedia({ data, panel }: PanelPropsOf<typeof featuredMediaFields>) {
-  const m = data.media;
+  const mediaItem = data.media;
   const media =
-    m?.kind === 'video' ? (
-      <video src={mediaUrl(m)} width={m.width} height={m.height} controls playsInline preload="metadata" aria-label={m.alt} />
-    ) : m?.kind === 'embed' ? (
-      <a href={m.path}>{m.alt || m.path}</a>
-    ) : m ? (
-      <img src={mediaUrl(m)} alt={m.alt ?? ''} width={m.width} height={m.height} loading="lazy" />
+    mediaItem?.kind === 'video' ? (
+      <video src={mediaUrl(mediaItem)} width={mediaItem.width} height={mediaItem.height} controls playsInline preload="metadata" aria-label={mediaItem.alt} />
+    ) : mediaItem?.kind === 'embed' ? (
+      <a href={mediaItem.path}>{mediaItem.alt || mediaItem.path}</a>
+    ) : mediaItem ? (
+      <img src={mediaUrl(mediaItem)} alt={mediaItem.alt ?? ''} width={mediaItem.width} height={mediaItem.height} loading="lazy" />
     ) : null;
 
   return (
     <PanelFrame name="featured-media" data={data} panel={panel} className={data.fullWidth ? 'is-full-width' : undefined}>
-      {media && <figure className="featured-media">{data.imageLink && m?.kind === 'image' ? <a href={data.imageLink}>{media}</a> : media}</figure>}
+      {media && <figure className="featured-media">{data.imageLink && mediaItem?.kind === 'image' ? <a href={data.imageLink}>{media}</a> : media}</figure>}
     </PanelFrame>
   );
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { definePanel, f, upgradePagePanels, type StoredPanel } from '../src/index.ts';
+import { definePanel, field, upgradePagePanels, type StoredPanel } from '../src/index.ts';
 import { defineCorePanel } from '../src/define-panel.ts';
 import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
@@ -54,7 +54,7 @@ test('invalid data is rejected with a useful path', () => {
 
 test('unknown panel types are dropped, not fatal', () => {
   const dropped: string[] = [];
-  const out = upgradePagePanels(landingPage.panels, [{ id: 'x', type: 'carousel', v: 1, data: {} }], (p) => dropped.push(p.type));
+  const out = upgradePagePanels(landingPage.panels, [{ id: 'x', type: 'carousel', v: 1, data: {} }], (panel) => dropped.push(panel.type));
   assert.deepEqual(out, []);
   assert.deepEqual(dropped, ['carousel']);
 });
@@ -64,7 +64,7 @@ test('definePanel guards: kebab-case type, migrations required for each version'
   assert.throws(() => definePanel({ type: 'TextMedia', label: 'x', fields: {}, component }), /kebab-case/);
   assert.throws(() => definePanel({ type: 'a/b/c', label: 'x', fields: {}, component }), /kebab-case/);
   assert.throws(() => definePanel({ type: '/blocks', label: 'x', fields: {}, component }), /kebab-case/);
-  assert.throws(() => definePanel({ type: 'x', label: 'x', version: 2, fields: { a: f.text() }, component }), /no migration from v1/);
+  assert.throws(() => definePanel({ type: 'x', label: 'x', version: 2, fields: { a: field.text() }, component }), /no migration from v1/);
 });
 
 test('panel namespaces: sites may use their own, cera/ is reserved for core panels', () => {
@@ -75,11 +75,11 @@ test('panel namespaces: sites may use their own, cera/ is reserved for core pane
   assert.equal(definePanel({ type: 'blocks', label: 'x', fields: {}, component }).type, 'blocks');
   assert.throws(() => definePanel({ type: 'cera/blocks', label: 'x', fields: {}, component }), /reserved.*Name it "blocks"/);
   assert.throws(() => defineCorePanel({ type: 'blocks' as 'cera/blocks', label: 'x', fields: {}, component }), /must start with "cera\/"/);
-  for (const p of landingPage.panels) assert.match(p.type, /^cera\//);
+  for (const panel of landingPage.panels) assert.match(panel.type, /^cera\//);
 });
 
 test('repeater limit is enforced (theme: decision-tree Cards limit 2)', () => {
-  const cards = f.repeater({ limit: 2, fields: { title: f.text() } });
+  const cards = field.repeater({ limit: 2, fields: { title: field.text() } });
   assert.equal(cards.schema.safeParse([{ _id: 'a' }, { _id: 'b' }, { _id: 'c' }]).success, false);
   assert.equal(cards.schema.safeParse([{ _id: 'a' }]).success, true);
 });

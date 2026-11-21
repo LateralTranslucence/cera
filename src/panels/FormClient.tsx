@@ -37,13 +37,13 @@ export function FormClient({ form, endpoint, preview = false }: { form: PublicFo
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fromQuery: Record<string, string> = {};
-    for (const f of formFieldList(form)) if (f.type === 'hidden' && f.fromQuery && params.get(f.fromQuery)) fromQuery[f.name] = params.get(f.fromQuery)!.slice(0, 500);
+    for (const field of formFieldList(form)) if (field.type === 'hidden' && field.fromQuery && params.get(field.fromQuery)) fromQuery[field.name] = params.get(field.fromQuery)!.slice(0, 500);
     setHidden(fromQuery);
     if (preview) return;
     const controller = new AbortController();
     fetch(`${endpoint}?form=${encodeURIComponent(form.id)}`, { signal: controller.signal, cache: 'no-store' })
-      .then((r) => (r.ok ? (r.json() as Promise<{ token?: string }>) : {}))
-      .then((r: { token?: string }) => setToken(r.token ?? null))
+      .then((response) => (response.ok ? (response.json() as Promise<{ token?: string }>) : {}))
+      .then((data: { token?: string }) => setToken(data.token ?? null))
       .catch(() => undefined);
     return () => controller.abort();
   }, [endpoint, form, preview]);
@@ -62,17 +62,17 @@ export function FormClient({ form, endpoint, preview = false }: { form: PublicFo
   const errors = state.kind === 'error' ? state.errors : {};
   const sending = state.kind === 'sending';
 
-  async function send(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function send(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (preview || sending) return;
-    const body = new FormData(e.currentTarget);
+    const body = new FormData(event.currentTarget);
     body.set(PAGE_FIELD, window.location.pathname);
     setState({ kind: 'sending' });
     try {
       let current = token;
       if (!current) {
-        const r = (await (await fetch(`${endpoint}?form=${encodeURIComponent(form.id)}`, { cache: 'no-store' })).json()) as { token?: string };
-        current = r.token ?? '';
+        const tokenResponse = (await (await fetch(`${endpoint}?form=${encodeURIComponent(form.id)}`, { cache: 'no-store' })).json()) as { token?: string };
+        current = tokenResponse.token ?? '';
         setToken(current);
       }
       body.set(TOKEN_FIELD, current);
@@ -90,7 +90,7 @@ export function FormClient({ form, endpoint, preview = false }: { form: PublicFo
     }
   }
 
-  const fieldsWithErrors = formFieldList(form).filter((f) => errors[f.name]);
+  const fieldsWithErrors = formFieldList(form).filter((field) => errors[field.name]);
 
   return (
     <form ref={formRef} className={`cera-form${sending ? ' is-sending' : ''}`} noValidate onSubmit={send} aria-label={form.title} aria-busy={sending || undefined}>
@@ -100,16 +100,16 @@ export function FormClient({ form, endpoint, preview = false }: { form: PublicFo
           <p>{state.message}</p>
           {fieldsWithErrors.length > 0 && (
             <ul>
-              {fieldsWithErrors.map((f) => (
-                <li key={f.name}>
+              {fieldsWithErrors.map((field) => (
+                <li key={field.name}>
                   <a
-                    href={`#${idFor(f.name)}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      document.getElementById(idFor(f.name))?.focus();
+                    href={`#${idFor(field.name)}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      document.getElementById(idFor(field.name))?.focus();
                     }}
                   >
-                    {errors[f.name]!.startsWith(f.label) ? errors[f.name] : `${f.label}: ${errors[f.name]}`}
+                    {errors[field.name]!.startsWith(field.label) ? errors[field.name] : `${field.label}: ${errors[field.name]}`}
                   </a>
                 </li>
               ))}
@@ -132,8 +132,8 @@ export function FormClient({ form, endpoint, preview = false }: { form: PublicFo
           <fieldset key={`section-${i}`} className="cera-form__section">
             <legend>{item.legend}</legend>
             {item.note && <p className="cera-form__note">{item.note}</p>}
-            {item.fields.map((f) => (
-              <Field key={f.name} field={f} id={idFor(f.name)} error={errors[f.name]} hiddenValue={hidden[f.name]} />
+            {item.fields.map((field) => (
+              <Field key={field.name} field={field} id={idFor(field.name)} error={errors[field.name]} hiddenValue={hidden[field.name]} />
             ))}
           </fieldset>
         ) : (
@@ -151,29 +151,29 @@ export function FormClient({ form, endpoint, preview = false }: { form: PublicFo
   );
 }
 
-function Field({ field: f, id, error, hiddenValue }: { field: FormField; id: string; error?: string; hiddenValue?: string }) {
-  if (f.type === 'hidden') return <input type="hidden" name={f.name} value={hiddenValue ?? f.value ?? ''} />;
+function Field({ field, id, error, hiddenValue }: { field: FormField; id: string; error?: string; hiddenValue?: string }) {
+  if (field.type === 'hidden') return <input type="hidden" name={field.name} value={hiddenValue ?? field.value ?? ''} />;
 
-  const noteId = f.note ? `${id}-note` : undefined;
+  const noteId = field.note ? `${id}-note` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [noteId, errorId].filter(Boolean).join(' ') || undefined;
-  const aria = { 'aria-required': f.required || undefined, 'aria-invalid': error ? true : undefined, 'aria-describedby': describedBy } as const;
+  const aria = { 'aria-required': field.required || undefined, 'aria-invalid': error ? true : undefined, 'aria-describedby': describedBy } as const;
   const labelText = (
     <>
-      {f.label}
-      {f.required && (
+      {field.label}
+      {field.required && (
         <span className="cera-form__required" aria-hidden="true">
           {' '}*
         </span>
       )}
     </>
   );
-  const labelClass = `cera-form__label${f.hideLabel ? ' cera-visually-hidden' : ''}`;
+  const labelClass = `cera-form__label${field.hideLabel ? ' cera-visually-hidden' : ''}`;
   const extras: ReactNode = (
     <>
-      {f.note && (
+      {field.note && (
         <p className="cera-form__note" id={noteId}>
-          {f.note}
+          {field.note}
         </p>
       )}
       {error && (
@@ -183,32 +183,32 @@ function Field({ field: f, id, error, hiddenValue }: { field: FormField; id: str
       )}
     </>
   );
-  const wrap = (children: ReactNode) => <div className={`cera-form__field cera-form__field--${f.type}${error ? ' has-error' : ''}`}>{children}</div>;
+  const wrap = (children: ReactNode) => <div className={`cera-form__field cera-form__field--${field.type}${error ? ' has-error' : ''}`}>{children}</div>;
 
   // Groups of choices: a fieldset whose legend is the label.
-  if (f.type === 'radio' || f.type === 'button-select' || f.type === 'checkbox') {
-    const multiple = f.type === 'checkbox';
+  if (field.type === 'radio' || field.type === 'button-select' || field.type === 'checkbox') {
+    const multiple = field.type === 'checkbox';
     return wrap(
       <fieldset
         className="cera-form__choices"
         {...(!multiple && { role: 'radiogroup' })}
-        aria-required={f.required || undefined}
+        aria-required={field.required || undefined}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
       >
         <legend className={labelClass}>
           {labelText}
-          {f.required && multiple && <span className="cera-visually-hidden"> (required)</span>}
+          {field.required && multiple && <span className="cera-visually-hidden"> (required)</span>}
         </legend>
-        {(f.options ?? []).map((o, i) => {
+        {(field.options ?? []).map((option, i) => {
           const optionId = i === 0 ? id : `${id}-${i}`;
-          const descId = o.description ? `${optionId}-desc` : undefined;
+          const descId = option.description ? `${optionId}-desc` : undefined;
           return (
-            <div key={o.value} className="cera-form__choice">
-              <input id={optionId} type={multiple ? 'checkbox' : 'radio'} name={f.name} value={o.value} aria-describedby={descId} />
+            <div key={option.value} className="cera-form__choice">
+              <input id={optionId} type={multiple ? 'checkbox' : 'radio'} name={field.name} value={option.value} aria-describedby={descId} />
               <label htmlFor={optionId}>
-                <span>{o.label}</span>
-                {o.description && <span id={descId} className="cera-form__choice-desc">{o.description}</span>}
+                <span>{option.label}</span>
+                {option.description && <span id={descId} className="cera-form__choice-desc">{option.description}</span>}
               </label>
             </div>
           );
@@ -218,12 +218,12 @@ function Field({ field: f, id, error, hiddenValue }: { field: FormField; id: str
     );
   }
 
-  if (f.type === 'binary') {
+  if (field.type === 'binary') {
     return wrap(
       <>
         <div className="cera-form__choice">
-          <input id={id} type="checkbox" name={f.name} value="yes" {...aria} />
-          <label htmlFor={id} className={f.hideLabel ? 'cera-visually-hidden' : undefined}>
+          <input id={id} type="checkbox" name={field.name} value="yes" {...aria} />
+          <label htmlFor={id} className={field.hideLabel ? 'cera-visually-hidden' : undefined}>
             {labelText}
           </label>
         </div>
@@ -232,30 +232,30 @@ function Field({ field: f, id, error, hiddenValue }: { field: FormField; id: str
     );
   }
 
-  if (f.type === 'toggle') return wrap(<Toggle field={f} id={id} aria={aria} label={labelText} labelClass={labelClass} extras={extras} />);
+  if (field.type === 'toggle') return wrap(<Toggle field={field} id={id} aria={aria} label={labelText} labelClass={labelClass} extras={extras} />);
 
-  if (f.type === 'range') return wrap(<Range field={f} id={id} aria={aria} label={labelText} labelClass={labelClass} extras={extras} />);
+  if (field.type === 'range') return wrap(<Range field={field} id={id} aria={aria} label={labelText} labelClass={labelClass} extras={extras} />);
 
   const input =
-    f.type === 'textarea' ? (
-      <textarea id={id} name={f.name} rows={5} maxLength={10_000} {...aria} />
-    ) : f.type === 'select' ? (
-      <select id={id} name={f.name} defaultValue="" {...aria}>
+    field.type === 'textarea' ? (
+      <textarea id={id} name={field.name} rows={5} maxLength={10_000} {...aria} />
+    ) : field.type === 'select' ? (
+      <select id={id} name={field.name} defaultValue="" {...aria}>
         <option value="">Select…</option>
-        {(f.options ?? []).map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
+        {(field.options ?? []).map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>
     ) : (
       <input
         id={id}
-        name={f.name}
-        type={f.type === 'email' ? 'email' : f.type === 'phone' ? 'tel' : 'text'}
-        autoComplete={f.type === 'email' ? 'email' : f.type === 'phone' ? 'tel' : f.autocomplete}
-        maxLength={f.type === 'email' ? 254 : f.type === 'phone' ? 40 : 500}
-        {...(f.type === 'email' && { spellCheck: false, autoCapitalize: 'off' })}
+        name={field.name}
+        type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'}
+        autoComplete={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : field.autocomplete}
+        maxLength={field.type === 'email' ? 254 : field.type === 'phone' ? 40 : 500}
+        {...(field.type === 'email' && { spellCheck: false, autoCapitalize: 'off' })}
         {...aria}
       />
     );
@@ -273,7 +273,7 @@ function Field({ field: f, id, error, hiddenValue }: { field: FormField; id: str
 type FieldPartProps = { field: FormField; id: string; aria: Record<string, unknown>; label: ReactNode; labelClass: string; extras: ReactNode };
 
 /** An on/off switch: sends "on" when on and nothing when off. Its answers are read out as its description. */
-function Toggle({ field: f, id, aria, label, labelClass, extras }: FieldPartProps) {
+function Toggle({ field, id, aria, label, labelClass, extras }: FieldPartProps) {
   const [on, setOn] = useState(false);
   const stateId = `${id}-state`;
   return (
@@ -283,10 +283,10 @@ function Toggle({ field: f, id, aria, label, labelClass, extras }: FieldPartProp
           id={id}
           type="checkbox"
           role="switch"
-          name={f.name}
+          name={field.name}
           value="on"
           checked={on}
-          onChange={(e) => setOn(e.target.checked)}
+          onChange={(event) => setOn(event.target.checked)}
           {...aria}
           aria-describedby={[stateId, aria['aria-describedby']].filter(Boolean).join(' ')}
         />
@@ -294,7 +294,7 @@ function Toggle({ field: f, id, aria, label, labelClass, extras }: FieldPartProp
           {label}
         </label>
         <span id={stateId} className="cera-form__toggle-state">
-          {on ? f.onLabel : f.offLabel}
+          {on ? field.onLabel : field.offLabel}
         </span>
       </div>
       {extras}
@@ -303,15 +303,15 @@ function Toggle({ field: f, id, aria, label, labelClass, extras }: FieldPartProp
 }
 
 /** A slider that starts at its minimum and shows its value. */
-function Range({ field: f, id, aria, label, labelClass, extras }: FieldPartProps) {
-  const [value, setValue] = useState(f.min ?? 0);
+function Range({ field, id, aria, label, labelClass, extras }: FieldPartProps) {
+  const [value, setValue] = useState(field.min ?? 0);
   return (
     <>
       <label htmlFor={id} className={labelClass}>
         {label}
       </label>
       <div className="cera-form__range">
-        <input id={id} type="range" name={f.name} min={f.min} max={f.max} step={f.step} value={value} onChange={(e) => setValue(Number(e.target.value))} {...aria} />
+        <input id={id} type="range" name={field.name} min={field.min} max={field.max} step={field.step} value={value} onChange={(event) => setValue(Number(event.target.value))} {...aria} />
         <output htmlFor={id} aria-live="off">
           {value}
         </output>

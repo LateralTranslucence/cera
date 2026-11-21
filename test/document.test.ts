@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defineContentType, definePanel, f, preparePageForSave, readPage, PageShapeError, type StoredPage } from '../src/index.ts';
+import { defineContentType, definePanel, field, preparePageForSave, readPage, PageShapeError, type StoredPage } from '../src/index.ts';
 import { landingPage } from '../examples/next-site/cera/content-types/landing-page.ts';
 import sample from '../examples/sample-page.json' with { type: 'json' };
 
@@ -15,13 +15,13 @@ test('save keeps unknown keys in panel data, repeater items and boxes', async ()
   raw.boxes.hero!.legacySubtitle = 'kept';
   raw.boxes.retiredBox = { anything: 1 };
 
-  const r = await preparePageForSave(landingPage, raw, { mode: 'publish' });
-  assert.equal(r.ok, true, JSON.stringify(r.issues));
-  const blocks = r.page!.panels[0]!.data;
+  const result = await preparePageForSave(landingPage, raw, { mode: 'publish' });
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  const blocks = result.page!.panels[0]!.data;
   assert.equal(blocks.legacyLayout, 'masonry');
   assert.equal((blocks.blocks as Array<Record<string, unknown>>)[0]!.legacyBadge, 'new');
-  assert.equal(r.page!.boxes.hero!.legacySubtitle, 'kept');
-  assert.deepEqual(r.page!.boxes.retiredBox, { anything: 1 });
+  assert.equal(result.page!.boxes.hero!.legacySubtitle, 'kept');
+  assert.deepEqual(result.page!.boxes.retiredBox, { anything: 1 });
   // …and defaults are still filled in.
   assert.equal(blocks.perRow, 3);
 });
@@ -31,15 +31,15 @@ test('save keeps panels of unknown types, in place, with a warning', async () =>
   const carousel = { id: 'p_car', type: 'carousel', v: 4, hidden: false, data: { slides: [1, 2] }, extra: true };
   raw.panels.splice(1, 0, carousel);
 
-  const r = await preparePageForSave(landingPage, raw, { mode: 'publish' });
-  assert.equal(r.ok, true, JSON.stringify(r.issues));
-  assert.deepEqual(r.page!.panels[1], carousel);
-  assert.deepEqual(r.issues.map((i) => i.code), ['unknown-panel']);
+  const result = await preparePageForSave(landingPage, raw, { mode: 'publish' });
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  assert.deepEqual(result.page!.panels[1], carousel);
+  assert.deepEqual(result.issues.map((issue) => issue.code), ['unknown-panel']);
 });
 
 test('save upgrades old panels to the current version', async () => {
-  const r = await preparePageForSave(landingPage, clone(), { mode: 'draft' });
-  const tm = r.page!.panels[1]!;
+  const result = await preparePageForSave(landingPage, clone(), { mode: 'draft' });
+  const tm = result.page!.panels[1]!;
   assert.equal(tm.v, 2);
   assert.equal(tm.data.alignment, 'right');
 });
@@ -55,7 +55,7 @@ test('drafts save with warnings and keep the raw value; publishing refuses', asy
   assert.equal(draft.ok, true);
   assert.equal(draft.page!.panels[0]!.data.style, 'grid');
   assert.deepEqual(
-    draft.issues.map((i) => [i.severity, i.path.join('.')]),
+    draft.issues.map((issue) => [issue.severity, issue.path.join('.')]),
     [
       ['warning', 'title'],
       ['warning', 'panels.0.data.style'],
@@ -64,22 +64,22 @@ test('drafts save with warnings and keep the raw value; publishing refuses', asy
 
   const publish = await preparePageForSave(landingPage, raw, { mode: 'publish' });
   assert.equal(publish.ok, false);
-  assert.deepEqual(publish.issues.map((i) => i.severity), ['error', 'error']);
+  assert.deepEqual(publish.issues.map((issue) => issue.severity), ['error', 'error']);
 });
 
 test('bad slugs and duplicate panel ids are errors even for drafts', async () => {
   const raw = clone();
   raw.slug = 'About Us';
   raw.panels[1]!.id = raw.panels[0]!.id;
-  const r = await preparePageForSave(landingPage, raw, { mode: 'draft' });
-  assert.equal(r.ok, false);
-  assert.deepEqual(r.issues.filter((i) => i.severity === 'error').map((i) => i.code).sort(), ['duplicate-panel-id', 'invalid-page']);
+  const result = await preparePageForSave(landingPage, raw, { mode: 'draft' });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code).sort(), ['duplicate-panel-id', 'invalid-page']);
 });
 
 test('a malformed envelope is rejected without throwing', async () => {
-  const r = await preparePageForSave(landingPage, { id: 'x', contentType: 'other', slug: 'a' }, { mode: 'draft' });
-  assert.equal(r.ok, false);
-  assert.equal(r.page, undefined);
+  const result = await preparePageForSave(landingPage, { id: 'x', contentType: 'other', slug: 'a' }, { mode: 'draft' });
+  assert.equal(result.ok, false);
+  assert.equal(result.page, undefined);
 });
 
 test('beforeSave sees known panels only; unknown panels are put back in place', async () => {
@@ -87,10 +87,10 @@ test('beforeSave sees known panels only; unknown panels are put back in place', 
   raw.slug = 'home';
   raw.panels.splice(1, 0, { id: 'p_car', type: 'carousel', v: 1, data: {} });
 
-  const r = await preparePageForSave(landingPage, raw, { mode: 'publish' });
-  assert.equal(r.ok, true, JSON.stringify(r.issues));
-  assert.equal(r.page!.title, 'Home');
-  assert.deepEqual(r.page!.panels.map((p) => p.type), ['cera/blocks', 'carousel', 'cera/text-media']);
+  const result = await preparePageForSave(landingPage, raw, { mode: 'publish' });
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  assert.equal(result.page!.title, 'Home');
+  assert.deepEqual(result.page!.panels.map((panel) => panel.type), ['cera/blocks', 'carousel', 'cera/text-media']);
 });
 
 /* ---------------------------- reads are forgiving ---------------------------- */
@@ -102,14 +102,14 @@ test('read: an invalid field falls back to its default and the panel still rende
   const blocks = page.panels[0];
   if (blocks?.type !== 'cera/blocks') throw new Error('expected blocks');
   assert.equal(blocks.data.style, 'card');
-  assert.deepEqual(issues.map((i) => [i.code, i.path.join('.')]), [['invalid-field', 'panels.0.data.style']]);
+  assert.deepEqual(issues.map((issue) => [issue.code, issue.path.join('.')]), [['invalid-field', 'panels.0.data.style']]);
 });
 
 test('read: unknown, too-new and unrepairable panels are skipped; the rest render', () => {
   const quote = definePanel({
     type: 'quote',
     label: 'Quote',
-    fields: { text: f.text({ required: true }) },
+    fields: { text: field.text({ required: true }) },
     component: async () => ({ default: () => null }),
   });
   const ct = defineContentType({ name: 'landing_page', label: 'x', route: '/[slug]', boxes: landingPage.boxes, panels: [...landingPage.panels, quote] });
@@ -121,9 +121,9 @@ test('read: unknown, too-new and unrepairable panels are skipped; the rest rende
     { id: 'q', type: 'quote', v: 1, data: { text: 42 } }, // required field, wrong type, no default
   );
   const { page, issues } = readPage(ct, raw);
-  assert.deepEqual(page.panels.map((p) => p.id), ['p_8f2a', 'p_19cc']);
+  assert.deepEqual(page.panels.map((panel) => panel.id), ['p_8f2a', 'p_19cc']);
   assert.deepEqual(
-    issues.map((i) => [i.code, i.panelId]),
+    issues.map((issue) => [issue.code, issue.panelId]),
     [
       ['unknown-panel', 'u'],
       ['migration-failed', 'n'],

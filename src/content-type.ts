@@ -13,18 +13,18 @@ export type BoxMap = Record<string, FieldMap>;
 
 export type PageStatus = 'draft' | 'published';
 
-export interface PageDocument<N extends string, B extends BoxMap, P extends readonly AnyPanel[]> {
+export interface PageDocument<Name extends string, Boxes extends BoxMap, Panels extends readonly AnyPanel[]> {
   id: string;
-  contentType: N;
+  contentType: Name;
   slug: string;
   title: string;
   status: PageStatus;
-  boxes: { [K in keyof B]: InferFields<B[K]> };
-  panels: PanelUnion<P>[];
+  boxes: { [BoxName in keyof Boxes]: InferFields<Boxes[BoxName]> };
+  panels: PanelUnion<Panels>[];
 }
 
-export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends readonly AnyPanel[]> {
-  name: N;
+export interface ContentTypeConfig<Name extends string, Boxes extends BoxMap, Panels extends readonly AnyPanel[]> {
+  name: Name;
   label: string;
   /**
    * Next.js-style route pattern. Theme: rewrite rules / post_type_slug.
@@ -41,28 +41,28 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
    */
   slugScope?: string;
   /** A page's public URL. Defaults to `route` with `[slug]` filled in. */
-  url?: (page: PageDocument<N, B, P>) => string;
-  boxes: B;
-  panels?: P;
+  url?: (page: PageDocument<Name, Boxes, Panels>) => string;
+  boxes: Boxes;
+  panels?: Panels;
   seo?: {
-    title?: (page: PageDocument<N, B, P>) => string | undefined;
-    description?: (page: PageDocument<N, B, P>) => string | undefined;
-    image?: (page: PageDocument<N, B, P>) => MediaRef | undefined;
-    noindex?: (page: PageDocument<N, B, P>) => boolean;
+    title?: (page: PageDocument<Name, Boxes, Panels>) => string | undefined;
+    description?: (page: PageDocument<Name, Boxes, Panels>) => string | undefined;
+    image?: (page: PageDocument<Name, Boxes, Panels>) => MediaRef | undefined;
+    noindex?: (page: PageDocument<Name, Boxes, Panels>) => boolean;
   };
   /** schema.org JSON-LD. Theme: settings()['schema']. */
-  jsonLd?: (page: PageDocument<N, B, P>) => Record<string, unknown>;
+  jsonLd?: (page: PageDocument<Name, Boxes, Panels>) => Record<string, unknown>;
   /** Hide from public queries/routes. Theme: settings()['hide_field']. */
-  hidden?: (page: PageDocument<N, B, P>) => boolean;
+  hidden?: (page: PageDocument<Name, Boxes, Panels>) => boolean;
   /**
    * Where boxes appear in the admin editor. Boxes not listed here get their
    * own section between the Page section and the panels, in declared order.
    */
   editor?: {
     /** Shown inside the Page section, under title and slug (e.g. admin settings). */
-    pageBoxes?: ReadonlyArray<keyof B & string>;
+    pageBoxes?: ReadonlyArray<keyof Boxes & string>;
     /** Shown just above the panels, styled like one (e.g. a hero that renders like a panel). */
-    leadBoxes?: ReadonlyArray<keyof B & string>;
+    leadBoxes?: ReadonlyArray<keyof Boxes & string>;
     /** What the admin calls one of these, lowercase. Default "page". */
     noun?: string;
     /** Plural of `noun`. Default: `noun` + "s". */
@@ -78,22 +78,22 @@ export interface ContentTypeConfig<N extends string, B extends BoxMap, P extends
   };
   hooks?: {
     /** Theme: onsave_callback (could modify $_POST). */
-    beforeSave?: (page: PageDocument<N, B, P>) => PageDocument<N, B, P> | Promise<PageDocument<N, B, P>>;
+    beforeSave?: (page: PageDocument<Name, Boxes, Panels>) => PageDocument<Name, Boxes, Panels> | Promise<PageDocument<Name, Boxes, Panels>>;
     /** Theme: aftersave_callback. */
-    afterSave?: (page: PageDocument<N, B, P>) => void | Promise<void>;
+    afterSave?: (page: PageDocument<Name, Boxes, Panels>) => void | Promise<void>;
   };
 }
 
-export interface ContentType<N extends string, B extends BoxMap, P extends readonly AnyPanel[]>
-  extends ContentTypeConfig<N, B, P> {
-  panels: P;
+export interface ContentType<Name extends string, Boxes extends BoxMap, Panels extends readonly AnyPanel[]>
+  extends ContentTypeConfig<Name, Boxes, Panels> {
+  panels: Panels;
   /**
    * Strict, all-or-nothing schema for a fully valid page. Useful in tests and
    * scripts. For real reads and writes use `readPage` (tolerant, per panel)
    * and `preparePageForSave` (keeps unknown data, draft vs publish) from
    * `document.ts`.
    */
-  pageSchema: z.ZodType<PageDocument<N, B, P>>;
+  pageSchema: z.ZodType<PageDocument<Name, Boxes, Panels>>;
 }
 
 /**
@@ -105,32 +105,32 @@ export interface ContentType<N extends string, B extends BoxMap, P extends reado
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyContentType = ContentType<any, any, any>;
 
-export type PageOf<CT> = CT extends ContentType<infer N, infer B, infer P> ? PageDocument<N, B, P> : never;
+export type PageOf<Type> = Type extends ContentType<infer Name, infer Boxes, infer Panels> ? PageDocument<Name, Boxes, Panels> : never;
 
 export function defineContentType<
-  const N extends string,
-  const B extends BoxMap,
-  const P extends readonly AnyPanel[] = readonly [],
->(config: ContentTypeConfig<N, B, P>): ContentType<N, B, P> {
-  const panels = (config.panels ?? []) as unknown as P;
+  const Name extends string,
+  const Boxes extends BoxMap,
+  const Panels extends readonly AnyPanel[] = readonly [],
+>(config: ContentTypeConfig<Name, Boxes, Panels>): ContentType<Name, Boxes, Panels> {
+  const panels = (config.panels ?? []) as unknown as Panels;
 
   const seen = new Set<string>();
-  for (const p of panels) {
-    if (seen.has(p.type)) throw new Error(`Duplicate panel type "${p.type}" in content type "${config.name}".`);
-    seen.add(p.type);
+  for (const panel of panels) {
+    if (seen.has(panel.type)) throw new Error(`Duplicate panel type "${panel.type}" in content type "${config.name}".`);
+    seen.add(panel.type);
   }
 
   const boxesSchema = z.object(
-    Object.fromEntries(Object.entries(config.boxes).map(([k, fields]) => [k, objectSchema(fields).default({} as never)])),
+    Object.fromEntries(Object.entries(config.boxes).map(([boxName, fields]) => [boxName, objectSchema(fields).default({} as never)])),
   );
 
-  const instanceSchemas = panels.map((p) =>
+  const instanceSchemas = panels.map((panel) =>
     z.object({
       id: z.string(),
-      type: z.literal(p.type),
+      type: z.literal(panel.type),
       v: z.number().int().min(1),
       hidden: z.boolean().default(false),
-      data: p.schema as z.ZodType,
+      data: panel.schema as z.ZodType,
     }),
   );
 
@@ -147,13 +147,13 @@ export function defineContentType<
     status: z.enum(['draft', 'published']).default('draft'),
     boxes: boxesSchema,
     panels: panelsSchema,
-  }) as unknown as z.ZodType<PageDocument<N, B, P>>;
+  }) as unknown as z.ZodType<PageDocument<Name, Boxes, Panels>>;
 
   return { ...config, panels, pageSchema };
 }
 
 /** A page's public URL: the content type's `url`, or its `route` with `[slug]` filled in. */
-export function pageUrl<CT extends AnyContentType>(ct: CT, page: PageOf<CT>): string {
+export function pageUrl<Type extends AnyContentType>(ct: Type, page: PageOf<Type>): string {
   if (ct.url) return ct.url(page);
   return ct.route ? ct.route.replace('[slug]', encodeURIComponent(page.slug)) : '';
 }

@@ -38,11 +38,11 @@ before(async () => {
 });
 
 function newPage(slug: string, title = slug): StoredPage {
-  const p = structuredClone(sample) as unknown as StoredPage;
-  p.id = crypto.randomUUID();
-  p.slug = slug;
-  p.title = title;
-  return p;
+  const page = structuredClone(sample) as unknown as StoredPage;
+  page.id = crypto.randomUUID();
+  page.slug = slug;
+  page.title = title;
+  return page;
 }
 
 async function save(page: StoredPage, mode: 'draft' | 'publish', expectedVersion: number) {
@@ -78,7 +78,7 @@ test('only a page that is not live can be deleted, at the version the editor saw
   result = await deletePage(server, page.id, { expectedVersion: 2, userId: editor });
   assert.deepEqual(result, { ok: true, id: page.id, contentType: landingPage.name, slug: 'del-a' });
   assert.equal(await getPageForEditing(server, landingPage, page.id), null);
-  assert.equal((await listPages(server)).some((p) => p.id === page.id), false);
+  assert.equal((await listPages(server)).some((listedPage) => listedPage.id === page.id), false);
   // Its history went with it.
   const left = await queryAs(db, 'service_role', `select count(*)::int as n from public.cera_page_revisions where page_id = $1`, [page.id]);
   assert.equal(left[0]?.n, 0);
@@ -111,7 +111,7 @@ test('pageLinks lists the other pages that link to a page, draft and live', asyn
 
   const links = await pageLinks(staff, target.id);
   assert.deepEqual(
-    links.map((l) => [l.title, l.draft, l.live]),
+    links.map((link) => [link.title, link.draft, link.live]),
     [
       ['Draft linker', true, false],
       ['Live linker', true, true],
@@ -130,7 +130,7 @@ test('pageHistory lists versions newest first, with who saved them and what went
 
   const history = await pageHistory(staff, page.id);
   assert.deepEqual(
-    history.map((r) => [r.version, r.kind, r.title, r.live]),
+    history.map((revision) => [revision.version, revision.kind, revision.title, revision.live]),
     [
       [3, 'draft', 'Three', false],
       [2, 'publish', 'Two', true],
@@ -140,7 +140,7 @@ test('pageHistory lists versions newest first, with who saved them and what went
   assert.equal(history[0]!.createdBy, 'ed@example.test');
 
   // Paging: older than version 3, two at a time.
-  assert.deepEqual((await pageHistory(staff, page.id, { before: 3, limit: 1 })).map((r) => r.version), [2]);
+  assert.deepEqual((await pageHistory(staff, page.id, { before: 3, limit: 1 })).map((revision) => revision.version), [2]);
   await assert.rejects(pageHistory(anon, page.id), { code: '42501' });
 });
 

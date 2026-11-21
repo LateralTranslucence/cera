@@ -7,16 +7,16 @@ export function FormListClient({ forms, counts }: { forms: PageSummary[]; counts
   return (
     <PageList
       pages={forms}
-      editHref={(f) => `/admin/forms/${f.id}`}
+      editHref={(form) => `/admin/forms/${form.id}`}
       noun="form"
       countLabel="Fields"
       slugs="id"
       {...(counts && {
         extra: {
           label: 'Submissions',
-          render: (f: PageSummary) => {
-            const total = counts[f.id]?.total ?? 0;
-            return total > 0 ? <a href={`/admin/submissions?form=${f.id}`}>{total}</a> : '0';
+          render: (form: PageSummary) => {
+            const total = counts[form.id]?.total ?? 0;
+            return total > 0 ? <a href={`/admin/submissions?form=${form.id}`}>{total}</a> : '0';
           },
         },
       })}

@@ -18,12 +18,12 @@ export function AccordionClient({ items }: { items: AccordionItem[] }) {
   const [open, setOpen] = useState<number | null>(null);
   const triggers = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const onKeyDown = (e: KeyboardEvent, i: number) => {
+  const onKeyDown = (event: KeyboardEvent, i: number) => {
     const last = items.length - 1;
     const moves: Record<string, number> = { ArrowDown: i === last ? 0 : i + 1, ArrowUp: i === 0 ? last : i - 1, Home: 0, End: last };
-    if (e.key in moves) {
-      e.preventDefault();
-      triggers.current[moves[e.key]!]?.focus();
+    if (event.key in moves) {
+      event.preventDefault();
+      triggers.current[moves[event.key]!]?.focus();
     }
   };
 
@@ -46,7 +46,7 @@ export function AccordionClient({ items }: { items: AccordionItem[] }) {
                 aria-expanded={isOpen}
                 aria-controls={regionId}
                 onClick={() => setOpen(isOpen ? null : i)}
-                onKeyDown={(e) => onKeyDown(e, i)}
+                onKeyDown={(event) => onKeyDown(event, i)}
               >
                 <span>{item.title}</span>
                 <span className="accordion__icon" aria-hidden="true" />

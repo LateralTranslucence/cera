@@ -9,7 +9,7 @@
 //     description): the title is the editor's built-in field, and the
 //     description is rich text. Search engines get the description's first
 //     160 characters, with its formatting removed.
-import { defineContentType, f } from '@lateraltranslucence/cera';
+import { defineContentType, field } from '@lateraltranslucence/cera';
 
 const stripHtml = (html = '') => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -18,39 +18,39 @@ export const simplePage = defineContentType({
   label: 'Simple Page',
   route: '/[slug]',
   slugScope: 'landing_page',
-  url: (p) => `/${p.slug}`,
+  url: (page) => `/${page.slug}`,
 
   boxes: {
     content: {
-      image: f.media({ label: 'Image', accept: ['image'] }),
-      imageCredit: f.text({ label: 'Image Credit' }),
-      description: f.html({ label: 'Description', toolbar: 'limited', note: 'Shown under the title. Search engines get its first 160 characters.' }),
-      content: f.html({ label: 'Content' }),
+      image: field.media({ label: 'Image', accept: ['image'] }),
+      imageCredit: field.text({ label: 'Image Credit' }),
+      description: field.html({ label: 'Description', toolbar: 'limited', note: 'Shown under the title. Search engines get its first 160 characters.' }),
+      content: field.html({ label: 'Content' }),
     },
     seo: {
-      image: f.media({ label: 'SEO Image', accept: ['image'], note: 'For sharing on social media. Defaults to the Image.' }),
+      image: field.media({ label: 'SEO Image', accept: ['image'], note: 'For sharing on social media. Defaults to the Image.' }),
     },
     admin: {
-      hidden: f.toggle({ label: 'Hidden' }),
+      hidden: field.toggle({ label: 'Hidden' }),
     },
   },
 
   editor: { pageBoxes: ['admin'] },
 
   seo: {
-    title: (p) => p.title,
-    description: (p) => stripHtml(p.boxes.content.description).slice(0, 160) || undefined,
-    image: (p) => p.boxes.seo.image ?? p.boxes.content.image,
+    title: (page) => page.title,
+    description: (page) => stripHtml(page.boxes.content.description).slice(0, 160) || undefined,
+    image: (page) => page.boxes.seo.image ?? page.boxes.content.image,
   },
 
   // theme: settings()['schema']
-  jsonLd: (p) => ({
+  jsonLd: (page) => ({
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    headline: p.title,
-    description: stripHtml(p.boxes.content.description) || undefined,
-    text: stripHtml(p.boxes.content.content) || undefined,
+    headline: page.title,
+    description: stripHtml(page.boxes.content.description) || undefined,
+    text: stripHtml(page.boxes.content.content) || undefined,
   }),
 
-  hidden: (p) => p.boxes.admin.hidden,
+  hidden: (page) => page.boxes.admin.hidden,
 });

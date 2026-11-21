@@ -111,14 +111,14 @@ type SubmissionRow = { id: string; form_id: string; form_version: number; data: 
 export async function listSubmissions(client: SupabaseClient, opts: { formId?: string; before?: string; limit?: number } = {}): Promise<Submission[]> {
   const { data, error } = await client.rpc('cera_list_submissions', { p_form_id: opts.formId ?? null, p_before: opts.before ?? null, p_limit: opts.limit ?? 50 });
   if (error) fail(error);
-  return ((data as SubmissionRow[] | null) ?? []).map((r) => ({
-    id: r.id,
-    formId: r.form_id,
-    formVersion: r.form_version,
-    values: r.data,
-    ...(r.email && { email: r.email }),
-    ...(r.page_path && { pagePath: r.page_path }),
-    createdAt: r.created_at,
+  return ((data as SubmissionRow[] | null) ?? []).map((row) => ({
+    id: row.id,
+    formId: row.form_id,
+    formVersion: row.form_version,
+    values: row.data,
+    ...(row.email && { email: row.email }),
+    ...(row.page_path && { pagePath: row.page_path }),
+    createdAt: row.created_at,
   }));
 }
 
@@ -126,7 +126,7 @@ export async function listSubmissions(client: SupabaseClient, opts: { formId?: s
 export async function submissionCounts(client: SupabaseClient): Promise<Map<string, { total: number; latest: string }>> {
   const { data, error } = await client.rpc('cera_submission_counts');
   if (error) fail(error);
-  return new Map(((data as Array<{ form_id: string; total: number; latest: string }> | null) ?? []).map((r) => [r.form_id, { total: r.total, latest: r.latest }]));
+  return new Map(((data as Array<{ form_id: string; total: number; latest: string }> | null) ?? []).map((row) => [row.form_id, { total: row.total, latest: row.latest }]));
 }
 
 /**

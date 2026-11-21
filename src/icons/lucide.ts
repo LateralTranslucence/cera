@@ -17,16 +17,16 @@ function load() {
     import('lucide-static/icon-nodes.json', { with: { type: 'json' } }),
     import('lucide-static/tags.json', { with: { type: 'json' } }),
   ]).then(([nodes, tags]) => {
-    const n = (nodes.default ?? nodes) as unknown as Record<string, IconNode>;
-    const t = (tags.default ?? tags) as unknown as Record<string, string[]>;
-    return { nodes: n, tags: t, names: Object.keys(n).sort() };
+    const iconNodes = (nodes.default ?? nodes) as unknown as Record<string, IconNode>;
+    const iconTags = (tags.default ?? tags) as unknown as Record<string, string[]>;
+    return { nodes: iconNodes, tags: iconTags, names: Object.keys(iconNodes).sort() };
   });
   return data;
 }
 
 /** Lucide's own attributes, as in its SVG files (less the fixed size, which CSS sets). */
 function toSvg(node: IconNode): string {
-  const children = node.map(([tag, attrs]) => `<${tag}${Object.entries(attrs).map(([k, v]) => ` ${k}="${attr(v)}"`).join('')}/>`).join('');
+  const children = node.map(([tag, attrs]) => `<${tag}${Object.entries(attrs).map(([name, value]) => ` ${name}="${attr(value)}"`).join('')}/>`).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${children}</svg>`;
 }
 
@@ -44,12 +44,12 @@ export const lucideIcons: IconSet = {
       const score = matchScore(name, tags[name] ?? [], words);
       if (score !== null) scored.push([score, name]);
     }
-    scored.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
+    scored.sort((first, second) => first[0] - second[0] || first[1].localeCompare(second[1]));
     return scored.slice(0, limit).map(([, name]) => glyph(name, nodes[name]!));
   },
 
   async get(names) {
     const { nodes } = await load();
-    return names.filter((n) => Object.hasOwn(nodes, n)).map((n) => glyph(n, nodes[n]!));
+    return names.filter((name) => Object.hasOwn(nodes, name)).map((name) => glyph(name, nodes[name]!));
   },
 };

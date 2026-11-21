@@ -42,7 +42,7 @@ import { serviceClient } from '@/lib/supabase.ts';
  */
 export async function savePageAction(input: SaveInput): Promise<SaveResult> {
   const { user } = await requireStaff('editor');
-  const ct = contentTypes.find((c) => c.name === input.page?.contentType);
+  const ct = contentTypes.find((contentType) => contentType.name === input.page?.contentType);
   if (!ct) {
     return { ok: false, reason: 'invalid', issues: [{ severity: 'error', code: 'invalid-page', path: ['contentType'], message: 'Unknown content type.' }] };
   }
@@ -58,19 +58,19 @@ export async function savePageAction(input: SaveInput): Promise<SaveResult> {
  */
 export async function findPagesAction(query: PageQuery): Promise<PageOption[]> {
   const staff = await requireStaff();
-  const known = new Map(contentTypes.map((c) => [c.name as string, c.label]));
+  const known = new Map(contentTypes.map((contentType) => [contentType.name as string, contentType.label]));
   const ids = query.ids ? new Set(query.ids) : null;
   const types = query.contentTypes?.length ? new Set(query.contentTypes) : null;
   const words = (query.search ?? '').toLowerCase().split(/\s+/).filter(Boolean);
 
   const pages = await listPages(staff.client);
   return pages
-    .filter((p) => known.has(p.contentType))
-    .filter((p) => !ids || ids.has(p.id))
-    .filter((p) => !types || types.has(p.contentType))
-    .filter((p) => words.every((w) => `${p.title} ${p.slug}`.toLowerCase().includes(w)))
+    .filter((page) => known.has(page.contentType))
+    .filter((page) => !ids || ids.has(page.id))
+    .filter((page) => !types || types.has(page.contentType))
+    .filter((page) => words.every((word) => `${page.title} ${page.slug}`.toLowerCase().includes(word)))
     .slice(0, ids ? undefined : 20)
-    .map((p) => ({ id: p.id, title: p.title, slug: p.slug, contentType: p.contentType, contentTypeLabel: known.get(p.contentType)!, published: p.published }));
+    .map((page) => ({ id: page.id, title: page.title, slug: page.slug, contentType: page.contentType, contentTypeLabel: known.get(page.contentType)!, published: page.published }));
 }
 
 /**
@@ -87,7 +87,7 @@ export async function searchIconsAction(query: string): Promise<IconSearchResult
 /** The picked icons, drawn, for the picker. */
 export async function getIconsAction(values: string[]): Promise<IconGlyph[]> {
   const staff = await requireStaff();
-  const wanted = (Array.isArray(values) ? values : []).filter((v): v is string => typeof v === 'string').slice(0, 50);
+  const wanted = (Array.isArray(values) ? values : []).filter((value): value is string => typeof value === 'string').slice(0, 50);
   return [...(await iconLibrary(staff.client, true).byValues(wanted)).values()];
 }
 
@@ -131,7 +131,7 @@ export async function pageHistoryAction(input: { pageId: string; before?: number
 /** Restores an old version as a new draft. Drafts don't change the live site, so the cache stays. */
 export async function restoreRevisionAction(input: { pageId: string; contentType: string; version: number; expectedVersion: number }): Promise<SaveResult> {
   const { user } = await requireStaff('editor');
-  const ct = contentTypes.find((c) => c.name === input.contentType);
+  const ct = contentTypes.find((contentType) => contentType.name === input.contentType);
   if (!ct) return { ok: false, reason: 'not-found', message: 'Unknown content type.', issues: [] };
   return restoreRevision(serviceClient(), ct, input.pageId, input.version, { expectedVersion: input.expectedVersion, userId: user.id });
 }

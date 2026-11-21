@@ -8,10 +8,10 @@
 import { useEffect, useRef, useState } from 'react';
 
 const DURATION = 2000;
-const ease = (t: number) => 1 - (1 - t) ** 3; // ease-out cubic
+const ease = (progress: number) => 1 - (1 - progress) ** 3; // ease-out cubic
 
-export function format(n: number, decimal: boolean): string {
-  return n.toLocaleString('en-US', decimal ? { minimumFractionDigits: 1, maximumFractionDigits: 1 } : { maximumFractionDigits: 0 });
+export function format(value: number, decimal: boolean): string {
+  return value.toLocaleString('en-US', decimal ? { minimumFractionDigits: 1, maximumFractionDigits: 1 } : { maximumFractionDigits: 0 });
 }
 
 export function StatCount({ value, decimal = false, countDown = false }: { value: number; decimal?: boolean; countDown?: boolean }) {
@@ -32,9 +32,9 @@ export function StatCount({ value, decimal = false, countDown = false }: { value
         observer.disconnect();
         const t0 = performance.now();
         const tick = (now: number) => {
-          const p = Math.min((now - t0) / DURATION, 1);
-          setShown(start + (end - start) * ease(p));
-          if (p < 1) frame = requestAnimationFrame(tick);
+          const progress = Math.min((now - t0) / DURATION, 1);
+          setShown(start + (end - start) * ease(progress));
+          if (progress < 1) frame = requestAnimationFrame(tick);
         };
         frame = requestAnimationFrame(tick);
       },

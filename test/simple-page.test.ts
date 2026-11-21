@@ -33,8 +33,8 @@ const page = (ct: AnyContentType, slug: string, boxes: StoredPage['boxes'] = {})
   panels: [],
 });
 
-const save = (ct: AnyContentType, p: StoredPage, mode: 'draft' | 'publish' | 'schedule' = 'publish', expectedVersion = 0) =>
-  savePage(server, ct, p, { mode, expectedVersion, userId: editor, ...(mode === 'schedule' && { publishAt: new Date(Date.now() + 3_600_000).toISOString() }) });
+const save = (ct: AnyContentType, storedPage: StoredPage, mode: 'draft' | 'publish' | 'schedule' = 'publish', expectedVersion = 0) =>
+  savePage(server, ct, storedPage, { mode, expectedVersion, userId: editor, ...(mode === 'schedule' && { publishAt: new Date(Date.now() + 3_600_000).toISOString() }) });
 
 test('types in one slug scope can’t share an address; other types can', async () => {
   assert.equal((await save(landingPage, page(landingPage, 'shared'))).ok, true);
@@ -80,8 +80,8 @@ test('findPublishedPage and findDraftPage find a page at a shared route, whichev
 
 test('a simple page’s search details come from its description and image', () => {
   const image = { id: 'm1', path: '2026/11/a.jpg', kind: 'image' as const, alt: 'A', width: 800, height: 600 };
-  const { page: p } = readPage(simplePage, page(simplePage, 'meta', { content: { image, description: `<p>${'Words and more. '.repeat(20)}</p>` } }));
-  const meta = pageMetadata(simplePage, p, { mediaUrl: (m) => `https://cdn.example/${m.path}` });
+  const { page: loadedPage } = readPage(simplePage, page(simplePage, 'meta', { content: { image, description: `<p>${'Words and more. '.repeat(20)}</p>` } }));
+  const meta = pageMetadata(simplePage, loadedPage, { mediaUrl: (media) => `https://cdn.example/${media.path}` });
   assert.equal(meta.title, 'meta');
   assert.equal(String(meta.description).length, 160);
   assert.doesNotMatch(String(meta.description), /<p>/);

@@ -7,13 +7,13 @@ import { mediaUrl } from '../media-url.ts';
 import type { decisionTreeFields } from './decision-tree.fields.ts';
 
 export default function DecisionTree({ data, panel }: PanelPropsOf<typeof decisionTreeFields>) {
-  const cards: DecisionCard[] = data.cards.slice(0, 2).map((c) => ({
-    id: c._id,
-    title: c.title,
-    overview: c.overview,
-    copy: c.copy,
-    cta: c.cta,
-    list: c.list
+  const cards: DecisionCard[] = data.cards.slice(0, 2).map((card) => ({
+    id: card._id,
+    title: card.title,
+    overview: card.overview,
+    copy: card.copy,
+    cta: card.cta,
+    list: card.list
       .filter((item) => item.title && item.url)
       .map((item) => ({
         id: item._id,

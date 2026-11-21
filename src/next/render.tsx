@@ -18,9 +18,9 @@ import type { AnyPanel, LoadContext, PanelContext } from '../panel.ts';
 
 type StoredInstance = { id: string; type: string; hidden: boolean; data: unknown };
 
-export interface PanelsProps<CT extends AnyContentType> {
-  contentType: CT;
-  page: PageOf<CT>;
+export interface PanelsProps<Type extends AnyContentType> {
+  contentType: Type;
+  page: PageOf<Type>;
   /**
    * Needed when any panel defines `load`: how to look up linked pages, and
    * whether this is a draft preview. Panels with `load` are skipped without it.
@@ -30,32 +30,32 @@ export interface PanelsProps<CT extends AnyContentType> {
   onError?: (error: unknown, panel: { id: string; type: string }) => void;
 }
 
-export async function Panels<CT extends AnyContentType>({
+export async function Panels<Type extends AnyContentType>({
   contentType,
   page,
   loadContext,
-  onError = (e, p) => console.error(`cera: panel ${p.type} (${p.id}) failed to load`, e),
-}: PanelsProps<CT>): Promise<ReactElement> {
-  const byType = new Map<string, AnyPanel>(contentType.panels.map((p: AnyPanel) => [p.type, p]));
-  const visible = (page.panels as StoredInstance[]).filter((p) => !p.hidden);
+  onError = (error, failedPanel) => console.error(`cera: panel ${failedPanel.type} (${failedPanel.id}) failed to load`, error),
+}: PanelsProps<Type>): Promise<ReactElement> {
+  const byType = new Map<string, AnyPanel>(contentType.panels.map((definition: AnyPanel) => [definition.type, definition]));
+  const visible = (page.panels as StoredInstance[]).filter((instance) => !instance.hidden);
 
   const prepared = await Promise.all(
-    visible.map(async (p, index) => {
-      const def = byType.get(p.type);
+    visible.map(async (instance, index) => {
+      const def = byType.get(instance.type);
       if (!def) return null;
-      const panel: PanelContext = { pageId: page.id, panelId: p.id, index, contentType: contentType.name };
+      const panel: PanelContext = { pageId: page.id, panelId: instance.id, index, contentType: contentType.name };
       try {
         const [mod, loaded] = await Promise.all([
           def.component(),
           def.load
             ? loadContext
-              ? def.load(p.data as Record<string, unknown>, { ...loadContext, page: { id: page.id, contentType: contentType.name, slug: page.slug }, panel })
-              : Promise.reject(new Error(`Panel "${p.type}" loads data, but <Panels> was given no loadContext.`))
+              ? def.load(instance.data as Record<string, unknown>, { ...loadContext, page: { id: page.id, contentType: contentType.name, slug: page.slug }, panel })
+              : Promise.reject(new Error(`Panel "${instance.type}" loads data, but <Panels> was given no loadContext.`))
             : undefined,
         ]);
-        return { p, panel, loaded, hasLoad: Boolean(def.load), Component: mod.default as ComponentType<Record<string, unknown>> };
-      } catch (e) {
-        onError(e, p);
+        return { instance, panel, loaded, hasLoad: Boolean(def.load), Component: mod.default as ComponentType<Record<string, unknown>> };
+      } catch (error) {
+        onError(error, instance);
         return null;
       }
     }),
@@ -65,8 +65,8 @@ export async function Panels<CT extends AnyContentType>({
     <>
       {prepared.map((entry) => {
         if (!entry) return null;
-        const { p, panel, loaded, hasLoad, Component } = entry;
-        return <Component key={p.id} data={p.data} panel={panel} {...(hasLoad && { loaded })} />;
+        const { instance, panel, loaded, hasLoad, Component } = entry;
+        return <Component key={instance.id} data={instance.data} panel={panel} {...(hasLoad && { loaded })} />;
       })}
     </>
   );

@@ -50,7 +50,7 @@ export function EditorClient({
   readOnly: boolean;
 }) {
   const router = useRouter();
-  const ct = contentTypes.find((c) => c.name === page.contentType);
+  const ct = contentTypes.find((contentType) => contentType.name === page.contentType);
   // Each type has its own list and editor path (app/admin/content.ts).
   const { list, base, title, noun } = placeOf(page.contentType);
   if (!ct) return <p className="cera-status cera-status--error">This site has no content type “{page.contentType}”.</p>;
@@ -58,7 +58,7 @@ export function EditorClient({
   return (
     <PageEditor
       contentType={ct}
-      contentTypes={contentTypes.map((c) => ({ name: c.name, label: c.label, public: Boolean(c.route) }))}
+      contentTypes={contentTypes.map((contentType) => ({ name: contentType.name, label: contentType.label, public: Boolean(contentType.route) }))}
       page={page}
       version={version}
       published={published}
