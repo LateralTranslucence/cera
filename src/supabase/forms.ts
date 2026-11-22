@@ -141,3 +141,19 @@ export async function deleteSubmissions(client: SupabaseClient, options: { ids?:
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Whether a confirmation email may go to this submission's address now, and
+ * if so, records it: at most one per address per `perAddressHours` (24) and
+ * `hourlyMax` (50) an hour across the site, so a form can't be used to email
+ * strangers. Service-role client only.
+ */
+export async function claimConfirmation(client: SupabaseClient, submissionId: string, options: { perAddressHours?: number; hourlyMax?: number } = {}): Promise<boolean> {
+  const { data, error } = await client.rpc('cera_claim_confirmation', {
+    p_submission: submissionId,
+    p_window: `${options.perAddressHours ?? 24} hours`,
+    p_hourly_max: options.hourlyMax ?? 50,
+  });
+  if (error) fail(error);
+  return data === true;
+}

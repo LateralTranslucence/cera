@@ -31,6 +31,7 @@ export { mediaUrl } from '../media-url.ts';
 export { formatBytes } from '../media.ts';
 export {
   addSubmission,
+  claimConfirmation,
   createFormResolver,
   DEFAULT_FORM_ENDPOINT,
   deleteSubmissions,

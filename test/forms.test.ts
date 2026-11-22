@@ -5,7 +5,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { checkSubmission, formType, publicForm, submissionsCsv, type FormField, type FormResponse, type PublicForm } from '../src/forms/index.ts';
+import { buildFormEmails, checkSubmission, formType, parseAddresses, publicForm, submissionsCsv, type FormEmail, type FormField, type FormResponse, type PublicForm } from '../src/forms/index.ts';
 import { checkFormToken, issueFormToken, MAX_AGE_MILLISECONDS } from '../src/forms/server.ts';
 import { createFormHandler } from '../src/next/forms.ts';
 import { createSubmissionsExportHandler } from '../src/next/submissions.ts';
@@ -463,4 +463,92 @@ test('the CSV export: one form’s submissions, oldest first, read as the signed
   // A malformed form id means every form's.
   const all = await exportFor(staffEditor).GET(new Request('http://localhost/admin/submissions/export?form=nope'));
   assert.match(all.headers.get('Content-Disposition') ?? '', /all-forms-submissions/);
+});
+
+test('form emails: routed by an answer, else the default addresses; the confirmation is the form’s own text', () => {
+  const settings = {
+    to: 'office@example.test, not an address, office@example.test',
+    routeBy: 'topic',
+    routes: [
+      { value: 'Sales', to: 'sales@example.test; deals@example.test' },
+      { value: 'help', to: '' },
+    ],
+    confirmation: 'Thanks, we got it.\n\nThe <team>',
+  };
+  const values = (topic: string | string[]) => [
+    { name: 'your-name', label: 'Your name', value: 'Ada <script>' },
+    { name: 'topic', label: 'Topic', value: topic },
+    { name: 'empty', label: 'Empty', value: '' },
+  ];
+  assert.deepEqual(parseAddresses(settings.to), ['office@example.test']);
+
+  const [alert, confirmation] = buildFormEmails({ formTitle: 'Contact', settings, values: values('Sales'), email: 'ada@example.test', confirmationAllowed: true });
+  assert.deepEqual(alert?.to, ['sales@example.test', 'deals@example.test']);
+  assert.equal(alert?.replyTo, 'ada@example.test');
+  assert.equal(alert?.subject, 'Submission from Contact form');
+  assert.equal(alert?.text, 'Your name: Ada <script>\nTopic: Sales');
+  assert.match(alert!.html, /<strong>Your name:<\/strong> Ada &lt;script&gt;/);
+  assert.deepEqual([confirmation?.kind, confirmation?.to, confirmation?.subject], ['confirmation', ['ada@example.test'], 'Submission of Contact form']);
+  assert.equal(confirmation?.html, '<p>Thanks, we got it.</p>\n<p>The &lt;team&gt;</p>');
+
+  // A route with no addresses, or no match, falls back to the default; several answers take the first that routes.
+  assert.deepEqual(buildFormEmails({ formTitle: 'Contact', settings, values: values('help'), confirmationAllowed: false })[0]?.to, ['office@example.test']);
+  assert.deepEqual(buildFormEmails({ formTitle: 'Contact', settings, values: values(['Other', 'Sales']), confirmationAllowed: false })[0]?.to, ['sales@example.test', 'deals@example.test']);
+  // No confirmation unless allowed and the visitor gave an address; no alert without addresses; a subject of the form's own.
+  assert.equal(buildFormEmails({ formTitle: 'Contact', settings, values: values('x'), email: 'ada@example.test', confirmationAllowed: false }).length, 1);
+  assert.deepEqual(buildFormEmails({ formTitle: 'Contact', settings: { confirmation: 'Hi', subject: 'Hello' }, values: values('x'), email: 'ada@example.test', confirmationAllowed: true }).map((email) => [email.kind, email.subject]), [['confirmation', 'Hello']]);
+});
+
+test('the endpoint sends emails from the live form’s private settings, after the response, with confirmations rationed', async () => {
+  const stored = { ...contact('emailed'), boxes: { email: { to: 'office@example.test', routeBy: 'topic', routes: [{ _id: 'r', value: 'Sales', to: 'sales@example.test' }], confirmation: 'Thanks!' } } };
+  await publish(stored);
+  const sent: FormEmail[][] = [];
+  const pending: Array<Promise<void>> = [];
+  const emailing = createFormHandler({
+    client: () => server,
+    secret: () => SECRET,
+    ip: () => '203.0.113.120',
+    limit: { max: 10, minutes: 10 },
+    sendEmails: (emails) => void sent.push(emails),
+    defer: (task) => void pending.push(task()),
+  });
+  const send = async (values: Record<string, string>) => {
+    const result = await post(emailing as ReturnType<typeof handler>, stored.id, values);
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    await Promise.all(pending.splice(0));
+  };
+
+  await send({ ...valid, topic: 'Sales', email: 'ada@example.test' });
+  assert.deepEqual(sent[0]?.map((email) => [email.kind, email.to.join()]), [['alert', 'sales@example.test'], ['confirmation', 'ada@example.test']]);
+  // The same address again within a day: the alert, but no second confirmation.
+  await send({ ...valid, email: 'ADA@example.test' });
+  assert.deepEqual(sent[1]?.map((email) => [email.kind, email.to.join()]), [['alert', 'office@example.test']]);
+
+  // The settings never reach visitors: not in the public form, not in the published row they can read.
+  assert.doesNotMatch(JSON.stringify(await (await import('../src/supabase/forms.ts')).getLiveForm(anonymous, stored.id)), /office@example\.test/);
+
+  // If the confirmation can't be checked, the alert still goes.
+  const brokenClaims = { ...server, rpc: (name: string, args: unknown) => (name === 'cera_claim_confirmation' ? Promise.resolve({ data: null, error: { message: 'boom' } }) : server.rpc(name, args as never)) } as SupabaseClient;
+  const checking = createFormHandler({ client: () => brokenClaims, secret: () => SECRET, ip: () => '203.0.113.122', sendEmails: (emails) => void sent.push(emails), defer: (task) => void pending.push(task()) });
+  const quietCheck = console.error;
+  console.error = () => {};
+  try {
+    assert.equal((await post(checking as ReturnType<typeof handler>, stored.id, { ...valid, email: 'linus@example.test' })).status, 200);
+    await Promise.all(pending.splice(0));
+  } finally {
+    console.error = quietCheck;
+  }
+  assert.deepEqual(sent[2]?.map((email) => email.kind), ['alert']);
+
+  // A sender that fails doesn't fail the submission.
+  const failing = createFormHandler({ client: () => server, secret: () => SECRET, ip: () => '203.0.113.121', sendEmails: () => Promise.reject(new Error('SMTP down')), defer: (task) => void pending.push(task()) });
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    const result = await post(failing as ReturnType<typeof handler>, stored.id, { ...valid, email: 'grace@example.test' });
+    assert.equal(result.status, 200);
+    await Promise.all(pending.splice(0));
+  } finally {
+    console.error = quiet;
+  }
 });

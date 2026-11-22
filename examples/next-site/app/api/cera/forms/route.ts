@@ -4,6 +4,7 @@
  * address used for the rate limit.
  */
 import { createFormHandler } from '@lateraltranslucence/cera/next';
+import { sendEmails } from '@/lib/email.ts';
 import { serviceClient } from '@/lib/supabase.ts';
 
 export const { GET, POST } = createFormHandler({
@@ -13,4 +14,6 @@ export const { GET, POST } = createFormHandler({
     if (!key) throw new Error('Missing environment variable SUPABASE_SECRET_KEY. See .env.example.');
     return key;
   },
+  // Each form's alert and confirmation (its private Email box), sent by SMTP; see lib/email.ts.
+  sendEmails,
 });

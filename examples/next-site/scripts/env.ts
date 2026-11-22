@@ -34,6 +34,10 @@ const previewSecret = existing.CERA_PREVIEW_SECRET ?? randomBytes(24).toString('
 // Local admin account created by `npm run seed`. Sign in at /admin with these.
 const adminEmail = existing.CERA_ADMIN_EMAIL ?? 'admin@cera.test';
 const adminPassword = existing.CERA_ADMIN_PASSWORD ?? randomBytes(12).toString('base64url');
+// Form emails go to the stack's test inbox (supabase/config.toml's [local_smtp] smtp_port), unless set otherwise.
+const smtpPort = readFileSync(join(repoRoot, 'supabase', 'config.toml'), 'utf8').match(/^\s*smtp_port\s*=\s*(\d+)/m)?.[1];
+const smtpUrl = existing.SMTP_URL ?? (smtpPort ? `smtp://127.0.0.1:${smtpPort}` : undefined);
+const emailFrom = existing.CERA_EMAIL_FROM ?? 'Cera <no-reply@cera.test>';
 
 writeFileSync(
   target,
@@ -45,6 +49,8 @@ writeFileSync(
     `CERA_PREVIEW_SECRET=${previewSecret}`,
     `CERA_ADMIN_EMAIL=${adminEmail}`,
     `CERA_ADMIN_PASSWORD=${adminPassword}`,
+    ...(smtpUrl ? [`SMTP_URL=${smtpUrl}`] : []),
+    `CERA_EMAIL_FROM=${emailFrom}`,
     '',
   ].join('\n'),
 );
