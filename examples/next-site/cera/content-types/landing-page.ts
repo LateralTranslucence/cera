@@ -1,8 +1,6 @@
 // Ported from DO_Landing_Page (class-landing-page.php).
-import { defineContentType, field } from '@lateraltranslucence/cera';
+import { defineContentType, field, plainText } from '@lateraltranslucence/cera';
 import { corePanels } from '@lateraltranslucence/cera/panels';
-
-const stripHtml = (html = '') => html.replace(/<[^>]+>/g, '').trim();
 
 export const landingPage = defineContentType({
   name: 'landing_page',
@@ -12,9 +10,9 @@ export const landingPage = defineContentType({
 
   boxes: {
     hero: {
-      title: field.text({ label: 'Title' }),
-      background: field.background({ label: 'Background' }),
-      copy: field.html({ label: 'Copy' }),
+      title: field.text(),
+      background: field.background(),
+      copy: field.html(),
       ctas: field.ctas({ label: 'CTA' }),
     },
     seo: {
@@ -23,16 +21,16 @@ export const landingPage = defineContentType({
       image: field.media({ label: 'SEO Image', accept: ['image'] }),
     },
     admin: {
-      hidden: field.toggle({ label: 'Hidden' }),
+      hidden: field.toggle(),
       noindex: field.toggle({ label: 'NoIndex' }),
-      css: field.text({ label: 'CSS' }),
+      css: field.text(),
       pageType: field.select({ label: 'Landing Page Type', options: { 'landing-page': 'Landing Page', form: 'Form' }, default: 'landing-page' }),
       schemaType: field.select({
         label: 'Schema',
         options: { WebPage: 'WebPage (default)', AboutPage: 'AboutPage', ContactPage: 'ContactPage', SearchResultsPage: 'SearchResultsPage' },
         default: 'WebPage',
       }),
-      breadcrumbs: field.repeater({ label: 'Breadcrumbs', itemTitle: 'text', fields: { text: field.text(), url: field.url() } }),
+      breadcrumbs: field.repeater({ itemTitle: 'text', fields: { text: field.text(), url: field.url() } }),
     },
   },
 
@@ -40,17 +38,17 @@ export const landingPage = defineContentType({
   panels: corePanels,
 
   // Admin settings sit with title and slug; the hero renders like a panel, so it sits with them.
-  editor: { pageBoxes: ['admin'], leadBoxes: ['hero'] },
+  // The admin's Pages: /admin/pages, first in the sidebar.
+  editor: { path: 'pages', title: 'Pages', icon: 'pages', noun: 'page', pageBoxes: ['admin'], leadBoxes: ['hero'] },
 
   seo: {
     title: (page) => page.boxes.seo.title || page.title,
-    description: (page) => page.boxes.seo.description || stripHtml(page.boxes.hero.copy),
+    description: (page) => page.boxes.seo.description || plainText(page.boxes.hero.copy),
     image: (page) => page.boxes.seo.image,
     noindex: (page) => page.boxes.admin.noindex,
   },
 
   jsonLd: (page) => ({
-    '@context': 'https://schema.org',
     '@type': page.boxes.admin.schemaType,
     headline: page.title,
     description: page.boxes.seo.description,

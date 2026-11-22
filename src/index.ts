@@ -8,3 +8,4 @@ export * from './document.ts';
 export * from './media.ts';
 export * from './roles.ts';
 export { isLightColor } from './color.ts';
+export { plainText } from './text.ts';

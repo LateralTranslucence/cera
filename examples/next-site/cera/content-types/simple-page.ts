@@ -9,37 +9,28 @@
 //     description): the title is the editor's built-in field, and the
 //     description is rich text. Search engines get the description's first
 //     160 characters, with its formatting removed.
-import { defineContentType, field } from '@lateraltranslucence/cera';
-
-// Block tags become spaces ("<p>One</p><p>Two</p>" → "One Two"); inline ones just go ("<em>red</em>," → "red,").
-const stripHtml = (html = '') =>
-  html
-    .replace(/<\/?(?:p|br|li|ul|ol|h[1-6]|div|blockquote|tr|td|th)\b[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+import { defineContentType, field, plainText } from '@lateraltranslucence/cera';
 
 export const simplePage = defineContentType({
   name: 'simple_page',
   label: 'Simple Page',
   route: '/[slug]',
   slugScope: 'landing_page',
-  url: (page) => `/${page.slug}`,
   // theme: settings()['breadcrumbs'], shown before every simple page.
   breadcrumbs: [{ text: 'Home', url: '/' }],
 
   boxes: {
     content: {
-      image: field.media({ label: 'Image', accept: ['image'] }),
+      image: field.media({ accept: ['image'] }),
       imageCredit: field.text({ label: 'Image Credit' }),
-      description: field.html({ label: 'Description', toolbar: 'limited', note: 'Shown under the title. Search engines get its first 160 characters.' }),
-      content: field.html({ label: 'Content' }),
+      description: field.html({ toolbar: 'limited', note: 'Shown under the title. Search engines get its first 160 characters.' }),
+      content: field.html(),
     },
     seo: {
       image: field.media({ label: 'SEO Image', accept: ['image'], note: 'For sharing on social media. Defaults to the Image.' }),
     },
     admin: {
-      hidden: field.toggle({ label: 'Hidden' }),
+      hidden: field.toggle(),
     },
   },
 
@@ -47,17 +38,16 @@ export const simplePage = defineContentType({
 
   seo: {
     title: (page) => page.title,
-    description: (page) => stripHtml(page.boxes.content.description).slice(0, 160) || undefined,
+    description: (page) => plainText(page.boxes.content.description, 160) || undefined,
     image: (page) => page.boxes.seo.image ?? page.boxes.content.image,
   },
 
   // theme: settings()['schema']
   jsonLd: (page) => ({
-    '@context': 'https://schema.org',
     '@type': 'WebPage',
     headline: page.title,
-    description: stripHtml(page.boxes.content.description) || undefined,
-    text: stripHtml(page.boxes.content.content) || undefined,
+    description: plainText(page.boxes.content.description) || undefined,
+    text: plainText(page.boxes.content.content) || undefined,
   }),
 
   hidden: (page) => page.boxes.admin.hidden,

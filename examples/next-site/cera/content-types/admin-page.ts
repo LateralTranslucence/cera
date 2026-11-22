@@ -49,7 +49,11 @@ export const adminPage = defineContentType({
       body: field.html({ label: 'Content' }),
     },
   },
+  // Managed by admins under Site; everyone reads them under Team (app/admin/team).
   editor: {
+    section: 'Site',
+    icon: 'settings',
+    listRole: 'admin',
     pageBoxes: ['settings'],
     noun: 'admin page',
     titleLabel: 'Page name',

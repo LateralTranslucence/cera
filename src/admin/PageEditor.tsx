@@ -12,7 +12,7 @@ import { useEffect, useId, useMemo, useRef, useState, useTransition, type CSSPro
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { AnyContentType, BoxMap } from '../content-type.ts';
+import { adminNounOf, adminNounPluralOf, type AnyContentType, type BoxMap } from '../content-type.ts';
 import type { FieldMap, OptionsContext } from '../fields.ts';
 import { checkPage, type PageIssue, type SaveMode, type StoredPage } from '../document.ts';
 import { upgradePanel, type StoredPanel } from '../migrate.ts';
@@ -153,8 +153,8 @@ export function PageEditor({
   // What this content type calls itself and its panels ("page"/"panel", "form"/"field").
   // Types that are never published (contentType.publishable: false) get a plain Save and no publishing controls.
   const publishable = contentType.publishable !== false;
-  const noun = contentType.editor?.noun ?? 'page';
-  const nouns = contentType.editor?.nounPlural ?? `${noun}s`;
+  const noun = adminNounOf(contentType);
+  const nouns = adminNounPluralOf(contentType);
   const item = contentType.editor?.itemNoun ?? 'panel';
   const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
   const Item = item.charAt(0).toUpperCase() + item.slice(1);
@@ -617,7 +617,7 @@ export function PageEditor({
                     update({ ...page, slug: event.target.value });
                   }}
                 />
-                <p className="cera-note">{contentType.editor?.slugNote ?? 'Lowercase words joined by hyphens. “home” is the front page.'}</p>
+                <p className="cera-note">{contentType.editor?.slugNote ?? `Lowercase words joined by hyphens.${contentType.route === '/[slug]' ? ' “home” is the front page.' : ''}`}</p>
                 <IssueList issues={issuesAt(issues, ['slug'])} />
               </div>
             </div>

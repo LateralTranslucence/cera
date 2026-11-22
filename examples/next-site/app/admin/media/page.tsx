@@ -1,5 +1,5 @@
 import { canEdit, requireStaff } from '@/lib/auth.ts';
-import { Shell } from '../Shell.tsx';
+import { admin } from '../admin.ts';
 import { MediaClient } from './MediaClient.tsx';
 
 export const metadata = { title: 'Media' };
@@ -7,7 +7,7 @@ export const metadata = { title: 'Media' };
 export default async function MediaPage() {
   const staff = await requireStaff();
   return (
-    <Shell staff={staff} active="media">
+    <admin.Shell staff={staff} active="media">
       <div className="cera-screen">
         <div className="cera-screen__head">
           <div>
@@ -17,6 +17,6 @@ export default async function MediaPage() {
         </div>
         <MediaClient canEdit={canEdit(staff.role)} />
       </div>
-    </Shell>
+    </admin.Shell>
   );
 }

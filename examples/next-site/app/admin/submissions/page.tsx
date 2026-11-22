@@ -1,7 +1,7 @@
 import { listPages, listSubmissions } from '@lateraltranslucence/cera/supabase';
 import { formType } from '@/cera';
 import { requireStaff } from '@/lib/auth.ts';
-import { Shell } from '../Shell.tsx';
+import { admin } from '../admin.ts';
 import { SubmissionsClient } from './SubmissionsClient.tsx';
 
 export const metadata = { title: 'Submissions' };
@@ -28,7 +28,7 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
   };
 
   return (
-    <Shell staff={staff} active="submissions">
+    <admin.Shell staff={staff} active="submissions">
       <div className="cera-screen">
         <div className="cera-screen__head">
           <div>
@@ -46,6 +46,6 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
           newestHref={before ? `/admin/submissions${query({})}` : undefined}
         />
       </div>
-    </Shell>
+    </admin.Shell>
   );
 }

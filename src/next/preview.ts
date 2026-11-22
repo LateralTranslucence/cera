@@ -7,6 +7,8 @@
  *   // app/admin/preview/route.ts
  *   export const { GET } = createPreviewHandler({ authorize: async () => Boolean(await requireStaff()) });
  *
+ * The admin sends a page's address (?path=/guides/setup, from `pageUrl`).
+ *
  * Preview for outside tools, with a shared secret (?secret=…&slug=about):
  *
  *   // app/api/draft/route.ts
@@ -60,15 +62,21 @@ export function defaultPreviewPath(slug: string): string {
   return slug === 'home' ? '/' : `/${slug}`;
 }
 
-/** Turns on draft mode and sends the browser to the page for `?slug=` (default `home`). */
+/**
+ * Turns on draft mode and sends the browser to `?path=` (a same-site path,
+ * e.g. `/guides/setup`), else to the page for `?slug=` (default `home`).
+ */
 export function createPreviewHandler(options: PreviewHandlerOptions) {
   async function GET(request: Request): Promise<Response> {
     const allowed = await options.authorize(request);
     if (allowed instanceof Response) return allowed;
     if (!allowed) return new Response('Not allowed to preview.', { status: 401 });
     const params = new URL(request.url).searchParams;
+    // The admin sends the page's own address (?path=/guides/setup); outside tools may send just its slug.
+    const path = params.get('path');
+    if (path !== null && returnPath(path) !== path) return new Response('Invalid path.', { status: 400 });
     const slug = params.get('slug') ?? 'home';
-    if (!SLUG.test(slug)) return new Response('Invalid slug.', { status: 400 });
+    if (path === null && !SLUG.test(slug)) return new Response('Invalid slug.', { status: 400 });
     const version = parsePreviewVersion(params.get('page'), params.get('version'));
     if ((params.has('page') || params.has('version')) && !version) return new Response('Invalid version.', { status: 400 });
     (await draftMode()).enable();
@@ -76,7 +84,7 @@ export function createPreviewHandler(options: PreviewHandlerOptions) {
     // A plain preview shows working copies again.
     if (version) store.set(PREVIEW_VERSION_COOKIE, `${version.pageId}:${version.version}`, { httpOnly: true, sameSite: 'lax', path: '/', secure: process.env.NODE_ENV === 'production' });
     else store.delete(PREVIEW_VERSION_COOKIE);
-    redirect((options.pathFor ?? defaultPreviewPath)(slug));
+    redirect(path ?? (options.pathFor ?? defaultPreviewPath)(slug));
   }
   return { GET };
 }

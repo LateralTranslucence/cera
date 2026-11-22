@@ -1,5 +1,5 @@
 import { requireStaff } from '@/lib/auth.ts';
-import { Shell } from '../Shell.tsx';
+import { admin } from '../admin.ts';
 import { PasswordForm } from './PasswordForm.tsx';
 
 export const metadata = { title: 'Account' };
@@ -7,7 +7,7 @@ export const metadata = { title: 'Account' };
 export default async function AccountPage() {
   const staff = await requireStaff();
   return (
-    <Shell staff={staff} active="account">
+    <admin.Shell staff={staff} active="account">
       <div className="cera-screen">
         <div className="cera-screen__head">
           <div>
@@ -23,6 +23,6 @@ export default async function AccountPage() {
           <PasswordForm />
         </section>
       </div>
-    </Shell>
+    </admin.Shell>
   );
 }
