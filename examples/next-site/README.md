@@ -1,6 +1,6 @@
 # Cera example site
 
-A Next.js site that renders Cera pages from a local Supabase stack, with a minimal admin for editing them. Its `landing_page` content type (`cera/`) is built from Cera's core panels (`@lateraltranslucence/cera/panels`), and the library's tests use it too.
+A Next.js site that renders Cera pages from a local Supabase stack, with an admin for editing them. Its `landing_page` content type (`cera/`) is built from Cera's core panels (`@lateraltranslucence/cera/panels`), and the library's tests use it too. To add a content type, see "Adding a content type" in the repository's README.
 
 ## Run it
 
@@ -39,11 +39,12 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 
 | Path | Purpose |
 |---|---|
-| `cera/` | The `landing_page` content type, with every core panel (`/panels` shows one of each); `simple_page` (no panels: image, description, content), which shares landing pages' addresses at `/[slug]`; and the package's `formType` (forms, shown on pages by the Form panel) and `iconType` (your own icons). Panels come from the package (`cera/blocks`, …); a site's own panels would sit here too, under names without the reserved `cera/` prefix |
-| `app/(site)/` | Live pages: `findPublishedPage` (a landing page or a simple page) → `RoutedPage`, with `generateMetadata` from `pageMetadata` |
-| `app/admin/` | Sign-in, page list and the editor (`PageEditor` from `@lateraltranslucence/cera/admin`) |
-| `app/admin/simple-pages`, `app/admin/icons` | Simple pages and icons, through the shared screens in `content-screens.tsx` (`content.ts` says where each type lives in the admin) |
-| `app/admin/forms`, `app/admin/submissions` | Forms (built in the same editor; fields are its panels) and what visitors sent (admins and editors; CSV download at `submissions/export`) |
+| `cera/` | The `landing_page` content type, with every core panel (`/panels` shows one of each); `simple_page` (no panels: image, description, content), which shares landing pages' addresses at `/[slug]`; and the package's `formType` (forms, shown on pages by the Form panel) and `iconType` (your own icons). Panels come from the package (`cera/blocks`, …); a site's own panels would sit here too, under names without the reserved `cera/` prefix. `cera/index.ts` lists every type (`contentTypes`, in the sidebar's order); `cera/views.ts` names the view for each type with pages of its own |
+| `app/(site)/[[...path]]` | Live pages at every address: `loadPage` finds the types routed there (`matchRoute`) and the page, and `RoutedPage` renders its type's view, with `generateMetadata` from `pageMetadata` |
+| `app/admin/admin.ts` | The admin's screens: the package's `createAdminScreens`, built from `contentTypes` (each type's sidebar entry, list, new and edit screens), plus this site's own screens in the sidebar (`items`) |
+| `app/admin/[type]` | Every content type's list, new and edit screens, at `/admin/<editor.path>` (`/admin/pages`, `/admin/simple-pages`, `/admin/forms`, …); `/admin` goes to the first type's list |
+| `app/admin/EditorClient.tsx` | The package's `PageEditor` with this site's content types and server actions (a client component, so it imports the types itself) |
+| `app/admin/submissions`, `app/admin/team` | What visitors sent through forms (admins and editors; CSV download at `submissions/export`), and admin pages to read under Team |
 | `app/api/cera/search` | The Search panel's endpoint: `createSearchHandler` (live pages, or working copies in draft mode), with live results cached |
 | `app/api/cera/forms` | Where forms post: `createFormHandler` (token, honeypot, checks, rate limit), storing submissions with the secret key |
 | `app/admin/users`, `app/admin/account` | People (admins: add people, set roles) and Account (change your password) |
@@ -53,7 +54,7 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 | `app/api/cera/cleanup` | Daily upkeep for Vercel Cron (`vercel.json`, `CRON_SECRET`): removes unfinished and replaced uploads nothing uses, prunes old drafts |
 | `proxy.ts` | Refreshes the admin's Supabase session cookies |
 | `lib/auth.ts` | `requireStaff(role)` from the package's `createStaffAuth`: verified user + Cera role from `app_metadata.cera_role` |
-| `lib/pages.ts` | Picks the live revision or, in draft mode, the working copy (or the old version History asked for); logs read issues; `loadContextFor` (the package's `createLoadContexts`) gives panels' `load` linked pages, forms, icons and searches, cached on the live site |
+| `lib/pages.ts` | For an address, picks the live revision or, in draft mode, the working copy (or the old version History asked for); logs read issues; `loadContextFor` (the package's `createLoadContexts`) gives panels' `load` linked pages, forms, icons and searches, cached on the live site |
 | `lib/icons.ts` | The site's icon sets: its own icons, then Lucide |
 | `lib/supabase.ts` | Anonymous client (published pages only) and secret-key client (server only) |
 | `scripts/seed.ts` | Admin account and pages, saved through `savePage` like the admin does |
