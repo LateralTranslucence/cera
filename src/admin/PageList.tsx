@@ -21,6 +21,8 @@ export interface PageListProps {
   countLabel?: string | null;
   /** Show slugs as paths ("/about", the default) or as plain IDs ("contact"). */
   slugs?: 'path' | 'id';
+  /** With `slugs: 'path'`: a page's address. Default "/" for `home`, "/<slug>" otherwise. */
+  pathOf?: (page: PageSummary) => string;
   /** One more column after the count, e.g. a form's submissions. */
   extra?: { label: string; render: (page: PageSummary) => ReactNode };
 }
@@ -89,6 +91,7 @@ export function PageList({
   nounPlural = `${noun}s`,
   countLabel = 'Panels',
   slugs = 'path',
+  pathOf,
   extra,
 }: PageListProps) {
   const [search, setSearch] = useState('');
@@ -179,7 +182,7 @@ export function PageList({
                     <a className="cera-table__title" href={editHref(summary)}>
                       {summary.title || 'Untitled'}
                     </a>
-                    <span className="cera-table__slug">{slugs === 'id' ? summary.slug : summary.slug === 'home' ? '/' : `/${summary.slug}`}</span>
+                    <span className="cera-table__slug">{slugs === 'id' ? summary.slug : pathOf ? pathOf(summary) : summary.slug === 'home' ? '/' : `/${summary.slug}`}</span>
                   </td>
                   <td>
                     <PageStatus page={summary} />

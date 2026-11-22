@@ -10,13 +10,14 @@ const formType = { ...baseFormType, editRoles: ['admin'] as const };
 
 export { adminPage, formType, iconType, landingPage, simplePage };
 /**
+ * Every content type, in the admin sidebar's order. Adding one here adds it
+ * to the admin; one with a `route` also needs a view (cera/views.ts).
+ *
  * Landing pages and simple pages have pages of their own, both at /[slug]
  * (one address scope). Forms show on them through the Form panel; icons
  * through field.icon() fields.
  */
 export const contentTypes = [landingPage, simplePage, formType, iconType, adminPage] as const;
-/** The types the site's /[slug] route serves. */
-export const routedTypes = [landingPage, simplePage] as const;
 
 /**
  * The colors editors pick a panel background from. The first five are the

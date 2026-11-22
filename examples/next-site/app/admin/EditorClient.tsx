@@ -2,14 +2,14 @@
 /**
  * Client wrapper: gives the package's PageEditor this site's content type
  * (which holds functions, so it can't be passed from a Server Component) and
- * the server actions.
+ * the server actions. The admin's screens (admin.ts) render it for every
+ * type; nothing here is per type.
  */
 import { useRouter } from 'next/navigation';
-import type { StoredPage } from '@lateraltranslucence/cera';
+import { adminNounOf, adminPathOf, adminTitleOf, pageUrl, type PageOf, type StoredPage } from '@lateraltranslucence/cera';
 import { mediaUploader, PageEditor } from '@lateraltranslucence/cera/admin';
 import type { PageSchedule } from '@lateraltranslucence/cera/supabase';
 import { backgroundColors, contentTypes } from '@/cera';
-import { placeOf } from '../content.ts';
 import {
   cancelScheduleAction,
   deletePageAction,
@@ -24,7 +24,7 @@ import {
   savePageAction,
   searchIconsAction,
   unpublishPageAction,
-} from '../actions.ts';
+} from './actions.ts';
 
 const media = {
   upload: mediaUploader({ prepare: prepareMediaUploadAction, finish: finishMediaUploadAction }),
@@ -51,9 +51,9 @@ export function EditorClient({
 }) {
   const router = useRouter();
   const contentType = contentTypes.find((candidate) => candidate.name === page.contentType);
-  // Each type has its own list and editor path (app/admin/content.ts).
-  const { list, base, title, noun } = placeOf(page.contentType);
   if (!contentType) return <p className="cera-status cera-status--error">This site has no content type “{page.contentType}”.</p>;
+  // The type's list, which is also its editor's base: /admin/<editor.path>.
+  const list = `/admin/${adminPathOf(contentType)}`;
 
   return (
     <PageEditor
@@ -78,8 +78,8 @@ export function EditorClient({
         await cancelScheduleAction(page.id);
       }}
       onSaved={() => {
-        // A new page lives at /admin/pages/new until its first save.
-        if (version === 0) router.replace(`${base}/${page.id}`);
+        // A new page lives at /admin/<type>/new until its first save.
+        if (version === 0) router.replace(`${list}/${page.id}`);
         // Refresh the server-rendered sidebar (titles, the page count).
         else router.refresh();
       }}
@@ -87,12 +87,13 @@ export function EditorClient({
       onRestore={(input) => restoreRevisionAction({ pageId: page.id, contentType: page.contentType, ...input })}
       onDelete={(input) => deletePageAction({ pageId: page.id, ...input })}
       findLinks={() => pageLinksAction(page.id)}
-      onDeleted={() => router.replace(`${list}?deleted=${encodeURIComponent(page.title || `Untitled ${noun}`)}`)}
+      onDeleted={() => router.replace(`${list}?deleted=${encodeURIComponent(page.title || `Untitled ${adminNounOf(contentType)}`)}`)}
       backHref={list}
-      backLabel={title}
+      backLabel={adminTitleOf(contentType)}
       {...(contentType.route && {
+        // The page's own address (its type's route or url), e.g. /guides/setup.
         previewHref: (slug: string, version?: { pageId: string; version: number }) =>
-          `/admin/preview?slug=${encodeURIComponent(slug)}${version ? `&page=${version.pageId}&version=${version.version}` : ''}`,
+          `/admin/preview?path=${encodeURIComponent(pageUrl(contentType, { ...page, slug } as PageOf<typeof contentType>))}${version ? `&page=${version.pageId}&version=${version.version}` : ''}`,
       })}
     />
   );

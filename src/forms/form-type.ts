@@ -49,6 +49,7 @@ export const formType = defineContentType({
   privateBoxes: ['email'],
   panels: formFields,
   editor: {
+    icon: 'form',
     noun: 'form',
     itemNoun: 'field',
     titleLabel: 'Form name',

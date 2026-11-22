@@ -48,5 +48,6 @@ export function pageMetadata<Type extends AnyContentType>(contentType: Type, pag
 export function jsonLdString<Type extends AnyContentType>(contentType: Type, page: PageOf<Type>): string | undefined {
   const data = contentType.jsonLd?.(page);
   if (!data) return undefined;
-  return JSON.stringify(data).replace(/</g, '\\u003c');
+  // schema.org's context, unless the definition gave its own.
+  return JSON.stringify({ '@context': 'https://schema.org', ...data }).replace(/</g, '\\u003c');
 }

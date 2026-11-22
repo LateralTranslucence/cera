@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { type FieldMap, type InferFields, type MediaRef, objectSchema } from './fields.ts';
 import type { AnyPanel, PanelUnion } from './panel.ts';
 import type { CeraRole } from './roles.ts';
+import type { IconName } from './admin/icons.tsx';
 
 export type BoxMap = Record<string, FieldMap>;
 
@@ -91,17 +92,36 @@ export interface ContentTypeConfig<Name extends string, Boxes extends BoxMap, Pa
   /** Hide from public queries/routes. Theme: settings()['hide_field']. */
   hidden?: (page: PageDocument<Name, Boxes, Panels>) => boolean;
   /**
-   * Where boxes appear in the admin editor. Boxes not listed here get their
-   * own section between the Page section and the panels, in declared order.
+   * How the admin shows this type: its place in the sidebar, its screens'
+   * address and names, and where boxes appear in the editor. Everything is
+   * optional; the admin builds the sidebar item, list, new and edit screens
+   * from it (`createAdminScreens`).
    */
   editor?: {
+    /**
+     * The type's address under /admin, e.g. `simple-pages` → /admin/simple-pages.
+     * Default: `label` in the plural, in kebab case ("Simple Page" → `simple-pages`).
+     */
+    path?: string;
+    /** The list's heading and the sidebar label. Default: `label` in the plural ("Simple Pages"). */
+    title?: string;
+    /** The sidebar icon. Default `article`. */
+    icon?: IconName;
+    /** The sidebar group it's listed under. Default `Content`. */
+    section?: string;
+    /** The lowest role that sees the type in the admin. Default `viewer` (everyone signed in). */
+    listRole?: CeraRole;
+    /**
+     * Boxes not listed in `pageBoxes` or `leadBoxes` get their own section
+     * between the Page section and the panels, in declared order.
+     */
     /** Shown inside the Page section, under title and slug (e.g. admin settings). */
     pageBoxes?: ReadonlyArray<keyof Boxes & string>;
     /** Shown just above the panels, styled like one (e.g. a hero that renders like a panel). */
     leadBoxes?: ReadonlyArray<keyof Boxes & string>;
-    /** What the admin calls one of these, lowercase. Default "page". */
+    /** What the admin calls one of these, lowercase. Default: `label` in lowercase ("simple page"). */
     noun?: string;
-    /** Plural of `noun`. Default: `noun` + "s". */
+    /** Plural of `noun`. Default: `noun` in the plural. */
     nounPlural?: string;
     /** What the admin calls one panel, lowercase. Default "panel" (forms: "field"). */
     itemNoun?: string;
@@ -188,7 +208,6 @@ export function defineContentType<
   return { ...config, panels, pageSchema };
 }
 
-/** A page's public URL: the content type's `url`, or its `route` with `[slug]` filled in. */
 /**
  * A page's breadcrumb trail: the content type's breadcrumbs, then the
  * page's own, then the page itself (without a link to itself, its url is
@@ -199,7 +218,75 @@ export function breadcrumbsFor<Type extends AnyContentType>(contentType: Type, p
   return [...trail, { text: page.title, url: pageUrl(contentType, page) }];
 }
 
+/** A page's public URL: the content type's `url`, or its `route` with `[slug]` filled in. */
 export function pageUrl<Type extends AnyContentType>(contentType: Type, page: PageOf<Type>): string {
   if (contentType.url) return contentType.url(page);
   return contentType.route ? contentType.route.replace('[slug]', encodeURIComponent(page.slug)) : '';
+}
+
+/** "Simple Page" → "Simple Pages", "Case Study" → "Case Studies", "Box" → "Boxes". */
+export function pluralize(words: string): string {
+  if (/[^aeiou]y$/i.test(words)) return `${words.slice(0, -1)}ies`;
+  if (/(?:s|x|z|ch|sh)$/i.test(words)) return `${words}es`;
+  return `${words}s`;
+}
+
+/** What the admin calls one of these, lowercase: `editor.noun`, else `label` ("simple page"). */
+export function adminNounOf(contentType: AnyContentType): string {
+  return contentType.editor?.noun ?? contentType.label.toLowerCase();
+}
+
+/** The plural of `adminNounOf`: `editor.nounPlural`, else the noun in the plural. */
+export function adminNounPluralOf(contentType: AnyContentType): string {
+  return contentType.editor?.nounPlural ?? pluralize(adminNounOf(contentType));
+}
+
+/** The list's heading and sidebar label: `editor.title`, else `label` in the plural. */
+export function adminTitleOf(contentType: AnyContentType): string {
+  return contentType.editor?.title ?? pluralize(contentType.label);
+}
+
+/** The type's address under /admin: `editor.path`, else its plural label in kebab case. */
+export function adminPathOf(contentType: AnyContentType): string {
+  return (
+    contentType.editor?.path ??
+    pluralize(contentType.label)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  );
+}
+
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Which content types serve a public path, and the slug in it. */
+export interface RouteMatch<Type extends AnyContentType> {
+  /** Every type with the matching route (types sharing a route share a `slugScope`). */
+  types: Type[];
+  slug: string;
+}
+
+/**
+ * The content types whose `route` matches `path`, and the slug it names. A
+ * route is static segments plus one `[slug]`, e.g. `/[slug]` or
+ * `/guides/[slug]`. The site's home, `/`, is the page with slug `home` of the
+ * types routed at `/[slug]`. When two routes fit (`/guides/[slug]` and
+ * `/[slug]/print` both fit /guides/print), the first type's wins. `null` when
+ * nothing matches or the slug isn't one Cera could have saved.
+ */
+export function matchRoute<const Types extends readonly AnyContentType[]>(contentTypes: Types, path: string | readonly string[]): RouteMatch<Types[number]> | null {
+  const segments = (typeof path === 'string' ? path.split('/') : [...path]).filter(Boolean);
+  if (segments.length === 0) {
+    const types = contentTypes.filter((contentType) => contentType.route === '/[slug]');
+    return types.length > 0 ? { types, slug: 'home' } : null;
+  }
+  for (const route of new Set(contentTypes.map((contentType) => contentType.route).filter((route): route is string => Boolean(route)))) {
+    const pattern = route.split('/').filter(Boolean);
+    if (pattern.length !== segments.length || pattern.filter((part) => part === '[slug]').length !== 1) continue;
+    const slugIndex = pattern.indexOf('[slug]');
+    const slug = segments[slugIndex]!;
+    if (!SLUG.test(slug) || !pattern.every((part, i) => i === slugIndex || part === segments[i])) continue;
+    return { types: contentTypes.filter((contentType) => contentType.route === route), slug };
+  }
+  return null;
 }

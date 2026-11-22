@@ -26,6 +26,8 @@ export const iconType = defineContentType({
     },
   },
   editor: {
+    icon: 'shapes',
+    section: 'Library',
     pageBoxes: ['icon'],
     noun: 'icon',
     titleLabel: 'Label',

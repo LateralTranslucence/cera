@@ -4,7 +4,7 @@ import { Icon } from '@lateraltranslucence/cera/admin';
 import { adminPage } from '@/cera';
 import { readableAdminPages } from '@/lib/admin-pages.ts';
 import { requireStaff } from '@/lib/auth.ts';
-import { Shell } from '../../Shell.tsx';
+import { admin } from '../../admin.ts';
 
 export const metadata = { title: 'Team' };
 
@@ -16,7 +16,7 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
   if (!page) notFound();
 
   return (
-    <Shell staff={staff} active="team" currentTeamSlug={slug}>
+    <admin.Shell staff={staff} active={`team:${slug}`}>
       <div className="cera-screen">
         <div className="cera-screen__head">
           <div>
@@ -32,6 +32,6 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
         </div>
         <article className="cera-card cera-prose" dangerouslySetInnerHTML={{ __html: page.boxes.content.body ?? '' }} />
       </div>
-    </Shell>
+    </admin.Shell>
   );
 }

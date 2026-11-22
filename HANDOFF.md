@@ -49,7 +49,9 @@ src/
   define-panel.ts   definePanel (sites) and defineCorePanel (core panels, the reserved cera/ namespace)
   media-url.ts      mediaUrl(): public URL of a cera-media object (exported from `/supabase`)
   defaults.ts       panelDefaults (Title, Background, Copy, ID) + omit()
-  content-type.ts   defineContentType, PageDocument, PageOf, runtime pageSchema
+  content-type.ts   defineContentType, PageDocument, PageOf, runtime pageSchema, pageUrl, matchRoute (which types serve an
+                    address), adminPathOf / adminTitleOf / adminNounOf (where and how the admin shows a type), pluralize
+  text.ts           plainText (rich text to plain text, for descriptions and JSON-LD)
   migrate.ts        upgradePanel / upgradePagePanels (version → version migrations)
   document.ts       readPage (forgiving, for rendering) and preparePageForSave (keeps unknown data; draft vs publish; sanitizes rich text)
   roles.ts          CERA_ROLES, their labels, roleAtLeast, canEditContentType, CeraUser
@@ -74,7 +76,8 @@ src/
                     createLoadContexts (what panels' load reads through: cached live, working copies in preview)
   next/             the `/next` entry: async <Panels> Server Component (each panel in a PanelBoundary), pageMetadata, jsonLdString,
                     createStaffAuth (auth.ts: userClient, requireStaff), createAdminActions (admin-actions.ts: the admin's
-                    Server Actions), previewedVersion, and route handlers: createFormHandler, createSearchHandler,
+                    Server Actions), createAdminScreens (admin-screens.tsx: the sidebar and every type's list, new and edit
+                    screens, from the content types), defineViews (views.ts: each routed type's view), previewedVersion, and route handlers: createFormHandler, createSearchHandler,
                     createPreviewHandler, createExitPreviewHandler, createSubmissionsExportHandler, createCleanupHandler
                     (the forms endpoint: token, honeypot, checks, rate limit), createSearchHandler (the Search panel's
                     endpoint: reads the live panel's settings, then searches within them); React lives only here
@@ -88,7 +91,7 @@ src/
   admin/            the `/admin` entry ('use client'): PageEditor, FieldMapForm (one control per field kind), state helpers,
                     MediaInput, GalleryInput and mediaUploader (media.tsx: upload, drop, library, typed path or URL);
                     PageEditor (top bar, card stack, dnd-kit reordering, schedule/unpublish/add-panel dialogs), PageList
-                    (the Pages table: search, status filter, sort, paging), AdminSidebar, icons.tsx (Icon, CeraSeal, CeraLockup),
+                    (the Pages table: search, status filter, sort, paging), ContentList (a type's list for createAdminScreens), AdminSidebar, icons.tsx (Icon, CeraSeal, CeraLockup),
                     Dialog, MediaManager (the Media page: browse, upload, alt text, usage, delete), UsersManager (People),
                     SubmissionList (the Submissions page), IconPicker and SvgInput (icon-inputs.tsx: field.icon() and field.svg()),
                     RichTextInput (field.html: Tiptap editor, HTML view) with rich-text/extensions.ts (schema per toolbar)
@@ -118,7 +121,9 @@ packages/
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
     cera/           the landing_page and simple_page content types (both at /[slug], one slug scope), admin_page (team
-                    pages, read under Team in the admin, never published), plus the package's form (admins only) and icon types; it imports the package like a real site, and the library tests use it too
+                    pages, read under Team in the admin, never published), plus the package's form (admins only) and icon types; it imports the package like a real site, and the library tests use it too.
+                    views.ts names each routed type's view; app/(site)/[[...path]] serves them, app/admin/[type] lists and edits
+                    every type (admin.ts: createAdminScreens, plus the site's own screens in the sidebar)
   sample-page.json  a stored page row
 test/
   types.test.ts     compile-time assertions on inferred types (Equal/Expect)
@@ -265,6 +270,13 @@ test/
     - **After the response:** the handler stores the submission, answers the visitor, then builds and sends the emails with Next's `after()`. A failure is logged and never loses the submission. A failed confirmation check only skips the confirmation.
     - **Confirmations are rationed,** as in the theme, so a form can't be used to email strangers: `cera_claim_confirmation` allows one per address per day and 50 an hour across the site, and records each one sent (`confirmation_sent_at`).
     - **The example site** sends by SMTP with nodemailer (`lib/email.ts`, `SMTP_URL`, `CERA_EMAIL_FROM`). Locally, `npm run env` points `SMTP_URL` at the Supabase stack's test inbox (Mailpit, SMTP on 56325, web inbox at http://127.0.0.1:56324), so nothing leaves the machine. Checked end to end: the alert and the confirmation arrived there, with the visitor's input escaped. The hosted site has no `SMTP_URL`, so it logs and skips.
+41. **A new content type is its definition, a view and one line** (decided 2026-11-22, after comparing how Developers Only adds a post type: a class and a template, both found automatically, with the admin from WordPress).
+    - **The problem:** writing a Cera definition was as easy as the PHP class, but the example site then needed a new type wired into 8 to 10 places: an admin places table, three admin route folders, the sidebar, and a ternary in the public route (or a new route and loader, since only /[slug] was served).
+    - **The admin comes from the definitions.** `createAdminScreens({ contentTypes, requireStaff, Editor, signOut, items })` builds the sidebar (grouped by `editor.section`, in `contentTypes` order, each with its pages and "+ New") and every type's list, new and edit screens, at `/admin/<editor.path>`. A type's `editor` gains `path`, `title`, `icon`, `section` and `listRole`; each has a default from `label` ("Simple Page" → Simple Pages at /admin/simple-pages), and `noun` now defaults to the label too. Forms and icons, the package's own types, keep their list columns (submissions, pictures). Two types at one path are refused at startup.
+    - **What the site keeps, and why:** its Server Actions (only a 'use server' file of its own can export them), `EditorClient` (a client component must import the content types itself: they hold functions), its own screens (Submissions, Media, People, Team, Account), which use `admin.Shell` and join the sidebar through `items` with `before`/`after`, and three one-line routes, `app/admin/[type]`, `[type]/new` and `[type]/[id]`. None of it changes when a type is added.
+    - **Public pages by `route`:** `matchRoute(types, path)` finds the types routed at an address and its slug (`/` is `home` for types at /[slug]). The example's `app/(site)/[[...path]]` loads the page and renders its type's view from `defineViews(contentTypes, { … })`, each typed by its own pages. A routed type with no view fails with a message naming what to add.
+    - **Addresses:** the admin's lists are unchanged (/admin/pages, /admin/simple-pages, /admin/forms, /admin/icons, /admin/admin-pages), except that /admin now redirects to the first type's list. Preview sends the page's own address (`?path=`, from `pageUrl`), so types routed elsewhere than /[slug] preview correctly; `?slug=` still works for outside tools.
+    - **Smaller:** `plainText` (rich text to plain text) replaces the example's own helpers; `jsonLdString` adds schema.org's `@context` unless given; labels that only repeated their key were dropped from the example (they default from the key).
 
 ## Pattern: keep fields in their own file
 
@@ -359,6 +371,7 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
 6. ✅ **Next.js integration** (decisions 38 and 39). The admin's Server Actions and sign-in are in the package; a site wraps them in one-line functions.
 7. ✅ **Packaging** (decision 39). The package builds to `dist/`; `create-cera` makes new sites. Not published: both packages are `private` until the first release.
 8. ✅ **Form email** (decision 40).
+9. ✅ **A content type is its definition and a view** (decision 41).
 
 ## Open questions for the project owner
 
