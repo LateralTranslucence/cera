@@ -63,7 +63,8 @@ src/
                     bundled set, from lucide-static's JSON, server only), fontAwesomeIcons (adapter for any Font Awesome
                     *-svg-icons pack, Free or a site's Pro), iconType (the cera_icon content type)
   forms/            the `/forms` entry: formType (the cera_form content type), its 13 field types as panels (cera/field-*),
-                    publicForm (what visitors see), checkSubmission (server-side checks), submissionsCsv; server.ts holds
+                    publicForm (what visitors see), checkSubmission (server-side checks), submissionsCsv, buildFormEmails
+                    (email.ts: the alert and confirmation from the private Email box); server.ts holds
                     the anti-spam token and sender key (node:crypto, server only)
   panels/           the `/panels` entry (definitions in <name>.panel.ts, fields in .fields.ts, loads in .load.ts, components in
                     PascalCase .tsx): the core panels (cera/blocks, cta, decision-tree, featured-media, featured-post,
@@ -108,6 +109,7 @@ supabase/
   migrations/…_cera_prune_revisions.sql   cera_prune_revisions (old drafts; daily pg_cron job)
   migrations/…_cera_media_maintenance.sql cera_media_in_use, cera_media_orphans, cera_unused_media, cera_replace_media (with cera_swap_media)
   migrations/…_cera_private_boxes.sql     private_boxes on pages and revisions (split from "$private" by triggers), anon column grants
+  migrations/…_cera_form_confirmations.sql confirmation_sent_at on submissions, cera_claim_confirmation (one a day per address, 50 an hour)
 scripts/
   build.mjs         the package build (and --watch); dev.mjs: build --watch plus the example's dev server
 packages/
@@ -252,6 +254,17 @@ test/
     - **Panel data:** `createLoadContexts` (in `/next/cache`) caches every live `load` read. Unpublish lists the live pages that feature the page, as Delete already did.
     - **Private boxes** (theme: private_fields): a content type's `privateBoxes` are saved in the reserved `boxes.$private`, which triggers move into `private_boxes` on the working copy, and each revision copies it. Visitors' role can read every column but that one (column grants: a column added later must be granted to anon on purpose). The editor and restore merge them back; the server reads them with `getPrivateBoxes(service, id, { from })`. Pages read for the live site get the boxes' defaults.
     - **Packaging:** `npm run build` emits `dist/` with tsc 7 (`rewriteRelativeImportExtensions`; the build also rewrites `.ts` imports in the `.d.ts` files to `.js`, so any consumer resolves them). Exports have `source` (src, this repo only), `types` and `default`. Panel definitions became `<name>.panel.ts`: `accordion.ts` and `Accordion.tsx` would both build to `accordion.js` on a case-insensitive disk. The example builds the package before dev, build and typecheck; `npm run dev` at the root watches. The tarball holds `dist`, the migrations and the README. `create-cera` copies a template synced from the example (minus the Developers Only import and the workspace build steps), with Supabase's config and every migration; CI scaffolds one and typechecks it. A trial site built with `next build --webpack` (Turbopack refuses a node_modules symlinked from outside the project, which a real install doesn't have).
+40. **Form email: Cera builds the emails, the site sends them** (decided 2026-11-22, after comparing Payload, Strapi, Directus and Keystone).
+    - **Settings, as in Developers Only,** in the form's private **Email** box (`privateBoxes: ['email']`, so visitors never see recipients):
+      - Email submissions to: the default addresses.
+      - Route by field + Routes: a field's answer picks addresses; no match, the default.
+      - Email subject.
+      - Confirmation email: sent to the visitor's address.
+    - **Building:** `buildFormEmails` makes the alert (to the routed addresses, Reply-To the visitor, every answer listed, HTML escaped) and the confirmation (the form's own text, never anything the visitor sent). The theme's subjects are the defaults.
+    - **Sending is the site's:** `createFormHandler({ sendEmails })` gets the built emails and sends them however it likes, changing or dropping them first if it wants. Cera ships no provider. Without the hook, emails are logged and skipped.
+    - **After the response:** the handler stores the submission, answers the visitor, then builds and sends the emails with Next's `after()`. A failure is logged and never loses the submission. A failed confirmation check only skips the confirmation.
+    - **Confirmations are rationed,** as in the theme, so a form can't be used to email strangers: `cera_claim_confirmation` allows one per address per day and 50 an hour across the site, and records each one sent (`confirmation_sent_at`).
+    - **The example site** sends by SMTP with nodemailer (`lib/email.ts`, `SMTP_URL`, `CERA_EMAIL_FROM`). Locally, `npm run env` points `SMTP_URL` at the Supabase stack's test inbox (Mailpit, SMTP on 56325, web inbox at http://127.0.0.1:56324), so nothing leaves the machine. Checked end to end: the alert and the confirmation arrived there, with the visitor's input escaped. The hosted site has no `SMTP_URL`, so it logs and skips.
 
 ## Pattern: keep fields in their own file
 
@@ -345,7 +358,7 @@ E. ✅ **Media uploads** (decision 23). Checked in the admin against the local s
 5. **Admin form generator.** ✅ Basic version in `src/admin/fields.tsx`: one control per kind, labels, notes, live `maxLength` counters, issues next to fields, collapsible repeater items titled by `itemTitle`, panel picker and reordering. Unknown kinds show read-only and keep their value. Sites register controls for their `custom()` kinds with PageEditor's `controls` (decision 39).
 6. ✅ **Next.js integration** (decisions 38 and 39). The admin's Server Actions and sign-in are in the package; a site wraps them in one-line functions.
 7. ✅ **Packaging** (decision 39). The package builds to `dist/`; `create-cera` makes new sites. Not published: both packages are `private` until the first release.
-8. **Form email** (with private boxes, decision 39): the alert to staff and the confirmation to the sender, from the form's private Submissions box. How to send needs discussing first.
+8. ✅ **Form email** (decision 40).
 
 ## Open questions for the project owner
 

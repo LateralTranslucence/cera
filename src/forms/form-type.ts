@@ -27,7 +27,26 @@ export const formType = defineContentType({
       thankYouText: field.html({ label: 'Thank-you message', toolbar: 'limited', note: 'Shown in place of the form once it’s sent. Default: “Thank you for reaching out, we’ll be in touch soon.”' }),
       thankYouRedirect: field.url({ label: 'Thank-you page', note: 'Go to this page instead, e.g. /thank-you. Only addresses on this site.' }),
     },
+    // Theme: the Submissions box. Private: recipients and routing never reach visitors.
+    email: {
+      to: field.textarea({ label: 'Email submissions to', note: 'Comma-separated email addresses. Also used when no route below matches.' }),
+      routeBy: field.text({ label: 'Route by field', note: 'A field’s ID (its name in submissions), e.g. “department”. Its answer picks the addresses in Routes.' }),
+      routes: field.repeater({
+        label: 'Routes',
+        itemTitle: 'value',
+        fields: {
+          value: field.text({ label: 'Answer', note: 'Exactly as the field’s option, e.g. “Sales”.' }),
+          to: field.textarea({ label: 'Email addresses', note: 'Comma-separated.' }),
+        },
+      }),
+      subject: field.text({ label: 'Email subject', note: 'Default: “Submission from <form name> form”.' }),
+      confirmation: field.textarea({
+        label: 'Confirmation email',
+        note: 'Sent to the address the visitor entered (the first email field), at most once a day per address. Empty: no confirmation.',
+      }),
+    },
   },
+  privateBoxes: ['email'],
   panels: formFields,
   editor: {
     noun: 'form',

@@ -47,3 +47,4 @@ export {
   type SubmissionValue,
 } from './model.ts';
 export { submissionsCsv } from './csv.ts';
+export { alertRecipients, buildFormEmails, parseAddresses, type FormEmail, type FormEmailSettings } from './email.ts';
