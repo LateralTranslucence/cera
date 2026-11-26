@@ -124,7 +124,7 @@ scripts/
   new-site.mjs      `npm run new-site -- ../my-site`: sync the template, build, run create-cera with this checkout packed in
   update-site.mjs   `npm run update-site -- ../my-site`: repack Cera into the site's vendor/, reinstall, copy new migrations
 packages/
-  create-cera/      `npm create cera my-site`: index.mjs copies template/ and gets the site running (lib.mjs: ports, names) (synced from the example by scripts/sync-template.mjs
+  create-cera/      `npm init @lateraltranslucence/cera my-site`: index.mjs copies template/ and gets the site running (lib.mjs: ports, names) (synced from the example by scripts/sync-template.mjs
                     before packing; not committed) and names the site, its Supabase project and its Cera version
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
@@ -314,6 +314,10 @@ test/
     - **Ports:** each site gets the first free block of ten from 570xx (Supabase's 543xx and Cera's 563xx are never used), and the first free dev port from 3101. They're written into its `supabase/config.toml`, `package.json`, `.env.example`, `lib/email.ts` and README, so several sites run at once.
     - **A local Cera is packed into the site** as `vendor/cera.tgz` (`file:vendor/cera.tgz`). It replaces the old `file:<checkout>` link, which never ran: Next's dev server doesn't resolve packages outside the site, a linked Cera would load its own React, and the link couldn't deploy. The site has its own copy (about 380 KB, committed), so it deploys as is. `npm run update-site -- ../my-site` repacks it and copies in new migrations.
     - Checked end to end: a site made with `npm run new-site` ran on its own ports, served its pages and menus, and its admin signed in; `update-site` left it unchanged when nothing had changed.
+46. **Releases go to GitHub Packages, privately, from a version tag** (decided 2026-11-26, step 2 of simplifying new sites). The repository is private and unlicensed (`"license": "UNLICENSED"`), so both packages are published to the organization's GitHub Packages: `@lateraltranslucence/cera` and `@lateraltranslucence/create-cera` (renamed from `create-cera`; GitHub Packages only takes the owner's scope).
+    - **Releasing:** push a tag like `v0.1.0` on a commit on `main`. `.github/workflows/release.yml` checks the tag, runs the tests, sets both packages to the tag's version (the repository's `package.json` files stay at 0.0.0), builds them and the template (which pins new sites to that version), and publishes with the workflow's own token. Pre-releases (`-beta.1`) go out under `next`.
+    - **Using it:** `npm init @lateraltranslucence/cera my-site`. Every computer, and Vercel, needs a GitHub token that can read packages: in `~/.npmrc` locally, in `NPM_RC` on Vercel. New sites get an `.npmrc` that says where `@lateraltranslucence` packages come from (no token in it). Sites made from a checkout (`npm run new-site`) still carry `vendor/cera.tgz` and need no token.
+    - Checked with a rehearsal: both packages dry-run publish to npm.pkg.github.com at 0.1.0, and a site made from the packed create-cera depends on `^0.1.0` with the `.npmrc`. That rehearsal caught npm dropping create-cera's `bin` (`./index.mjs`); it's `index.mjs` now. Not yet done: a real release.
 
 ## Pattern: keep fields in their own file
 

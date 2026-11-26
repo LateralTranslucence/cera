@@ -1,0 +1,83 @@
+name: Release
+
+# Publishes both packages to GitHub Packages (private to the organization)
+# when a version tag is pushed:
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# The tag is the version: package.json files in the repository stay at
+# 0.0.0, and the release sets both to the tag's version before publishing.
+# Only a tag on a commit that's on main is published.
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Check and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: '@lateraltranslucence'
+
+      - name: Read the version from the tag
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME isn't a version like v0.1.0 or v0.2.0-beta.1."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME isn't on main. Tag a commit that's been merged."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # A pre-release (1.0.0-beta.1) is published under the "next" tag, so it's never what `@latest` installs.
+          if [[ "$version" == *-* ]]; then echo "dist_tag=next" >> "$GITHUB_OUTPUT"; else echo "dist_tag=latest" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck and test
+        run: npm run check
+
+      - name: Set the version
+        run: |
+          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --workspaces=false
+          npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --prefix packages/create-cera
+
+      # Builds the package, and the template (from the example site), which
+      # pins the new sites' Cera to this version.
+      - name: Build
+        run: |
+          npm run build
+          node packages/create-cera/scripts/sync-template.mjs
+
+      - name: Publish @lateraltranslucence/cera
+        run: npm publish --tag "${{ steps.version.outputs.dist_tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish @lateraltranslucence/create-cera
+        working-directory: packages/create-cera
+        run: npm publish --tag "${{ steps.version.outputs.dist_tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

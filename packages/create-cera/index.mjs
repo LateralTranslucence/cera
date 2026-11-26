@@ -2,8 +2,8 @@
 /**
  * Starts a Next.js site with Cera, and gets it running:
  *
- *   npm create cera my-site
- *   npx create-cera my-site --cera ^0.1.0
+ *   npm init @lateraltranslucence/cera my-site
+ *   (from a Cera checkout: npm run new-site -- ../my-site)
  *
  * Copies the template (the Cera example site, its Supabase settings and
  * migrations) into a new folder, names it, gives it its own ports, installs
@@ -46,7 +46,7 @@ const start = install && !flag('no-start');
 const git = !flag('no-git');
 
 if (parameters.includes('--help') || parameters.includes('-h')) {
-  console.log(`Usage: npm create cera <folder> [-- --cera <version, path or tarball>] [--no-install] [--no-start] [--no-git]
+  console.log(`Usage: npm init @lateraltranslucence/cera <folder> [-- --cera <version, path or tarball>] [--no-install] [--no-start] [--no-git]
 
 Makes the site, installs it, starts its local Supabase stack (needs Docker and
 the Supabase CLI), writes .env.local, seeds an admin account and example pages,
@@ -60,7 +60,7 @@ and makes the first git commit.
 
 const folder = parameters[0];
 if (!folder) {
-  console.error('Name the folder for the new site: npm create cera my-site');
+  console.error('Name the folder for the new site: npm init @lateraltranslucence/cera my-site');
   process.exit(1);
 }
 if (!existsSync(template)) {
@@ -86,6 +86,7 @@ if (block === null || devPort === null) {
 
 cpSync(template, target, { recursive: true });
 renameSync(join(target, 'gitignore'), join(target, '.gitignore'));
+if (existsSync(join(target, 'npmrc'))) renameSync(join(target, 'npmrc'), join(target, '.npmrc'));
 
 /**
  * A local Cera (a folder, or a tarball) as vendor/cera.tgz in the site.
@@ -155,7 +156,9 @@ if (git && has('git')) run('git', ['init', '-q'], { quiet: true });
 if (!install) {
   remaining.push('npm install', 'supabase start', 'npm run env', 'npm run seed');
 } else if (!run('npm', ['install'])) {
-  problem = 'npm install failed (see above).';
+  problem = ceraDependency?.startsWith('file:')
+    ? 'npm install failed (see above).'
+    : 'npm install failed (see above). If it couldn’t fetch @lateraltranslucence/cera (401, 403 or 404), this computer needs a GitHub token that can read packages: see “Cera’s package” in the README.';
   remaining.push('npm install', 'supabase start', 'npm run env', 'npm run seed');
 } else if (!start) {
   remaining.push('supabase start', 'npm run env', 'npm run seed');

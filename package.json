@@ -1,9 +1,16 @@
 {
   "name": "@lateraltranslucence/cera",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
   "description": "Cera: a panel-based CMS for Next.js and Supabase, successor to the Developers Only WordPress theme",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LateralTranslucence/cera.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "files": [
     "dist",
     "supabase/migrations",
