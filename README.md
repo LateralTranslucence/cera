@@ -53,6 +53,30 @@ Later, to bring the site up to this checkout's Cera (the package, and any new mi
 npm run update-site -- ../my-site
 ```
 
-Neither package is published yet; once they are, that becomes `npm create cera my-site`, and updating is `npm install @lateraltranslucence/cera@latest`.
+Once a version is released (below), anyone in the organization can make a site without this checkout:
+
+```bash
+npm init @lateraltranslucence/cera my-site
+```
+
+That needs, once per computer, a GitHub token that can read packages: create a classic personal access token with `read:packages` at https://github.com/settings/tokens, and put these two lines in your `~/.npmrc`:
+
+```
+@lateraltranslucence:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=<your token>
+```
+
+A site made that way depends on the released `@lateraltranslucence/cera`; update it with `npm install @lateraltranslucence/cera@latest` and copy in any new migrations.
+
+## Releasing
+
+Both packages, `@lateraltranslucence/cera` and `@lateraltranslucence/create-cera`, are published privately to GitHub Packages by `.github/workflows/release.yml` when a version tag is pushed. Tag a commit on `main`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The workflow checks the tag is a version and on `main`, runs the tests, sets both packages to that version, builds them and publishes them. The `package.json` versions in the repository stay at 0.0.0: the tag is the version. A pre-release (`v0.2.0-beta.1`) is published under `next`, so `@latest` never installs it.
 
 **Start with [HANDOFF.md](./HANDOFF.md).**

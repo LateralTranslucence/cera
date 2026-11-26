@@ -61,6 +61,11 @@ writeFileSync(
   `import type { NextConfig } from 'next';\n\nconst config: NextConfig = {};\n\nexport default config;\n`,
 );
 
+// Where @lateraltranslucence packages come from: Cera is published privately
+// to GitHub Packages. npm leaves .npmrc out of packages, so it travels as
+// "npmrc"; create-cera renames it. Sign-in stays in the user's own ~/.npmrc.
+writeFileSync(join(template, 'npmrc'), '@lateraltranslucence:registry=https://npm.pkg.github.com\n');
+
 // npm leaves .gitignore files out of packages, so it travels as "gitignore".
 writeFileSync(join(template, 'gitignore'), ['node_modules', '.next', 'next-env.d.ts', '.env*', '!.env.example', 'supabase/.branches', 'supabase/.temp', '*.tsbuildinfo', '.vercel', ''].join('\n'));
 
@@ -72,7 +77,7 @@ A Next.js site built on [Cera](https://github.com/LateralTranslucence/cera): pag
 
 ## Run it locally
 
-Needs Node 22, Docker and the Supabase CLI. \`npm create cera\` already ran the first four steps; run them again on another computer, or after \`supabase stop --no-backup\`.
+Needs Node 22, Docker and the Supabase CLI. Making the site (\`npm init @lateraltranslucence/cera\` or \`npm run new-site\`) already ran the first four steps; run them again on another computer, or after \`supabase stop --no-backup\`.
 
 \`\`\`bash
 npm install
@@ -91,9 +96,24 @@ Sign in to the admin with \`CERA_ADMIN_EMAIL\` / \`CERA_ADMIN_PASSWORD\` from \`
 - \`lib/\`: sign-in, Supabase clients, page loading and icon sets.
 - \`supabase/migrations\`: Cera's database. Newer Cera versions ship new migrations; copy them in and run \`supabase migration up\`.
 
+## Cera's package
+
+Cera is published privately to GitHub Packages (\`.npmrc\` says where \`@lateraltranslucence\` packages come from). Installing it needs a GitHub token that can read packages, once per computer: create a classic personal access token with \`read:packages\` at https://github.com/settings/tokens and add it to your own \`~/.npmrc\` (not this site's):
+
+\`\`\`
+//npm.pkg.github.com/:_authToken=<your token>
+\`\`\`
+
+A site made from a Cera checkout (\`npm run new-site\`) has Cera in \`vendor/cera.tgz\` instead, and needs no token. Update Cera with \`npm install @lateraltranslucence/cera@latest\`, and copy in any new files from its \`supabase/migrations\`.
+
 ## Deploy
 
-Set \`NEXT_PUBLIC_SUPABASE_URL\`, \`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY\`, \`SUPABASE_SECRET_KEY\`, \`CERA_PREVIEW_SECRET\` and \`CRON_SECRET\` for the hosted project, push the migrations with \`supabase db push\`, and deploy. \`vercel.json\` runs the daily cleanup on Vercel.
+Set \`NEXT_PUBLIC_SUPABASE_URL\`, \`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY\`, \`SUPABASE_SECRET_KEY\`, \`CERA_PREVIEW_SECRET\` and \`CRON_SECRET\` for the hosted project, push the migrations with \`supabase db push\`, and deploy. \`vercel.json\` runs the daily cleanup on Vercel. On Vercel, also set \`NPM_RC\` (so its install can fetch Cera) to these two lines, with a token that can read packages:
+
+\`\`\`
+@lateraltranslucence:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=<token>
+\`\`\`
 `,
 );
 
