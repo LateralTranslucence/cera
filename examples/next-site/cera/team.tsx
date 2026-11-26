@@ -1,22 +1,20 @@
+import 'server-only';
+import type { ComponentType } from 'react';
 import { notFound } from 'next/navigation';
 import { canEditContentType } from '@lateraltranslucence/cera';
 import { Icon } from '@lateraltranslucence/cera/admin';
-import { adminPage } from '@/cera';
-import { readableAdminPages } from '@/lib/admin-pages.ts';
-import { requireStaff } from '@/lib/auth.ts';
-import { admin } from '../../admin.ts';
+import type { ShellProps, Staff } from '@lateraltranslucence/cera/next';
+import { readableAdminPages } from '../lib/admin-pages.ts';
+import { adminPage } from './index.ts';
 
-export const metadata = { title: 'Team' };
-
-/** An admin page, for the team to read (theme: DO_Admin_Page_Screen). Its content was sanitized on save. */
-export default async function TeamPage({ params }: { params: Promise<{ slug: string }> }) {
-  const staff = await requireStaff();
-  const { slug } = await params;
-  const page = (await readableAdminPages(staff)).find((candidate) => candidate.slug === slug);
+/** An admin page, for the team to read, at /admin/team/<slug> (theme: DO_Admin_Page_Screen). Its content was sanitized on save. */
+export async function TeamScreen({ staff, path, Shell }: { staff: Staff; path: string[]; Shell: ComponentType<ShellProps> }) {
+  const [slug, ...rest] = path;
+  const page = slug && !rest.length ? (await readableAdminPages(staff)).find((candidate) => candidate.slug === slug) : undefined;
   if (!page) notFound();
 
   return (
-    <admin.Shell staff={staff} active={`team:${slug}`}>
+    <Shell staff={staff} active={`team:${slug}`}>
       <div className="cera-screen">
         <div className="cera-screen__head">
           <div>
@@ -32,6 +30,6 @@ export default async function TeamPage({ params }: { params: Promise<{ slug: str
         </div>
         <article className="cera-card cera-prose" dangerouslySetInnerHTML={{ __html: page.boxes.content.body ?? '' }} />
       </div>
-    </admin.Shell>
+    </Shell>
   );
 }

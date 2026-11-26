@@ -78,7 +78,7 @@ src/
                     createLoadContexts (what panels' load reads through: cached live, working copies in preview)
   next/             the `/next` entry: async <Panels> Server Component (each panel in a PanelBoundary), pageMetadata, jsonLdString,
                     createStaffAuth (auth.ts: userClient, requireStaff), createAdminActions (admin-actions.ts: the admin's
-                    Server Actions), createAdminScreens (admin-screens.tsx: the sidebar and every type's list, new and edit
+                    Server Actions), createCera (cera.tsx: every admin screen and route handler, decision 50), createAdminScreens (admin-screens.tsx: the sidebar and every type's list, new and edit
                     screens, from the content types), defineViews (views.ts: each routed type's view), previewedVersion, and route handlers: createFormHandler, createSearchHandler,
                     createPreviewHandler, createExitPreviewHandler, createSubmissionsExportHandler, createCleanupHandler
                     (the forms endpoint: token, honeypot, checks, rate limit), createSearchHandler (the Search panel's
@@ -131,8 +131,8 @@ examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
     cera/           the landing_page and simple_page content types (both at /[slug], one slug scope), admin_page (team
                     pages, read under Team in the admin, never published), plus the package's form (admins only) and icon types; it imports the package like a real site, and the library tests use it too.
-                    views.ts names each routed type's view; app/(site)/[[...path]] serves them, app/admin/[type] lists and edits
-                    every type (admin.ts: createAdminScreens, plus the site's own screens in the sidebar)
+                    views.ts names each routed type's view; app/(site)/[[...path]] serves them. admin.tsx (createCera) is the
+                    admin and Cera's handlers, mounted by app/admin/[[...path]] and app/api/cera/[...path] (decision 50)
   sample-page.json  a stored page row
 test/
   types.test.ts     compile-time assertions on inferred types (Equal/Expect)
@@ -333,6 +333,14 @@ test/
     - 0.1.0 and 0.2.0 stay on GitHub Packages; the first npm release is 0.3.0. Sites made from those keep an `.npmrc` pointing at GitHub Packages: delete it to install from npm.
 49. **New sites bring their own Supabase CLI, and Docker gets started for you** (decided 2026-11-26). The template's `package.json` has `supabase` (the CLI's npm package, `^2.122.1`, the major version Cera's settings are tested with) as a dev dependency, so `npx supabase`, `npm run env` and `npm run go-live` use the site's own copy and nobody installs the CLI. Before starting the local database, `create-cera` checks Docker (`dockerPlan` in lib.mjs): running, fine; installed but stopped on a Mac, it opens OrbStack or Docker and waits; missing on a Mac with Homebrew and someone at the keyboard, it explains Docker Desktop's license terms and installs it with `brew install --cask docker` on a yes, then waits through its first-run window; otherwise it opens the download page and waits (up to 30 minutes) for Docker to run. Without anyone to ask, it never installs anything.
     - Checked: a new site started its database with its own CLI (2.122.1 beside the system's 2.122.0), applied the migrations and seeded. The Docker paths other than "running" are covered by tests of `dockerPlan`, not run for real (stopping Docker here would stop other projects' stacks).
+50. **The admin lives in the package; a site keeps three files in `app/`** (decided 2026-11-26: a new site had some 30 admin files in `app/`, copied from the example, that only an update of the template could change).
+    - **`createCera(options)`** (`src/next/cera.tsx`) takes the content types, sign-in (`createStaffAuth`), the clients, the site's client wrapper, icons and email, and returns `Page` and `generateMetadata` (every admin screen, routed by its address), `routes` (`GET` and `POST`: every handler, by its address) and `runAction`.
+    - **In the site:** `app/admin/[[...path]]/page.tsx` (`export default cera.Page`), `app/admin/layout.tsx` (fonts and CSS, the site's to choose) and `app/api/cera/[...path]/route.ts` (`export const { GET, POST } = cera.routes`). Next only finds routes in the site's `app/`, so these can't move into the package.
+    - **In `cera/`:** `admin.tsx` (the `createCera` call), `admin-client.tsx` (`AdminClient` with the content types and colors: they hold functions, so the browser must import them from the site) and `actions.ts`, the one server action (a `'use server'` file must be the site's). `ceraAction(name, ...args)` calls `cera.runAction`, which runs only `createAdminActions`' own names; each action checks the role itself, as before.
+    - **Addresses:** the admin's are unchanged. Handlers move under `/api/cera/`: `draft` (was `/api/draft`), `exit-preview` (was `/api/draft/disable`), `preview` (was `/admin/preview`), `submissions.csv` (was `/admin/submissions/export`), and `sign-out` (a POST, replacing the sign-out server action). `forms`, `search` and `cleanup` stay where they were.
+    - **A site's own screens:** `screens: { team: { title, render } }` puts one at `/admin/team/…`, drawn in the admin's `Shell`; `items` adds sidebar entries. Their keys can't be Cera's own addresses.
+    - **Still there for sites that want them:** `createAdminScreens`, `createAdminActions` and every handler, for a site that builds its admin by hand.
+    - **Updating a site made before 0.4.0:** delete `app/admin` except `layout.tsx`, `app/api/cera/*` and `app/api/draft`; add the three files above and `cera/admin.tsx`, `cera/admin-client.tsx` and `cera/actions.ts` as in the template; move any screens of your own into `screens`; point preview links for outside tools at `/api/cera/draft` and exit-preview links at `/api/cera/exit-preview`.
 
 ## Pattern: keep fields in their own file
 

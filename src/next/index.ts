@@ -11,3 +11,4 @@ export { createAdminActions, type AdminActions, type AdminActionsOptions, type D
 export { createCleanupHandler, type CleanupHandlerOptions } from './cleanup.ts';
 export { createAdminScreens, type AdminEditorProps, type AdminItem, type AdminScreens, type AdminScreensOptions, type ShellProps } from './admin-screens.tsx';
 export { defineViews, type DefinedViews, type ViewProps, type Views } from './views.ts';
+export { createCera, type Cera, type CeraOptions, type CeraScreen } from './cera.tsx';

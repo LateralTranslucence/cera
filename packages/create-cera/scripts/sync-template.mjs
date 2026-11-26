@@ -88,8 +88,8 @@ Sign in to the admin with \`CERA_ADMIN_EMAIL\` / \`CERA_ADMIN_PASSWORD\` from \`
 
 ## Where things are
 
-- \`cera/\`: the content types (landing pages, simple pages, admin pages) and the background palette.
-- \`app/(site)\`: the public site; \`app/admin\`: the admin screens; \`app/api\`: forms, search, preview and cleanup.
+- \`cera/\`: the content types (landing pages, simple pages, admin pages), the background palette, and the admin's settings (\`cera/admin.tsx\`: \`createCera\`, with the site's own screens and sidebar entries).
+- \`app/(site)\`: the public site. \`app/admin\` and \`app/api/cera\` are one file each that hand every admin screen and Cera's handlers (forms, search, preview, cleanup) to the package, so updating Cera updates them.
 - \`lib/\`: sign-in, Supabase clients, page loading and icon sets.
 - \`supabase/migrations\`: Cera's database. Newer Cera versions ship new migrations; copy them in and run \`npx supabase migration up\`.
 

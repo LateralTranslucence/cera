@@ -19,6 +19,9 @@
  * `sendEmails` sends it, however the site likes (SMTP, an email API…).
  * Without `sendEmails` the emails are logged and skipped. A failure is
  * logged; the submission is already stored.
+ *
+ * createCera (cera.tsx) sets this up for a site; use it directly only to
+ * build an admin by hand.
  */
 import { after } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';

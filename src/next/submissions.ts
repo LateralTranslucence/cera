@@ -8,6 +8,9 @@
  *
  * Read with the signed-in user's client, so row-level security decides who
  * gets them: admins and editors.
+ *
+ * createCera (cera.tsx) sets this up for a site; use it directly only to
+ * build an admin by hand.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { formType } from '../forms/form-type.ts';
