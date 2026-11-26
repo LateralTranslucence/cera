@@ -1,13 +1,17 @@
 name: Release
 
-# Publishes both packages to GitHub Packages (private to the organization)
-# when a version tag is pushed:
+# Publishes both packages to npm, publicly, when a version tag is pushed:
 #
-#   git tag v0.1.0 && git push origin v0.1.0
+#   git tag v0.3.0 && git push origin v0.3.0
 #
+# @lateraltranslucence/cera and create-cera (so a site is `npm create cera`).
 # The tag is the version: package.json files in the repository stay at
 # 0.0.0, and the release sets both to the tag's version before publishing.
 # Only a tag on a commit that's on main is published.
+#
+# npm sign-in: the NPM_TOKEN secret (an npm token that can publish) when it's
+# set, or else npm's trusted publishing (configured for both packages on
+# npmjs.com, for this repository and release.yml), which needs no secret.
 on:
   push:
     tags: ['v*']
@@ -18,7 +22,8 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
+  # For trusted publishing: npm checks the workflow's OIDC identity instead of a token.
+  id-token: write
 
 jobs:
   publish:
@@ -34,15 +39,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          registry-url: https://npm.pkg.github.com
-          scope: '@lateraltranslucence'
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 comes with npm 10.
+      - name: Update npm
+        run: npm install -g npm@^11.5.1
 
       - name: Read the version from the tag
         id: version
         run: |
           version="${GITHUB_REF_NAME#v}"
           if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME isn't a version like v0.1.0 or v0.2.0-beta.1."
+            echo "::error::Tag $GITHUB_REF_NAME isn't a version like v0.3.0 or v0.4.0-beta.1."
             exit 1
           fi
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
@@ -72,12 +80,12 @@ jobs:
           node packages/create-cera/scripts/sync-template.mjs
 
       - name: Publish @lateraltranslucence/cera
-        run: npm publish --tag "${{ steps.version.outputs.dist_tag }}"
+        run: npm publish --access public --tag "${{ steps.version.outputs.dist_tag }}"
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @lateraltranslucence/create-cera
+      - name: Publish create-cera
         working-directory: packages/create-cera
-        run: npm publish --tag "${{ steps.version.outputs.dist_tag }}"
+        run: npm publish --access public --tag "${{ steps.version.outputs.dist_tag }}"
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

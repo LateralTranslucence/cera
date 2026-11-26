@@ -53,17 +53,10 @@ Later, to bring the site up to this checkout's Cera (the package, and any new mi
 npm run update-site -- ../my-site
 ```
 
-Once a version is released (below), anyone in the organization can make a site without this checkout:
+Once a version is released (below), anyone can make a site without this checkout, with nothing to set up but Node, Docker and the Supabase CLI:
 
 ```bash
-npm init @lateraltranslucence/cera my-site
-```
-
-That needs, once per computer, a GitHub token that can read packages: create a classic personal access token with `read:packages` at https://github.com/settings/tokens, and put these two lines in your `~/.npmrc`:
-
-```
-@lateraltranslucence:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=<your token>
+npm create cera my-site
 ```
 
 To put a new site online, run `npm run go-live` in it: it creates (or uses) a Supabase project, applies the migrations, makes the first admin account, and sets up and deploys a Vercel project, asking as it goes (`-- --dry-run` shows the steps without doing them).
@@ -72,13 +65,19 @@ A site made that way depends on the released `@lateraltranslucence/cera`; update
 
 ## Releasing
 
-Both packages, `@lateraltranslucence/cera` and `@lateraltranslucence/create-cera`, are published privately to GitHub Packages by `.github/workflows/release.yml` when a version tag is pushed. Tag a commit on `main`:
+Both packages, `@lateraltranslucence/cera` and `create-cera`, are published publicly to npm (MIT) by `.github/workflows/release.yml` when a version tag is pushed. Tag a commit on `main`:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
-The workflow checks the tag is a version and on `main`, runs the tests, sets both packages to that version, builds them and publishes them. The `package.json` versions in the repository stay at 0.0.0: the tag is the version. A pre-release (`v0.2.0-beta.1`) is published under `next`, so `@latest` never installs it.
+The workflow signs in to npm with the `NPM_TOKEN` repository secret when it's set, or else with npm's trusted publishing (no secret): on npmjs.com, each package's settings name this repository and `release.yml` as a trusted publisher. Trusted publishing can only be set up on a package that exists, so the first release uses a token; after it, set up trusted publishing for both packages and delete the secret.
+
+The workflow checks the tag is a version and on `main`, runs the tests, sets both packages to that version, builds them and publishes them. The `package.json` versions in the repository stay at 0.0.0: the tag is the version. A pre-release (`v0.4.0-beta.1`) is published under `next`, so `@latest` never installs it.
 
 **Start with [HANDOFF.md](./HANDOFF.md).**
+
+## License
+
+MIT. See [LICENSE](./LICENSE).

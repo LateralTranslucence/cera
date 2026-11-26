@@ -1,16 +1,16 @@
 {
-  "name": "@lateraltranslucence/create-cera",
+  "name": "create-cera",
   "version": "0.0.0",
   "type": "module",
-  "description": "Starts a Next.js site with Cera and gets it running: npm init @lateraltranslucence/cera my-site",
-  "license": "UNLICENSED",
+  "description": "Starts a Next.js site with Cera and gets it running: npm create cera my-site",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/LateralTranslucence/cera.git",
     "directory": "packages/create-cera"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "bin": {
     "create-cera": "index.mjs"
@@ -19,7 +19,8 @@
     "index.mjs",
     "lib.mjs",
     "lib.d.mts",
-    "template"
+    "template",
+    "LICENSE"
   ],
   "scripts": {
     "sync": "node scripts/sync-template.mjs",
