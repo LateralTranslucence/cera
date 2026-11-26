@@ -11,7 +11,7 @@
  * 4. The first admin account, with a temporary password shown once.
  * 5. A Vercel project with those settings, and a production deploy.
  *
- * Needs the Supabase CLI signed in (`supabase login`), and for step 5 the
+ * Needs the Supabase CLI signed in (`npx supabase login`), and for step 5 the
  * Vercel CLI (`npx vercel login`). Running it again picks up where it
  * stopped: what's in .env.hosted is reused.
  */

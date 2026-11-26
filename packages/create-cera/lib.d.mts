@@ -10,3 +10,7 @@ export declare function siteSupabaseConfig(text: string, site: { name: string; b
 export declare function packageName(folderName: string): string;
 export declare function shellQuote(text: string): string;
 export declare function envValue(text: string, key: string): string | undefined;
+export declare const SUPABASE_CLI_VERSION: string;
+export declare const DOCKER_DOWNLOAD: Record<'darwin' | 'win32' | 'linux', string>;
+export type DockerPlan = { action: 'ready' } | { action: 'start'; app: 'OrbStack' | 'Docker' } | { action: 'manual' } | { action: 'install' } | { action: 'download'; url: string };
+export declare function dockerPlan(state: { platform: string; running: boolean; cliInstalled: boolean; apps?: string[]; hasBrew?: boolean; interactive?: boolean }): DockerPlan;

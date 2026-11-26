@@ -48,7 +48,7 @@ const added = readdirSync(ours).filter((file) => file.endsWith('.sql') && !exist
 for (const file of added) copyFileSync(join(ours, file), join(theirs, file));
 console.log(
   added.length
-    ? `\nNew migrations: ${added.join(', ')}.\nApply them: \`supabase migration up\` in the site (and \`supabase db push --linked\` for its hosted project).`
+    ? `\nNew migrations: ${added.join(', ')}.\nApply them: \`npx supabase migration up\` in the site (and \`npx supabase db push --linked\` for its hosted project).`
     : '\nNo new migrations.',
 );
 console.log('\nUpdated. Look over the changes in the site and commit them.');

@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockPorts, envValue, movePorts, packageName, pickDevPort, pickPortBlock, portIsFree, shellQuote, siteSupabaseConfig } from '../packages/create-cera/lib.mjs';
+import { blockPorts, dockerPlan, envValue, movePorts, packageName, pickDevPort, pickPortBlock, portIsFree, shellQuote, siteSupabaseConfig } from '../packages/create-cera/lib.mjs';
+import { SUPABASE_CLI_VERSION } from '../packages/create-cera/lib.mjs';
 
 test('a port block is ten ports, 5xx20 to 5xx29', () => {
   assert.deepEqual(blockPorts(571), [57120, 57121, 57122, 57123, 57124, 57125, 57126, 57127, 57128, 57129]);
@@ -49,4 +50,23 @@ test('names, shell quoting and env values', () => {
   assert.equal(envValue('A=1\nCERA_ADMIN_EMAIL=admin@cera.test\n', 'CERA_ADMIN_EMAIL'), 'admin@cera.test');
   assert.equal(envValue('B="quoted"', 'B'), 'quoted');
   assert.equal(envValue('', 'C'), undefined);
+});
+
+test('Docker: running, started, installed on a yes, or downloaded', () => {
+  const mac = { platform: 'darwin', running: false, cliInstalled: false };
+  assert.deepEqual(dockerPlan({ ...mac, running: true }), { action: 'ready' });
+  assert.deepEqual(dockerPlan({ ...mac, apps: ['Docker'] }), { action: 'start', app: 'Docker' });
+  // OrbStack, when it's there, is what was chosen over Docker Desktop.
+  assert.deepEqual(dockerPlan({ ...mac, apps: ['Docker', 'OrbStack'] }), { action: 'start', app: 'OrbStack' });
+  assert.deepEqual(dockerPlan({ ...mac, hasBrew: true, interactive: true }), { action: 'install' });
+  // Never installed without someone to say yes, or without Homebrew.
+  assert.equal(dockerPlan({ ...mac, hasBrew: true, interactive: false }).action, 'download');
+  assert.equal(dockerPlan({ ...mac, hasBrew: false, interactive: true }).action, 'download');
+  assert.deepEqual(dockerPlan({ platform: 'linux', running: false, cliInstalled: true }), { action: 'manual' });
+  assert.match((dockerPlan({ platform: 'win32', running: false, cliInstalled: false }) as { url: string }).url, /windows-install/);
+  assert.match((dockerPlan({ platform: 'freebsd', running: false, cliInstalled: false }) as { url: string }).url, /engine\/install/);
+});
+
+test('new sites bring their own Supabase CLI, on the tested major version', () => {
+  assert.match(SUPABASE_CLI_VERSION, /^\^2\./);
 });

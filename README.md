@@ -45,7 +45,7 @@ The admin builds the type's sidebar entry, list, new and edit screens from the d
 npm run new-site -- ../my-site
 ```
 
-That refreshes the template, builds the package, and packs it into the new site as `vendor/cera.tgz`, so the site has its own copy of Cera: it runs and deploys without this checkout. Then it installs the site, starts its own local Supabase stack on free ports (so it runs next to Cera's and other sites'), writes `.env.local`, seeds an admin account, pages and menus, and makes the first git commit. It ends by printing the admin address and the account. It needs Docker running and the Supabase CLI; without them it stops after installing and lists what's left. `--no-start`, `--no-install` and `--no-git` skip parts.
+That refreshes the template, builds the package, and packs it into the new site as `vendor/cera.tgz`, so the site has its own copy of Cera: it runs and deploys without this checkout. Then it installs the site, starts its own local Supabase stack on free ports (so it runs next to Cera's and other sites'), writes `.env.local`, seeds an admin account, pages and menus, and makes the first git commit. It ends by printing the admin address and the account. It starts Docker if needed (see below); if Docker can't run, it stops after installing and lists what's left. `--no-start`, `--no-install` and `--no-git` skip parts.
 
 Later, to bring the site up to this checkout's Cera (the package, and any new migrations):
 
@@ -53,11 +53,13 @@ Later, to bring the site up to this checkout's Cera (the package, and any new mi
 npm run update-site -- ../my-site
 ```
 
-Once a version is released (below), anyone can make a site without this checkout, with nothing to set up but Node, Docker and the Supabase CLI:
+Once a version is released (below), anyone can make a site without this checkout, with only Node installed:
 
 ```bash
 npm create cera my-site
 ```
+
+The Supabase CLI comes with each site (`npx supabase`). The local database runs in Docker: `create-cera` starts Docker when it's stopped; when it's missing, it offers to install Docker Desktop with Homebrew on a Mac (on a yes), or opens the download page and carries on once Docker runs.
 
 To put a new site online, run `npm run go-live` in it: it creates (or uses) a Supabase project, applies the migrations, makes the first admin account, and sets up and deploys a Vercel project, asking as it goes (`-- --dry-run` shows the steps without doing them).
 

@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SUPABASE_CLI_VERSION } from '../lib.mjs';
 
 const here = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repo = join(here, '..', '..');
@@ -49,7 +50,8 @@ writeFileSync(
       type: 'module',
       scripts,
       dependencies: { ...site.dependencies, '@lateraltranslucence/cera': `^${cera.version}` },
-      devDependencies: site.devDependencies,
+      // The Supabase CLI comes with the site, so nobody installs it themselves.
+      devDependencies: { ...site.devDependencies, supabase: SUPABASE_CLI_VERSION },
     },
     null,
     2,
@@ -72,12 +74,12 @@ A Next.js site built on [Cera](https://github.com/LateralTranslucence/cera): pag
 
 ## Run it locally
 
-Needs Node 22, Docker and the Supabase CLI. Making the site (\`npm create cera\` or \`npm run new-site\`) already ran the first four steps; run them again on another computer, or after \`supabase stop --no-backup\`.
+Needs Node 22 and Docker; the Supabase CLI comes with the site (\`npx supabase\`). Making the site (\`npm create cera\` or \`npm run new-site\`) already ran the first four steps; run them again on another computer, or after \`npx supabase stop --no-backup\`.
 
 \`\`\`bash
 npm install
-supabase start      # a local Supabase stack on ports 56320–56329, with Cera's migrations applied
-npm run env         # writes .env.local from \`supabase status\`
+npx supabase start  # a local Supabase stack on ports 56320–56329, with Cera's migrations applied
+npm run env         # writes .env.local from the stack
 npm run seed        # an admin account, a few example pages and the menus
 npm run dev         # http://localhost:3100, admin at /admin
 \`\`\`
@@ -89,17 +91,17 @@ Sign in to the admin with \`CERA_ADMIN_EMAIL\` / \`CERA_ADMIN_PASSWORD\` from \`
 - \`cera/\`: the content types (landing pages, simple pages, admin pages) and the background palette.
 - \`app/(site)\`: the public site; \`app/admin\`: the admin screens; \`app/api\`: forms, search, preview and cleanup.
 - \`lib/\`: sign-in, Supabase clients, page loading and icon sets.
-- \`supabase/migrations\`: Cera's database. Newer Cera versions ship new migrations; copy them in and run \`supabase migration up\`.
+- \`supabase/migrations\`: Cera's database. Newer Cera versions ship new migrations; copy them in and run \`npx supabase migration up\`.
 
 ## Updating Cera
 
-\`npm install @lateraltranslucence/cera@latest\`, then copy in any new files from \`node_modules/@lateraltranslucence/cera/supabase/migrations\` and run \`supabase migration up\` (and \`supabase db push --linked\` for the hosted project). A site made from a Cera checkout (\`npm run new-site\`) has Cera in \`vendor/cera.tgz\` instead; update it from the checkout with \`npm run update-site\`.
+\`npm install @lateraltranslucence/cera@latest\`, then copy in any new files from \`node_modules/@lateraltranslucence/cera/supabase/migrations\` and run \`npx supabase migration up\` (and \`npx supabase db push --linked\` for the hosted project). A site made from a Cera checkout (\`npm run new-site\`) has Cera in \`vendor/cera.tgz\` instead; update it from the checkout with \`npm run update-site\`.
 
 ## Deploy
 
-\`npm run go-live\` puts the site online, asking as it goes: it creates (or uses) a Supabase project, applies Cera's migrations, makes your admin account, and sets up a Vercel project with the site's settings, then deploys. It needs \`supabase login\` and \`npx vercel login\` first, and keeps the hosted settings in \`.env.hosted\` (never committed). \`npm run go-live -- --dry-run\` shows every step without changing anything; running it again picks up where it stopped.
+\`npm run go-live\` puts the site online, asking as it goes: it creates (or uses) a Supabase project, applies Cera's migrations, makes your admin account, and sets up a Vercel project with the site's settings, then deploys. It needs \`npx supabase login\` and \`npx vercel login\` first, and keeps the hosted settings in \`.env.hosted\` (never committed). \`npm run go-live -- --dry-run\` shows every step without changing anything; running it again picks up where it stopped.
 
-To do it by hand instead: set \`NEXT_PUBLIC_SUPABASE_URL\`, \`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY\`, \`SUPABASE_SECRET_KEY\`, \`CERA_PREVIEW_SECRET\` and \`CRON_SECRET\` for the hosted project, push the migrations with \`supabase db push\`, and deploy. \`vercel.json\` runs the daily cleanup on Vercel.
+To do it by hand instead: set \`NEXT_PUBLIC_SUPABASE_URL\`, \`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY\`, \`SUPABASE_SECRET_KEY\`, \`CERA_PREVIEW_SECRET\` and \`CRON_SECRET\` for the hosted project, push the migrations with \`npx supabase db push\`, and deploy. \`vercel.json\` runs the daily cleanup on Vercel.
 `,
 );
 

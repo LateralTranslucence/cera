@@ -132,7 +132,7 @@ export async function goLive(options: GoLiveOptions, io: Io): Promise<boolean> {
   io.say('1. Supabase');
   const projects = await io.run('supabase', ['projects', 'list', '-o', 'json']);
   if (!projects.ok) {
-    io.say('   The Supabase CLI isn’t signed in, or isn’t installed. Run `supabase login`, then run this again.');
+    io.say('   The Supabase CLI isn’t signed in, or isn’t installed. Run `npx supabase login`, then run this again.');
     return false;
   }
   let ref = env.get('NEXT_PUBLIC_SUPABASE_URL')?.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
