@@ -41,11 +41,15 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: '1'
 
-      # A site made by create-cera, against the package just built. It borrows
-      # this checkout's node_modules rather than installing from npm.
+      # A site made by create-cera, with the package just built packed into it
+      # (vendor/cera.tgz) and installed from npm as a new site would be, then
+      # typechecked and built. No Supabase here, so --no-start.
       - name: Try create-cera
         run: |
           node packages/create-cera/scripts/sync-template.mjs
-          node packages/create-cera/index.mjs "$RUNNER_TEMP/new-site" --cera "$PWD"
-          ln -s "$PWD/node_modules" "$RUNNER_TEMP/new-site/node_modules"
-          npx tsc --noEmit -p "$RUNNER_TEMP/new-site"
+          node packages/create-cera/index.mjs "$RUNNER_TEMP/new-site" --cera "$PWD" --no-start --no-git
+          cd "$RUNNER_TEMP/new-site"
+          npx tsc --noEmit
+          npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
