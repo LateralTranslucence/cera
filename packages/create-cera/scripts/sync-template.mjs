@@ -72,13 +72,13 @@ A Next.js site built on [Cera](https://github.com/LateralTranslucence/cera): pag
 
 ## Run it locally
 
-Needs Node 22, Docker and the Supabase CLI.
+Needs Node 22, Docker and the Supabase CLI. \`npm create cera\` already ran the first four steps; run them again on another computer, or after \`supabase stop --no-backup\`.
 
 \`\`\`bash
 npm install
-supabase start      # a local Supabase stack, with Cera's migrations applied
+supabase start      # a local Supabase stack on ports 56320–56329, with Cera's migrations applied
 npm run env         # writes .env.local from \`supabase status\`
-npm run seed        # an admin account and a few example pages
+npm run seed        # an admin account, a few example pages and the menus
 npm run dev         # http://localhost:3100, admin at /admin
 \`\`\`
 

@@ -63,7 +63,9 @@
     "typecheck": "tsc --noEmit",
     "test": "node --conditions=source --import tsx --test test/*.test.ts test/*.test.tsx",
     "check": "npm run typecheck && npm test",
-    "build:watch": "node scripts/build.mjs --watch"
+    "build:watch": "node scripts/build.mjs --watch",
+    "new-site": "node scripts/new-site.mjs",
+    "update-site": "node scripts/update-site.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
