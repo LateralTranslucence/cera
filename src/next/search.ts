@@ -4,6 +4,9 @@
  * panel ids and the visitor's query; the handler reads that panel's settings
  * from the live page (or, in draft-mode preview, the working copy) and
  * searches within them, so a request can narrow a search but never widen it.
+ *
+ * createCera (cera.tsx) sets this up for a site; use it directly only to
+ * build an admin by hand.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AnyContentType } from '../content-type.ts';

@@ -35,7 +35,7 @@ A site's content types live in `cera/content-types/`, one file each. A new one n
 2. **A view,** if it has pages of its own: `components/CaseStudyView.tsx`, given `{ page, loadContext }`.
 3. **One line each** in `cera/index.ts` (`contentTypes`) and `cera/views.ts` (`case_study: CaseStudyView`).
 
-The admin builds the type's sidebar entry, list, new and edit screens from the definition (`createAdminScreens`). The site's catch-all route serves its pages at their `route` (`matchRoute`).
+The admin (`createCera`, in `cera/admin.tsx`) builds the type's sidebar entry, list, new and edit screens from the definition. The site's catch-all route serves its pages at their `route` (`matchRoute`).
 
 ## A new site
 

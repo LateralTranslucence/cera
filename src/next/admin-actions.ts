@@ -12,6 +12,9 @@
  *   const actions = createAdminActions({ contentTypes, staff: requireStaff, userClient, serviceClient, icons, liveChanged: pagesChanged });
  *   export async function savePageAction(input: SaveInput) { return actions.savePage(input); }
  *   …
+ *
+ * createCera (cera.tsx) sets this up for a site; use it directly only to
+ * build an admin by hand.
  */
 import { redirect } from 'next/navigation';
 import { after } from 'next/server';

@@ -22,6 +22,9 @@
  *
  *   // app/api/draft/disable/route.ts
  *   export const { GET } = createExitPreviewHandler();
+ *
+ * createCera (cera.tsx) sets this up for a site; use it directly only to
+ * build an admin by hand.
  */
 import { timingSafeEqual } from 'node:crypto';
 import { cookies, draftMode } from 'next/headers';

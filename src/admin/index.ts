@@ -17,3 +17,4 @@ export { ContentList, type ContentListProps } from './ContentList.tsx';
 export { SubmissionList, type SubmissionListProps } from './SubmissionList.tsx';
 export { ApprovalList, type ApprovalListItem } from './ApprovalList.tsx';
 export { ApprovalSettingsForm, approvalWarnings, type ApprovalSettingsFormProps, type ApprovalType } from './ApprovalSettingsForm.tsx';
+export { AdminClient, type AdminAction, type AdminActionName, type AdminClientProps, type AdminScreenProps, type AdminSiteProps } from './AdminClient.tsx';

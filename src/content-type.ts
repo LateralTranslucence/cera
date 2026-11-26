@@ -121,6 +121,8 @@ export interface ContentTypeConfig<Name extends string, Boxes extends BoxMap, Pa
     pageBoxes?: ReadonlyArray<keyof Boxes & string>;
     /** Shown just above the panels, styled like one (e.g. a hero that renders like a panel). */
     leadBoxes?: ReadonlyArray<keyof Boxes & string>;
+    /** Where to preview a type without a route of its own (a menu shows on every page): e.g. `/`. Types with a route preview at their address. */
+    previewPath?: string;
     /** Lead boxes that start open, e.g. a menu's items. Others start closed, like panels. */
     openBoxes?: ReadonlyArray<keyof Boxes & string>;
     /** What the admin calls one of these, lowercase. Default: `label` in lowercase ("simple page"). */

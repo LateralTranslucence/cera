@@ -23,6 +23,9 @@
  *
  * Forms and icons, the package's own types, get their extra list columns
  * here: a form's submissions (editors and admins) and each icon's picture.
+ *
+ * createCera (cera.tsx) sets this up for a site; use it directly only to
+ * build an admin by hand.
  */
 import type { ComponentType, ReactNode } from 'react';
 import { notFound, redirect } from 'next/navigation';
@@ -84,8 +87,8 @@ export interface AdminScreensOptions {
   requireStaff: (minimum?: CeraRole) => Promise<Staff>;
   /** The site's client wrapper around PageEditor. */
   Editor: ComponentType<AdminEditorProps>;
-  /** A server action that signs out. */
-  signOut?: () => Promise<void>;
+  /** Signs out: a server action, or the address of a route that signs out on POST. */
+  signOut?: (() => Promise<void>) | string;
   /** Sidebar entries for the site's own screens, for this person (leave out what their role can't open). */
   items?: (staff: Staff) => AdminItem[] | Promise<AdminItem[]>;
   /** The order of the sidebar's groups. Groups not named here go before the last one. Default: Content, Library, Site. */

@@ -42,6 +42,8 @@ export function defineMenuType<const Fields extends FieldMap = typeof DEFAULT_ME
       slugNote: 'The site’s code shows a menu by its ID, e.g. “main” in the header or “footer”. Ask your developer before changing it.',
       leadBoxes: ['menu'],
       openBoxes: ['menu'],
+      // A menu shows on every page; preview it on the home page.
+      previewPath: '/',
     },
   });
 }

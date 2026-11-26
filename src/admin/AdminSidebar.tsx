@@ -47,7 +47,8 @@ export interface AdminSidebarProps {
   /** Links in the user menu (e.g. Account). */
   userLinks?: Array<{ label: string; href: string; icon: IconName }>;
   /** A server action that signs out. */
-  signOut?: () => Promise<void>;
+  /** Signs out: a server action, or the address of a route that signs out on POST. */
+  signOut?: (() => Promise<void>) | string;
 }
 
 const STORAGE_KEY = 'cera:nav-open';
@@ -232,7 +233,7 @@ function ExpandableItem({ item }: { item: NavItem }) {
   );
 }
 
-function UserChip({ user, links, signOut }: { user: AdminSidebarProps['user']; links: NonNullable<AdminSidebarProps['userLinks']>; signOut?: () => Promise<void> }) {
+function UserChip({ user, links, signOut }: { user: AdminSidebarProps['user']; links: NonNullable<AdminSidebarProps['userLinks']>; signOut?: AdminSidebarProps['signOut'] }) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -260,7 +261,7 @@ function UserChip({ user, links, signOut }: { user: AdminSidebarProps['user']; l
           </a>
         ))}
         {signOut && (
-          <form action={signOut}>
+          <form action={signOut} {...(typeof signOut === 'string' && { method: 'post' })}>
             <button type="submit">
               <Icon name="signOut" />
               Sign out

@@ -9,6 +9,9 @@
  *
  * Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`. Without a secret
  * set, every request is refused.
+ *
+ * createCera (cera.tsx) sets this up for a site; use it directly only to
+ * build an admin by hand.
  */
 import { timingSafeEqual } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
