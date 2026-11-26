@@ -39,13 +39,20 @@ The admin builds the type's sidebar entry, list, new and edit screens from the d
 
 ## A new site
 
-`packages/create-cera` makes a new Next.js site from the example: its content types, admin, routes, Supabase settings and Cera's migrations.
+`packages/create-cera` makes a new Next.js site from the example (its content types, admin, routes, Supabase settings and Cera's migrations) and gets it running. From this repository:
 
 ```bash
-npm run sync --prefix packages/create-cera
-node packages/create-cera/index.mjs ../my-site --cera "$PWD"
+npm run new-site -- ../my-site
 ```
 
-Neither package is published yet; once they are, that becomes `npm create cera my-site`.
+That refreshes the template, builds the package, and packs it into the new site as `vendor/cera.tgz`, so the site has its own copy of Cera: it runs and deploys without this checkout. Then it installs the site, starts its own local Supabase stack on free ports (so it runs next to Cera's and other sites'), writes `.env.local`, seeds an admin account, pages and menus, and makes the first git commit. It ends by printing the admin address and the account. It needs Docker running and the Supabase CLI; without them it stops after installing and lists what's left. `--no-start`, `--no-install` and `--no-git` skip parts.
+
+Later, to bring the site up to this checkout's Cera (the package, and any new migrations):
+
+```bash
+npm run update-site -- ../my-site
+```
+
+Neither package is published yet; once they are, that becomes `npm create cera my-site`, and updating is `npm install @lateraltranslucence/cera@latest`.
 
 **Start with [HANDOFF.md](./HANDOFF.md).**

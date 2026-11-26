@@ -121,8 +121,10 @@ supabase/
                                           cera_decide_approval, cera_withdraw_approval; publishing checks approval tiers
 scripts/
   build.mjs         the package build (and --watch); dev.mjs: build --watch plus the example's dev server
+  new-site.mjs      `npm run new-site -- ../my-site`: sync the template, build, run create-cera with this checkout packed in
+  update-site.mjs   `npm run update-site -- ../my-site`: repack Cera into the site's vendor/, reinstall, copy new migrations
 packages/
-  create-cera/      `npm create cera my-site`: index.mjs copies template/ (synced from the example by scripts/sync-template.mjs
+  create-cera/      `npm create cera my-site`: index.mjs copies template/ and gets the site running (lib.mjs: ports, names) (synced from the example by scripts/sync-template.mjs
                     before packing; not committed) and names the site, its Supabase project and its Cera version
 examples/
   next-site/        npm workspace: Next.js 16 example site (see its README)
@@ -150,6 +152,7 @@ test/
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   search.test.ts    Search: settings, URL queries, the resolver (words, A–Z, types, select lists, sort, paging, preview), the handler, the panel
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
+  create-cera.test.ts  new sites: free port blocks, files moved to them, names and quoting
   links.test.ts     link schemes: which are safe, refused on publish, dropped when rendered
   menus.test.tsx    menus: safe addresses, saving, links to pages, preview versions, the builder's moves, the live component
   icons.test.ts     SVG cleaning, cleaning on save, Lucide search, Font Awesome packs, the library, custom icons, Blocks' icons
@@ -306,6 +309,11 @@ test/
     - **Preview** of a menu, or of an old version from History, shows it on the home page.
     - **Not done:** dragging between levels (the arrows do that), mega menus, and importing the theme's menus.
 44. **Links editors type are checked for their scheme** (decided 2026-11-26). `field.cta()`, `field.ctas()`, `field.url()` and `field.imageLink()` accept paths, anchors, queries and `http`, `https`, `mailto` and `tel` addresses (`isSafeLink`, `src/links.ts`, shared with menus). `javascript:`, `data:`, `vbscript:` and the rest are refused on publish (an error at the field) and kept in drafts with a warning, read the way a browser reads them (so ` java\tscript:` counts). Rendering drops them: `safeHref` (CTAs, image links, Featured Post's Override URL, Decision Tree links) gives no href, so the CTA isn't shown, and a breadcrumb keeps its text without a link. React 19 already neutralises `javascript:` hrefs; this doesn't rely on that. Bare breadcrumb paths ("guides") now get a leading slash, like CTAs.
+45. **A new site is one command, and runs next to the others** (decided 2026-11-26, step 1 of simplifying new sites; publishing to npm and a go-live script come later).
+    - `npm run new-site -- ../my-site` in this repository syncs the template, builds the package and runs create-cera. create-cera then installs the site, starts its own Supabase stack, writes `.env.local`, seeds an admin account, pages and menus, makes the first git commit, and prints the admin address and account. Without Docker or the Supabase CLI it stops after installing and lists what's left. `--no-start`, `--no-install` and `--no-git` skip parts.
+    - **Ports:** each site gets the first free block of ten from 570xx (Supabase's 543xx and Cera's 563xx are never used), and the first free dev port from 3101. They're written into its `supabase/config.toml`, `package.json`, `.env.example`, `lib/email.ts` and README, so several sites run at once.
+    - **A local Cera is packed into the site** as `vendor/cera.tgz` (`file:vendor/cera.tgz`). It replaces the old `file:<checkout>` link, which never ran: Next's dev server doesn't resolve packages outside the site, a linked Cera would load its own React, and the link couldn't deploy. The site has its own copy (about 380 KB, committed), so it deploys as is. `npm run update-site -- ../my-site` repacks it and copies in new migrations.
+    - Checked end to end: a site made with `npm run new-site` ran on its own ports, served its pages and menus, and its admin signed in; `update-site` left it unchanged when nothing had changed.
 
 ## Pattern: keep fields in their own file
 

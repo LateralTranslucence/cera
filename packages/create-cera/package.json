@@ -3,12 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Starts a Next.js site with Cera: npm create cera my-site",
+  "description": "Starts a Next.js site with Cera and gets it running: npm create cera my-site",
   "bin": {
     "create-cera": "./index.mjs"
   },
   "files": [
     "index.mjs",
+    "lib.mjs",
+    "lib.d.mts",
     "template"
   ],
   "scripts": {
