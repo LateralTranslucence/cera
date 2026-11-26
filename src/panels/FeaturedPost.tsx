@@ -1,6 +1,7 @@
 // Ports app/components/panels/FeaturedPost.tsx from the theme. Difference: the
 // theme rendered nothing without an image; here the image is optional, since
 // Cera pages don't always have one.
+import { safeHref } from '../links.ts';
 import type { PanelPropsOf } from '../panel.ts';
 import { CtaLink } from './CtaLinks.tsx';
 import { Html } from './Html.tsx';
@@ -17,7 +18,7 @@ export default function FeaturedPost({ data, loaded, panel }: PanelPropsOf<typeo
 
   const image = data.overrideImage ?? linked?.image;
   const pretitle = data.overridePretitle || linked?.contentTypeLabel;
-  const url = data.overrideUrl || linked?.url;
+  const url = safeHref(data.overrideUrl) || linked?.url;
 
   return (
     // Featured Post has no title, background or copy fields (as in the theme), only the anchor id.

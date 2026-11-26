@@ -19,7 +19,7 @@ export default function TextMedia({ data, panel }: PanelPropsOf<typeof textMedia
         {data.media && (
           <figure className={`text-media__media size-${data.imageSize}`}>
             {/* TODO: imageLink.modal needs a client component, as with a CTA's Modal target; it opens normally for now. */}
-            {data.imageLink?.url ? <a href={linkHref(data.imageLink.url)}>{image}</a> : image}
+            {linkHref(data.imageLink?.url) ? <a href={linkHref(data.imageLink?.url)}>{image}</a> : image}
           </figure>
         )}
         <div className="text-media__text">

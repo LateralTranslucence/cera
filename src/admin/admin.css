@@ -704,3 +704,26 @@ html:has(.cera-admin[data-theme='dark']) { background: #1C1A16; color-scheme: da
 @media (max-width: 560px) {
   .cera-submission__answers > div { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Menu builder */
+.cera-menu-builder { display: grid; gap: 8px; justify-items: start; }
+.cera-menu-builder > :is(.cera-menu-tree, .cera-note) { justify-self: stretch; }
+.cera-menu-tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cera-menu-tree .cera-menu-tree { margin: 6px 0 0 28px; padding-left: 12px; border-left: 2px solid var(--line); }
+.cera-menu-row { position: relative; min-width: 0; }
+.cera-menu-row.is-dragging { z-index: 2; opacity: 0.85; }
+.cera-menu-row__head { display: flex; align-items: center; gap: 4px; min-height: 48px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.cera-menu-row.has-error > .cera-menu-row__head { border-color: var(--danger); }
+.cera-menu-row__toggle { flex: 1; min-width: 0; display: grid; gap: 0; padding: 4px 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.cera-menu-row__toggle:hover { background: var(--surface-sunken); }
+.cera-menu-row__summary { font-size: 13px; line-height: 18px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cera-menu-row__body { display: grid; gap: 12px; justify-items: start; margin-top: -1px; padding: 16px; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--surface-raised); }
+.cera-menu-row__body > * { justify-self: stretch; }
+.cera-menu-row__body > .cera-button { justify-self: start; }
+.cera-menu-row:has(> .cera-menu-row__body) > .cera-menu-row__head { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.cera-menu-row .cera-segmented button { height: 32px; padding: 0 12px; font-size: 13px; }
+@media (max-width: 640px) {
+  .cera-menu-tree .cera-menu-tree { margin-left: 8px; padding-left: 8px; }
+  .cera-menu-row__head { flex-wrap: wrap; }
+  .cera-menu-row__head .cera-item-buttons { width: 100%; justify-content: flex-end; }
+}

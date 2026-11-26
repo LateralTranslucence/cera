@@ -8,6 +8,8 @@
  * come straight from its field map — no hand-written `getBlocksPanelConfig()`.
  */
 import { z } from 'zod';
+import { isSafeLink, UNSAFE_LINK_MESSAGE } from './links.ts';
+
 
 /* ------------------------------------------------------------------ */
 /* Core types                                                          */
@@ -134,10 +136,13 @@ export const background = z.object({
 });
 export type Background = z.output<typeof background>;
 
-/** Theme note on CTA: "For internal links, only include the path" — so URLs are not validated as absolute. */
+/** A link editors type: a path, an anchor, or a web, email or phone address. Never `javascript:` and the like (links.ts). */
+const linkUrl = () => z.string().refine(isSafeLink, UNSAFE_LINK_MESSAGE);
+
+/** Theme note on CTA: "For internal links, only include the path" — so URLs are not validated as absolute, only for safe schemes. */
 export const cta = z.object({
   text: z.string(),
-  url: z.string(),
+  url: linkUrl(),
   target: z.enum(['_self', '_blank', 'modal']).default('_self'),
   style: z.string().optional(),
 });
@@ -145,7 +150,7 @@ export type CTA = z.output<typeof cta>;
 
 /** Makes an image a link (theme: `image_link`, a multi of URL and Modal). */
 export const imageLink = z.object({
-  url: z.string(),
+  url: linkUrl(),
   /** Theme: open the link in a modal. Cera has no modals yet, so it opens normally (as with a CTA's Modal target). */
   modal: z.boolean().default(false),
 });
@@ -206,9 +211,9 @@ export const field = {
   html: <const Options extends StrOpts & { toolbar?: 'full' | 'limited' } = {}>(options: Options = {} as Options) =>
     buildField<'html', Finalize<z.ZodString, Options>, { toolbar: 'full' | 'limited' }>('html', finalize(z.string(), options), options, { toolbar: options.toolbar ?? 'full' }),
 
-  /** URL or internal path (theme: `url`). */
+  /** URL or internal path (theme: `url`). Unsafe schemes (`javascript:` and the like) are refused. */
   url: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>
-    buildField<'url', Finalize<z.ZodString, Options>>('url', finalize(z.string(), options), options),
+    buildField<'url', Finalize<z.ZodString, Options>>('url', finalize(linkUrl() as unknown as z.ZodString, options), options),
 
   /** Icon key from the icon library (theme: `icon`, devo_icon post type). */
   icon: <const Options extends StrOpts = {}>(options: Options = {} as Options) =>

@@ -13,6 +13,7 @@ import type { PageIssue } from '../document.ts';
 import { GalleryInput, MediaInput, type MediaContext } from './media.tsx';
 import { IconPicker, SvgInput, type IconsContext } from './icon-inputs.tsx';
 import { RichTextInput } from './RichTextInput.tsx';
+import { MenuInput } from './MenuInput.tsx';
 import { dateTimeInput, dateTimeValue, fieldDefault, getIn, humanize, issuesAt, moveItem, newId, newRepeaterItem, removeItem, setIn, type Path } from './state.ts';
 
 /** What the page picker asks for: by ids (to show picked pages), or a search within content types. */
@@ -110,7 +111,7 @@ export function FieldMapForm({
 /* One field: label, control, note, counter, issues                    */
 /* ------------------------------------------------------------------ */
 
-const GROUP_KINDS = new Set(['html', 'media', 'gallery', 'background', 'cta', 'ctas', 'repeater', 'selectFrom', 'relation']);
+const GROUP_KINDS = new Set(['html', 'media', 'gallery', 'background', 'cta', 'ctas', 'repeater', 'selectFrom', 'relation', 'menu']);
 
 interface FieldProps {
   name: string;
@@ -376,6 +377,9 @@ function Control({ field, value, onChange, path, siblings, context, id }: FieldP
 
     case 'repeater':
       return <Repeater field={field} value={value} onChange={onChange} path={path} context={context} />;
+
+    case 'menu':
+      return <MenuInput field={field} value={value} onChange={onChange} path={path} context={context} />;
 
     case 'relation': {
       if (context.findPages) return <PagePicker field={field} value={value} onChange={onChange} siblings={siblings} context={context} findPages={context.findPages} id={id} />;
@@ -658,7 +662,8 @@ function SelectFrom({ field, value, onChange, id, context }: { field: AnyField; 
 /* Page picker (relation fields)                                       */
 /* ------------------------------------------------------------------ */
 
-function PagePicker({
+/** The page picker, also used by the menu builder. */
+export function PagePicker({
   field,
   value,
   onChange,
