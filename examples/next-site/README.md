@@ -55,6 +55,7 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 | `app/api/cera/cleanup` | Daily upkeep for Vercel Cron (`vercel.json`, `CRON_SECRET`): removes unfinished and replaced uploads nothing uses, prunes old drafts |
 | `proxy.ts` | Refreshes the admin's Supabase session cookies |
 | `lib/auth.ts` | `requireStaff(role)` from the package's `createStaffAuth`: verified user + Cera role from `app_metadata.cera_role` |
+| `lib/menus.ts`, `components/SiteMenu.tsx` | The header and footer menus (Menus in the admin, IDs `main` and `footer`): live and cached, or the working copy in preview |
 | `lib/pages.ts` | For an address, picks the live revision or, in draft mode, the working copy (or the old version History asked for); logs read issues; `loadContextFor` (the package's `createLoadContexts`) gives panels' `load` linked pages, forms, icons and searches, cached on the live site |
 | `lib/icons.ts` | The site's icon sets: its own icons, then Lucide |
 | `lib/supabase.ts` | Anonymous client (published pages only) and secret-key client (server only) |

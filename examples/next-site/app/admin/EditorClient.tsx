@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { adminNounOf, adminPathOf, adminTitleOf, pageUrl, type ApprovalRights, type PageApproval, type PageOf, type PageRights, type StoredPage } from '@lateraltranslucence/cera';
 import { mediaUploader, PageEditor } from '@lateraltranslucence/cera/admin';
 import type { PageSchedule } from '@lateraltranslucence/cera/supabase';
-import { backgroundColors, contentTypes } from '@/cera';
+import { backgroundColors, contentTypes, menuType } from '@/cera';
 import {
   cancelScheduleAction,
   decideApprovalAction,
@@ -112,10 +112,10 @@ export function EditorClient({
       onDeleted={() => router.replace(`${list}?deleted=${encodeURIComponent(page.title || `Untitled ${adminNounOf(contentType)}`)}`)}
       backHref={list}
       backLabel={adminTitleOf(contentType)}
-      {...(contentType.route && {
-        // The page's own address (its type's route or url), e.g. /guides/setup.
+      {...((contentType.route || contentType.name === menuType.name) && {
+        // The page's own address (its type's route or url), e.g. /guides/setup. Menus preview on the home page.
         previewHref: (slug: string, version?: { pageId: string; version: number }) =>
-          `/admin/preview?path=${encodeURIComponent(pageUrl(contentType, { ...page, slug } as PageOf<typeof contentType>))}${version ? `&page=${version.pageId}&version=${version.version}` : ''}`,
+          `/admin/preview?path=${encodeURIComponent(contentType.route ? pageUrl(contentType, { ...page, slug } as PageOf<typeof contentType>) : '/')}${version ? `&page=${version.pageId}&version=${version.version}` : ''}`,
       })}
     />
   );

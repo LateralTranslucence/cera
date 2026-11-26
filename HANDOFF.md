@@ -61,6 +61,8 @@ src/
   sanitize.ts       rich-text allowlists (full / limited) on sanitize-html; loaded lazily by document.ts
   svg.ts            cleanSvg / safeSvg: field.svg() values (custom icons) cleaned to drawing only, black → currentColor; loaded lazily
   search/model.ts   the Search panel's settings, query (parseSearchQuery, searchQueryParams) and result types, shared by server and browser
+  menus/            the `/menus` entry: menuType / defineMenuType (cera_menu), menuItems (the `menu` field kind),
+                    resolveMenu and isSafeMenuUrl (model.ts), tree moves for the builder (tree.ts), Menu (the live component)
   icons/            the `/icons` entry: IconSet, createIconLibrary (combines sets; values are `set:name`), lucideIcons (the
                     bundled set, from lucide-static's JSON, server only), fontAwesomeIcons (adapter for any Font Awesome
                     *-svg-icons pack, Free or a site's Pro), iconType (the cera_icon content type)
@@ -94,7 +96,7 @@ src/
                     PageEditor (top bar, card stack, dnd-kit reordering, schedule/unpublish/add-panel dialogs), PageList
                     (the Pages table: search, status filter, sort, paging), ContentList (a type's list for createAdminScreens), AdminSidebar, icons.tsx (Icon, CeraSeal, CeraLockup),
                     Dialog, MediaManager (the Media page: browse, upload, alt text, usage, delete), UsersManager (People),
-                    ApprovalCard (a page's request and its dialogs), ApprovalList (Approvals), ApprovalSettingsForm (Settings),
+                    MenuInput (the menu builder), ApprovalCard (a page's request and its dialogs), ApprovalList (Approvals), ApprovalSettingsForm (Settings),
                     SubmissionList (the Submissions page), IconPicker and SvgInput (icon-inputs.tsx: field.icon() and field.svg()),
                     RichTextInput (field.html: Tiptap editor, HTML view) with rich-text/extensions.ts (schema per toolbar)
                     and rich-text/html.ts (tidyEditorHtml, sameContent);
@@ -148,6 +150,7 @@ test/
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   search.test.ts    Search: settings, URL queries, the resolver (words, A–Z, types, select lists, sort, paging, preview), the handler, the panel
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
+  menus.test.tsx    menus: safe addresses, saving, links to pages, preview versions, the builder's moves, the live component
   icons.test.ts     SVG cleaning, cleaning on save, Lucide search, Font Awesome packs, the library, custom icons, Blocks' icons
   field-types.test.ts  email, phone, date and time, time zone, image link; custom controls
   next-integration.test.ts  panel error boundaries, preview handlers
@@ -292,7 +295,15 @@ test/
     - **Where it shows:** a card at the top of the editor, the page list (a flag and an In approval filter), History, and an Approvals screen whose sidebar count is what that person can decide.
     - **Telling people** is the site's: `createAdminActions({ approvalChanged })` gets who to tell (the waiting tier, or the submitter), and `approvalEmail` builds the message. The example sends it by SMTP, like form email.
     - **Not done:** naming particular approvers; authors limited to their own pages (they edit any page of a type they may write).
-
+43. **Menus are a content type, edited as a tree** (decided 2026-11-26, from WordPress's nav menus and DO_Menu_Custom_Fields).
+    - **`menuType` (`cera_menu`, in `@lateraltranslucence/cera/menus`)** has no route. The site shows a menu by its ID (slug), as the theme showed a menu location: the example's header shows `main` and its footer `footer` (`lib/menus.ts`, `getMenu`). So menus get drafts, preview, scheduling, history and approvals like pages.
+    - **Items** are a `menu` field (`menuItems({ depth, fields })`): a label, a link to a page (by id), an address or nothing (a heading for its submenu), a new-tab switch, the site's own item fields (default: an icon, as in the theme), and children, two levels by default (`defineMenuType({ depth })`, at most 4).
+    - **Links to pages follow the page:** they're resolved when the menu is read, so a renamed or moved page keeps its link, and a page that isn't live (or is hidden) drops out with its submenu. An empty label shows the page's title. Unpublish and Delete list the menus that link to a page, like any other page that does.
+    - **Addresses are checked on publish:** web addresses, paths, anchors, `mailto:` and `tel:` only (`isSafeMenuUrl`); `javascript:` and the like are refused, and dropped if one is ever stored.
+    - **The builder** (`MenuInput`): items drag to reorder among their siblings (with their submenus); arrow buttons move them up, down, and into and out of submenus, so it all works by keyboard. Each item opens to its label, link and fields.
+    - **On the live site,** `Menu` (a client component) renders the links with a button for each submenu (aria-expanded; Escape and clicking away close it) and marks the current page (`aria-current`; anchors don't count). Unstyled apart from class names.
+    - **Preview** of a menu, or of an old version from History, shows it on the home page.
+    - **Not done:** dragging between levels (the arrows do that), mega menus, and importing the theme's menus.
 ## Pattern: keep fields in their own file
 
 A component that imports its own panel's type through `component: () => import('./X.tsx')` creates a circular type reference. Avoid it like this:

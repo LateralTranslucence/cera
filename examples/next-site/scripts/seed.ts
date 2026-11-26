@@ -1,5 +1,6 @@
 /**
- * Seeds the local stack with published example pages (home, about, panels),
+ * Seeds the local stack with published example pages (home, about, panels)
+ * and the header and footer menus,
  * saved through the same `savePage` path the admin uses. Safe to run
  * repeatedly: each run saves and publishes a new version of the same pages,
  * replacing any edits made to them in the admin.
@@ -16,6 +17,7 @@ import { randomBytes } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { StoredPage } from '@lateraltranslucence/cera';
 import { getPageForEditing, savePage } from '@lateraltranslucence/cera/supabase';
+import { menuType } from '@lateraltranslucence/cera/menus';
 import { landingPage } from '../cera/content-types/landing-page.ts';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -284,6 +286,49 @@ const pages: StoredPage[] = [
   },
 ];
 
+/** The header and footer menus (lib/menus.ts shows them by these IDs). Links to pages follow them by id. */
+const menus: StoredPage[] = [
+  {
+    id: '00000000-0000-4000-8000-00000000c101',
+    contentType: 'cera_menu',
+    slug: 'main',
+    title: 'Main menu',
+    boxes: {
+      menu: {
+        items: [
+          { _id: 'main-about', label: '', page: '00000000-0000-4000-8000-00000000c002', newTab: false, children: [] },
+          {
+            _id: 'main-explore',
+            label: 'Explore',
+            newTab: false,
+            children: [
+              { _id: 'main-panels', label: 'Every panel', page: '00000000-0000-4000-8000-00000000c003', newTab: false, children: [] },
+              { _id: 'main-tabs', label: 'Tabs', url: '/panels#europa', newTab: false, children: [] },
+            ],
+          },
+        ],
+      },
+    },
+    panels: [],
+  },
+  {
+    id: '00000000-0000-4000-8000-00000000c102',
+    contentType: 'cera_menu',
+    slug: 'footer',
+    title: 'Footer menu',
+    boxes: {
+      menu: {
+        items: [
+          { _id: 'footer-home', label: 'Home', page: '00000000-0000-4000-8000-00000000c001', newTab: false, children: [] },
+          { _id: 'footer-about', label: '', page: '00000000-0000-4000-8000-00000000c002', newTab: false, children: [] },
+          { _id: 'footer-next', label: 'Built with Next.js', url: 'https://nextjs.org', newTab: true, children: [] },
+        ],
+      },
+    },
+    panels: [],
+  },
+];
+
 const onlyFlagIndex = process.argv.indexOf('--only');
 const only = onlyFlagIndex > -1 ? new Set((process.argv[onlyFlagIndex + 1] ?? '').split(',').filter(Boolean)) : null;
 if (only) {
@@ -303,4 +348,14 @@ for (const page of pages.filter((pageToSeed) => !only || only.has(pageToSeed.slu
   }
   console.log(`Published /${page.slug === 'home' ? '' : page.slug} (version ${result.version})`);
   for (const issue of result.issues) console.warn(`  ${issue.severity}: ${issue.path.join('.')} ${issue.message}`);
+}
+if (!only) {
+  for (const menu of menus) {
+    const existing = await getPageForEditing(admin, menuType, menu.id);
+    const result = await savePage(admin, menuType, menu, { mode: 'publish', expectedVersion: existing?.version ?? 0, userId });
+    if (!result.ok) {
+      console.error(`Could not save the "${menu.slug}" menu:`, result);
+      process.exitCode = 1;
+    } else console.log(`Published the ${menu.slug} menu (version ${result.version})`);
+  }
 }

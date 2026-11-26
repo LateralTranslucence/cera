@@ -58,6 +58,7 @@ export {
   type SettingsResult,
 } from './approvals.ts';
 export { supabaseIcons } from './icons.ts';
+export { getMenu, type GetMenuOptions } from './menus.ts';
 export { createSearchResolver, DEFAULT_SEARCH_ENDPOINT, searchableText, searchedTypes } from './search.ts';
 export { cleanUpUploads, deleteMedia, finishMediaUpload, listMedia, MEDIA_BUCKET, mediaPathFor, mediaUsage, prepareMediaUpload, replaceMedia, updateMedia } from './media.ts';
 export {

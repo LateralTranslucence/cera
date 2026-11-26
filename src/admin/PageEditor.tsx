@@ -216,7 +216,7 @@ export function PageEditor({
   const [dialog, setDialog] = useState<Dialogs>(null);
   const [scheduleAt, setScheduleAt] = useState('');
   // Which cards are open. A new page opens its settings, since it needs a title.
-  const [open, setOpen] = useState<Set<string>>(() => new Set(initialVersion === 0 ? [SETTINGS] : []));
+  const [open, setOpen] = useState<Set<string>>(() => new Set([...(initialVersion === 0 ? [SETTINGS] : []), ...((contentType.editor?.openBoxes ?? []) as string[])]));
   const [deleted, setDeleted] = useState<{ panel: StoredPanel; index: number; name: string } | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const [scrollTo, setScrollTo] = useState<string | null>(null);
@@ -571,6 +571,7 @@ export function PageEditor({
   const changes = published && (dirty || unpublished);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const dndId = useId();
   const nameAt = (index: number) => {
     const panel = page.panels[index];
     return panel ? panelName(definitions.get(panel.type), panel.data, panel.type) : '';
@@ -783,13 +784,14 @@ export function PageEditor({
         {leadBoxes.map(([name, fields]) => {
           const data = (page.boxes[name] ?? {}) as Record<string, unknown>;
           const boxIssues = issuesAt(issues, ['boxes', name]);
+          const title = panelName(undefined, data, humanize(name));
           return (
             <Card
               key={name}
               id={name}
               lead
-              badge={humanize(name)}
-              name={panelName(undefined, data, humanize(name))}
+              badge={title === humanize(name) ? undefined : humanize(name)}
+              name={title}
               open={open.has(name) || boxIssues.length > 0}
               onToggle={() => toggle(name)}
               hasError={boxIssues.some((issue) => issue.severity === 'error')}
@@ -799,7 +801,7 @@ export function PageEditor({
           );
         })}
 
-        <DndContext sensors={sensors} collisionDetection={closestCenter} accessibility={QUIET} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setAnnouncement('Move canceled.')}>
+        <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} accessibility={QUIET} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setAnnouncement('Move canceled.')}>
           <SortableContext items={page.panels.map((panel) => panel.id)} strategy={verticalListSortingStrategy}>
             {page.panels.map((panel, i) => {
               const definition = definitions.get(panel.type);

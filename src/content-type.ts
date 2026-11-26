@@ -120,6 +120,8 @@ export interface ContentTypeConfig<Name extends string, Boxes extends BoxMap, Pa
     pageBoxes?: ReadonlyArray<keyof Boxes & string>;
     /** Shown just above the panels, styled like one (e.g. a hero that renders like a panel). */
     leadBoxes?: ReadonlyArray<keyof Boxes & string>;
+    /** Lead boxes that start open, e.g. a menu's items. Others start closed, like panels. */
+    openBoxes?: ReadonlyArray<keyof Boxes & string>;
     /** What the admin calls one of these, lowercase. Default: `label` in lowercase ("simple page"). */
     noun?: string;
     /** Plural of `noun`. Default: `noun` in the plural. */
