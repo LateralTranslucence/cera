@@ -18,7 +18,7 @@ export default function FeaturedMedia({ data, panel }: PanelPropsOf<typeof featu
 
   return (
     <PanelFrame name="featured-media" data={data} panel={panel} className={data.fullWidth ? 'is-full-width' : undefined}>
-      {media && <figure className="featured-media">{data.imageLink?.url && mediaItem?.kind === 'image' ? <a href={linkHref(data.imageLink.url)}>{media}</a> : media}</figure>}
+      {media && <figure className="featured-media">{linkHref(data.imageLink?.url) && mediaItem?.kind === 'image' ? <a href={linkHref(data.imageLink?.url)}>{media}</a> : media}</figure>}
     </PanelFrame>
   );
 }

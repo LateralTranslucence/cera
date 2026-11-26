@@ -5,6 +5,7 @@
  * `boxes`  = fixed field groups (theme: Hero / SEO / Admin meta boxes)
  * `panels` = the panel types editors can add (theme: the dynamic "Panel" box)
  */
+import { safeHref } from './links.ts';
 import { z } from 'zod';
 import { type FieldMap, type InferFields, type MediaRef, objectSchema } from './fields.ts';
 import type { AnyPanel, PanelUnion } from './panel.ts';
@@ -214,10 +215,13 @@ export function defineContentType<
 /**
  * A page's breadcrumb trail: the content type's breadcrumbs, then the
  * page's own, then the page itself (without a link to itself, its url is
- * kept for structured data). Links without text are left out.
+ * kept for structured data). Links without text are left out, and an unsafe
+ * or empty address becomes '' (no link).
  */
 export function breadcrumbsFor<Type extends AnyContentType>(contentType: Type, page: PageOf<Type>): Breadcrumb[] {
-  const trail = [...(contentType.breadcrumbs ?? []), ...(contentType.pageBreadcrumbs?.(page) ?? [])].filter((crumb) => crumb.text?.trim());
+  const trail = [...(contentType.breadcrumbs ?? []), ...(contentType.pageBreadcrumbs?.(page) ?? [])]
+    .filter((crumb) => crumb.text?.trim())
+    .map((crumb) => ({ ...crumb, url: safeHref(crumb.url) ?? '' }));
   return [...trail, { text: page.title, url: pageUrl(contentType, page) }];
 }
 

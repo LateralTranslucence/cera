@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import { custom, shapeOf, type FieldMap, type FieldMeta, type InferFields } from '../fields.ts';
 import type { PageResolver } from '../panel.ts';
+import { isSafeLink, linkScheme, UNSAFE_LINK_MESSAGE } from '../links.ts';
 
 /** How deep menus nest by default: top items and one level of submenus. */
 export const DEFAULT_MENU_DEPTH = 2;
@@ -22,15 +23,13 @@ export const MAX_MENU_ITEMS = 200;
  */
 export function isSafeMenuUrl(url: string): boolean {
   const trimmed = url.trim();
-  if (trimmed === '' || /[\u0000-\u001f]/.test(trimmed)) return false;
-  if (/^(\/(?!\/)|#|\?)/.test(trimmed)) return true;
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(trimmed)?.[1]?.toLowerCase();
-  if (scheme) return ['http', 'https', 'mailto', 'tel'].includes(scheme);
-  // A bare path ("about") or a protocol-relative address ("//example.com"): neither is what an editor means.
-  return false;
+  if (trimmed === '' || !isSafeLink(trimmed)) return false;
+  // Stricter than other links: a bare path ("about") or a protocol-relative
+  // address ("//example.com") is never what an editor means in a menu.
+  return /^(\/(?!\/)|#|\?)/.test(trimmed) || linkScheme(trimmed) !== null;
 }
 
-const URL_MESSAGE = 'Use a web address (https://…), a path on this site (/about), an anchor (#team), mailto: or tel:.';
+const URL_MESSAGE = UNSAFE_LINK_MESSAGE;
 
 /** One stored item: a stable `_id`, the link, the site's own item fields, and the items under it. */
 export type MenuItem<Fields extends FieldMap = FieldMap> = {

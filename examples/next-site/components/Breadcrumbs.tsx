@@ -14,6 +14,8 @@ export function Breadcrumbs({ trail }: { trail: Breadcrumb[] }) {
           <li key={`${i}-${crumb.url}`}>
             {i === trail.length - 1 ? (
               <span aria-current="page">{crumb.text}</span>
+            ) : !crumb.url ? (
+              <span>{crumb.text}</span>
             ) : (
               <a href={crumb.url}>{crumb.text}</a>
             )}

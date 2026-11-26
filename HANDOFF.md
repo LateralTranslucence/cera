@@ -150,6 +150,7 @@ test/
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   search.test.ts    Search: settings, URL queries, the resolver (words, A–Z, types, select lists, sort, paging, preview), the handler, the panel
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
+  links.test.ts     link schemes: which are safe, refused on publish, dropped when rendered
   menus.test.tsx    menus: safe addresses, saving, links to pages, preview versions, the builder's moves, the live component
   icons.test.ts     SVG cleaning, cleaning on save, Lucide search, Font Awesome packs, the library, custom icons, Blocks' icons
   field-types.test.ts  email, phone, date and time, time zone, image link; custom controls
@@ -304,6 +305,8 @@ test/
     - **On the live site,** `Menu` (a client component) renders the links with a button for each submenu (aria-expanded; Escape and clicking away close it) and marks the current page (`aria-current`; anchors don't count). Unstyled apart from class names.
     - **Preview** of a menu, or of an old version from History, shows it on the home page.
     - **Not done:** dragging between levels (the arrows do that), mega menus, and importing the theme's menus.
+44. **Links editors type are checked for their scheme** (decided 2026-11-26). `field.cta()`, `field.ctas()`, `field.url()` and `field.imageLink()` accept paths, anchors, queries and `http`, `https`, `mailto` and `tel` addresses (`isSafeLink`, `src/links.ts`, shared with menus). `javascript:`, `data:`, `vbscript:` and the rest are refused on publish (an error at the field) and kept in drafts with a warning, read the way a browser reads them (so ` java\tscript:` counts). Rendering drops them: `safeHref` (CTAs, image links, Featured Post's Override URL, Decision Tree links) gives no href, so the CTA isn't shown, and a breadcrumb keeps its text without a link. React 19 already neutralises `javascript:` hrefs; this doesn't rely on that. Bare breadcrumb paths ("guides") now get a leading slash, like CTAs.
+
 ## Pattern: keep fields in their own file
 
 A component that imports its own panel's type through `component: () => import('./X.tsx')` creates a circular type reference. Avoid it like this:
