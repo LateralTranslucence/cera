@@ -108,7 +108,9 @@ A site made from a Cera checkout (\`npm run new-site\`) has Cera in \`vendor/cer
 
 ## Deploy
 
-Set \`NEXT_PUBLIC_SUPABASE_URL\`, \`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY\`, \`SUPABASE_SECRET_KEY\`, \`CERA_PREVIEW_SECRET\` and \`CRON_SECRET\` for the hosted project, push the migrations with \`supabase db push\`, and deploy. \`vercel.json\` runs the daily cleanup on Vercel. On Vercel, also set \`NPM_RC\` (so its install can fetch Cera) to these two lines, with a token that can read packages:
+\`npm run go-live\` puts the site online, asking as it goes: it creates (or uses) a Supabase project, applies Cera's migrations, makes your admin account, and sets up a Vercel project with the site's settings, then deploys. It needs \`supabase login\` and \`npx vercel login\` first, and keeps the hosted settings in \`.env.hosted\` (never committed). \`npm run go-live -- --dry-run\` shows every step without changing anything; running it again picks up where it stopped.
+
+To do it by hand instead: set \`NEXT_PUBLIC_SUPABASE_URL\`, \`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY\`, \`SUPABASE_SECRET_KEY\`, \`CERA_PREVIEW_SECRET\` and \`CRON_SECRET\` for the hosted project, push the migrations with \`supabase db push\`, and deploy. \`vercel.json\` runs the daily cleanup on Vercel. On Vercel, also set \`NPM_RC\` (so its install can fetch Cera) to these two lines, with a token that can read packages:
 
 \`\`\`
 @lateraltranslucence:registry=https://npm.pkg.github.com

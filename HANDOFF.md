@@ -121,6 +121,7 @@ supabase/
                                           cera_decide_approval, cera_withdraw_approval; publishing checks approval tiers
 scripts/
   build.mjs         the package build (and --watch); dev.mjs: build --watch plus the example's dev server
+  (example) scripts/go-live.ts + lib/go-live.ts: `npm run go-live` in a site: Supabase project, migrations, admin, Vercel
   new-site.mjs      `npm run new-site -- ../my-site`: sync the template, build, run create-cera with this checkout packed in
   update-site.mjs   `npm run update-site -- ../my-site`: repack Cera into the site's vendor/, reinstall, copy new migrations
 packages/
@@ -152,6 +153,7 @@ test/
   sanitize.test.ts  the allowlists, links, removal warnings, sanitizing on save (repeaters, unknown panels, beforeSave)
   search.test.ts    Search: settings, URL queries, the resolver (words, A–Z, types, select lists, sort, paging, preview), the handler, the panel
   load.test.ts      panels' load() through <Panels>: Featured Post, overrides, failures, the context load() gets
+  go-live.test.ts   going live, with the Supabase and Vercel CLIs faked: commands, order, stdin, saved settings, re-runs, dry runs
   create-cera.test.ts  new sites: free port blocks, files moved to them, names and quoting
   links.test.ts     link schemes: which are safe, refused on publish, dropped when rendered
   menus.test.tsx    menus: safe addresses, saving, links to pages, preview versions, the builder's moves, the live component
@@ -318,6 +320,14 @@ test/
     - **Releasing:** push a tag like `v0.1.0` on a commit on `main`. `.github/workflows/release.yml` checks the tag, runs the tests, sets both packages to the tag's version (the repository's `package.json` files stay at 0.0.0), builds them and the template (which pins new sites to that version), and publishes with the workflow's own token. Pre-releases (`-beta.1`) go out under `next`.
     - **Using it:** `npm init @lateraltranslucence/cera my-site`. Every computer, and Vercel, needs a GitHub token that can read packages: in `~/.npmrc` locally, in `NPM_RC` on Vercel. New sites get an `.npmrc` that says where `@lateraltranslucence` packages come from (no token in it). Sites made from a checkout (`npm run new-site`) still carry `vendor/cera.tgz` and need no token.
     - Checked with a rehearsal: both packages dry-run publish to npm.pkg.github.com at 0.1.0, and a site made from the packed create-cera depends on `^0.1.0` with the `.npmrc`. That rehearsal caught npm dropping create-cera's `bin` (`./index.mjs`); it's `index.mjs` now. Not yet done: a real release.
+47. **Going live is one command too** (decided 2026-11-26, step 3 of simplifying new sites). `npm run go-live` in a site (`scripts/go-live.ts`, steps in `lib/go-live.ts`):
+    1. a Supabase project: an existing one by ref, or a new one (`supabase projects create`, with a generated database password), waiting until it's up;
+    2. `supabase link`, then `db push --dry-run` shown, then applied on a yes;
+    3. `.env.hosted` (mode 600, ignored by git): the project's keys (`projects api-keys --reveal`: the new publishable/secret keys, else the legacy ones), a preview and a cron secret, `NPM_RC` for GitHub Packages (the token from `~/.npmrc`, or asked for; not for sites with Cera in `vendor/`), and SMTP if wanted;
+    4. the first admin (`createCeraUser`), with a temporary password shown once;
+    5. Vercel: `vercel link --yes --project <name>`, each setting through `vercel env add … --environment production,preview --force --non-interactive` with the value on stdin (secrets `--sensitive`), and `vercel deploy --prod`. If Vercel refuses a setting, it says to import `.env.hosted` in the dashboard.
+    - It runs the CLIs as the person running it (`supabase login`, `npx vercel login`; Vercel through `npx vercel@latest` when it isn't installed), and holds no credentials. Running it again reuses `.env.hosted`, so it picks up where it stopped. `--dry-run` asks the same questions and runs only `supabase projects list` and `orgs list`.
+    - Tested with the CLIs faked (the commands and their order, values only on stdin, what's saved, re-runs, dry runs, stopping early), and a real dry run against the Supabase CLI. Not yet run for real: it would create a paid project. The Vercel steps follow Vercel's CLI docs but are untested; previews without a branch are the least certain (`--environment production,preview`).
 
 ## Pattern: keep fields in their own file
 

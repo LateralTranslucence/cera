@@ -15,7 +15,8 @@
     "env": "node --conditions=source --import tsx scripts/env.ts",
     "seed": "node --env-file=.env.local --conditions=source --import tsx scripts/seed.ts",
     "import:devo": "node --env-file=.env.local --conditions=source --import tsx scripts/import-developers-only.ts",
-    "dev:site": "next dev --port 3100"
+    "dev:site": "next dev --port 3100",
+    "go-live": "node --conditions=source --import tsx scripts/go-live.ts"
   },
   "dependencies": {
     "@lateraltranslucence/cera": "file:../..",

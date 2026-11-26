@@ -66,6 +66,8 @@ That needs, once per computer, a GitHub token that can read packages: create a c
 //npm.pkg.github.com/:_authToken=<your token>
 ```
 
+To put a new site online, run `npm run go-live` in it: it creates (or uses) a Supabase project, applies the migrations, makes the first admin account, and sets up and deploys a Vercel project, asking as it goes (`-- --dry-run` shows the steps without doing them).
+
 A site made that way depends on the released `@lateraltranslucence/cera`; update it with `npm install @lateraltranslucence/cera@latest` and copy in any new migrations.
 
 ## Releasing
