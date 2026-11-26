@@ -9,9 +9,12 @@ name: Release
 # 0.0.0, and the release sets both to the tag's version before publishing.
 # Only a tag on a commit that's on main is published.
 #
-# npm sign-in: the NPM_TOKEN secret (an npm token that can publish) when it's
-# set, or else npm's trusted publishing (configured for both packages on
-# npmjs.com, for this repository and release.yml), which needs no secret.
+# npm sign-in: npm's trusted publishing, configured for both packages on
+# npmjs.com for this repository and release.yml. No token or secret: npm
+# trades the workflow's OIDC identity for a short-lived one. Nothing may set
+# NODE_AUTH_TOKEN, not even to an empty value (as setup-node's registry-url
+# or an unset secret would), or npm uses that instead and the publish is
+# refused ("OIDC permission denied").
 on:
   push:
     tags: ['v*']
@@ -39,7 +42,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          registry-url: https://registry.npmjs.org
 
       # Trusted publishing needs npm 11.5.1 or later; Node 22 comes with npm 10.
       - name: Update npm
@@ -81,11 +83,7 @@ jobs:
 
       - name: Publish @lateraltranslucence/cera
         run: npm publish --access public --tag "${{ steps.version.outputs.dist_tag }}"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish create-cera
         working-directory: packages/create-cera
         run: npm publish --access public --tag "${{ steps.version.outputs.dist_tag }}"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
