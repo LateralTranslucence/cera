@@ -2,7 +2,7 @@
 /**
  * Starts a Next.js site with Cera, and gets it running:
  *
- *   npm init @lateraltranslucence/cera my-site
+ *   npm create cera my-site
  *   (from a Cera checkout: npm run new-site -- ../my-site)
  *
  * Copies the template (the Cera example site, its Supabase settings and
@@ -13,15 +13,20 @@
  * checkout, built, or a tarball from `npm pack`): that is packed into the
  * site as vendor/cera.tgz, so the site has its own copy and deploys as is.
  *
+ * The Supabase CLI comes with the site (a dev dependency). Docker is started
+ * when it's stopped, and, on a Mac with Homebrew, installed on a yes when
+ * it's missing; otherwise the download page opens and it waits for Docker.
+ *
  * Skip parts with --no-install (then nothing after copying runs), --no-start
  * (no Supabase, env or seed) and --no-git.
  */
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createInterface } from 'node:readline/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { blockPorts, envValue, movePorts, packageName, pickDevPort, pickPortBlock, shellQuote, siteSupabaseConfig } from './lib.mjs';
+import { blockPorts, dockerPlan, envValue, movePorts, packageName, pickDevPort, pickPortBlock, shellQuote, siteSupabaseConfig } from './lib.mjs';
 
 const template = join(dirname(fileURLToPath(import.meta.url)), 'template');
 const parameters = process.argv.slice(2);
@@ -46,7 +51,7 @@ const start = install && !flag('no-start');
 const git = !flag('no-git');
 
 if (parameters.includes('--help') || parameters.includes('-h')) {
-  console.log(`Usage: npm init @lateraltranslucence/cera <folder> [-- --cera <version, path or tarball>] [--no-install] [--no-start] [--no-git]
+  console.log(`Usage: npm create cera <folder> [-- --cera <version, path or tarball>] [--no-install] [--no-start] [--no-git]
 
 Makes the site, installs it, starts its local Supabase stack (needs Docker and
 the Supabase CLI), writes .env.local, seeds an admin account and example pages,
@@ -60,7 +65,7 @@ and makes the first git commit.
 
 const folder = parameters[0];
 if (!folder) {
-  console.error('Name the folder for the new site: npm init @lateraltranslucence/cera my-site');
+  console.error('Name the folder for the new site: npm create cera my-site');
   process.exit(1);
 }
 if (!existsSync(template)) {
@@ -86,7 +91,6 @@ if (block === null || devPort === null) {
 
 cpSync(template, target, { recursive: true });
 renameSync(join(target, 'gitignore'), join(target, '.gitignore'));
-if (existsSync(join(target, 'npmrc'))) renameSync(join(target, 'npmrc'), join(target, '.npmrc'));
 
 /**
  * A local Cera (a folder, or a tarball) as vendor/cera.tgz in the site.
@@ -150,27 +154,74 @@ const has = (command, args = ['--version']) => spawnSync(command, args, { stdio:
 const cd = `cd ${shellQuote(folder)}`;
 const remaining = [];
 let problem = '';
+const interactive = process.stdin.isTTY === true && process.stdout.isTTY === true;
+
+async function ask(question) {
+  const reader = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await reader.question(question)).trim();
+  } finally {
+    reader.close();
+  }
+}
+
+const dockerRunning = () => has('docker', ['info']);
+
+/** Waits for Docker to answer, up to `minutes`. */
+function waitForDocker(minutes, message) {
+  console.log(message);
+  const until = Date.now() + minutes * 60_000;
+  while (Date.now() < until) {
+    if (dockerRunning()) return true;
+    spawnSync(process.execPath, ['-e', 'setTimeout(() => {}, 3000)']);
+  }
+  return dockerRunning();
+}
+
+/** Gets Docker running: starts it, installs it on a yes, or waits while it's installed. True once it runs. */
+async function ensureDocker() {
+  const apps = ['OrbStack', 'Docker'].filter((app) => existsSync(`/Applications/${app}.app`));
+  const plan = dockerPlan({ platform: process.platform, running: dockerRunning(), cliInstalled: has('docker'), apps, hasBrew: has('brew'), interactive });
+  if (plan.action === 'ready') return true;
+  if (plan.action === 'start') {
+    spawnSync('open', ['-a', plan.app]);
+    return waitForDocker(3, `\n${plan.app} wasn’t running. Starting it…`);
+  }
+  if (plan.action === 'manual') {
+    console.log('\nDocker is installed but not running. Start it (Docker Desktop, or `sudo systemctl start docker` on Linux).');
+    if (!interactive) return false;
+    return waitForDocker(10, 'Waiting for Docker to start (up to 10 minutes; Ctrl+C to stop)…');
+  }
+  if (plan.action === 'install') {
+    console.log('\nThe local database runs in Docker, which isn’t installed.');
+    console.log('Docker Desktop is free for personal use and small businesses (fewer than 250 people and under $10 million a year); larger ones need a paid plan. OrbStack (orbstack.dev) also works.');
+    if (!/^y(es)?$/i.test(await ask('Install Docker Desktop with Homebrew now? (y/n) '))) return false;
+    if (!run('brew', ['install', '--cask', 'docker'])) return false;
+    spawnSync('open', ['-a', 'Docker']);
+    return waitForDocker(10, '\nStarting Docker. The first time, it opens a window to finish setting up: go through it, and this carries on by itself (up to 10 minutes)…');
+  }
+  console.log(`\nThe local database runs in Docker, which isn’t installed. Get it here: ${plan.url}`);
+  if (!interactive) return false;
+  const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
+  spawnSync(opener, [plan.url], { stdio: 'ignore' });
+  return waitForDocker(30, 'Install and start it; this carries on by itself once it’s running (up to 30 minutes; Ctrl+C to stop)…');
+}
 
 if (git && has('git')) run('git', ['init', '-q'], { quiet: true });
 
 if (!install) {
-  remaining.push('npm install', 'supabase start', 'npm run env', 'npm run seed');
+  remaining.push('npm install', 'npx supabase start', 'npm run env', 'npm run seed');
 } else if (!run('npm', ['install'])) {
-  problem = ceraDependency?.startsWith('file:')
-    ? 'npm install failed (see above).'
-    : 'npm install failed (see above). If it couldn’t fetch @lateraltranslucence/cera (401, 403 or 404), this computer needs a GitHub token that can read packages: see “Cera’s package” in the README.';
-  remaining.push('npm install', 'supabase start', 'npm run env', 'npm run seed');
+  problem = 'npm install failed (see above).';
+  remaining.push('npm install', 'npx supabase start', 'npm run env', 'npm run seed');
 } else if (!start) {
-  remaining.push('supabase start', 'npm run env', 'npm run seed');
-} else if (!has('supabase')) {
-  problem = 'The Supabase CLI isn’t installed: https://supabase.com/docs/guides/local-development/cli/getting-started';
-  remaining.push('supabase start', 'npm run env', 'npm run seed');
-} else if (!has('docker', ['info'])) {
-  problem = 'Docker isn’t running. Start Docker Desktop (or another Docker), then run the steps below.';
-  remaining.push('supabase start', 'npm run env', 'npm run seed');
-} else if (!run('supabase', ['start'])) {
-  problem = 'supabase start failed (see above).';
-  remaining.push('supabase start', 'npm run env', 'npm run seed');
+  remaining.push('npx supabase start', 'npm run env', 'npm run seed');
+} else if (!(await ensureDocker())) {
+  problem = 'Docker isn’t running, so the local database can’t start. Once it runs, do the steps below.';
+  remaining.push('npx supabase start', 'npm run env', 'npm run seed');
+} else if (!run('npx', ['supabase', 'start'])) {
+  problem = 'Starting the local database failed (see above).';
+  remaining.push('npx supabase start', 'npm run env', 'npm run seed');
 } else if (!run('npm', ['run', 'env'])) {
   problem = 'npm run env failed (see above).';
   remaining.push('npm run env', 'npm run seed');
@@ -199,6 +250,6 @@ ${name} is ready.
 
 Then open http://localhost:${devPort}/admin and sign in as ${envValue(env, 'CERA_ADMIN_EMAIL')}
 (the password is CERA_ADMIN_PASSWORD in .env.local). Supabase Studio: http://127.0.0.1:${block * 100 + 23}.
-Stop the local database with \`supabase stop\` when you're done.`);
+Stop the local database with \`npx supabase stop\` when you're done.`);
 }
 process.exit(problem ? 1 : 0);

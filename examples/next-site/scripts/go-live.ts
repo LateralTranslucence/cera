@@ -7,25 +7,22 @@
  * 1. A Supabase project: an existing one, or a new one it creates.
  * 2. Cera's migrations, applied to it (after showing which).
  * 3. The site's settings in .env.hosted: the project's keys, a preview and a
- *    cron secret, the GitHub Packages token Vercel needs to install Cera,
- *    and an SMTP server if you want emails.
+ *    cron secret, and an SMTP server if you want emails.
  * 4. The first admin account, with a temporary password shown once.
  * 5. A Vercel project with those settings, and a production deploy.
  *
- * Needs the Supabase CLI signed in (`supabase login`), and for step 5 the
+ * Needs the Supabase CLI signed in (`npx supabase login`), and for step 5 the
  * Vercel CLI (`npx vercel login`). Running it again picks up where it
  * stopped: what's in .env.hosted is reused.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createClient } from '@supabase/supabase-js';
 import { createCeraUser } from '@lateraltranslucence/cera/supabase';
 import { goLive, type Io } from '../lib/go-live.ts';
 
-const site = JSON.parse(readFileSync('package.json', 'utf8')) as { name: string; dependencies: Record<string, string> };
+const site = JSON.parse(readFileSync('package.json', 'utf8')) as { name: string };
 const has = (command: string) => spawnSync(command, ['--version'], { stdio: 'ignore' }).status === 0;
 
 // One reader for the whole run, its lines queued: answers typed (or pasted)
@@ -85,8 +82,6 @@ const io: Io = {
 const ok = await goLive(
   {
     name: site.name,
-    ceraDependency: site.dependencies['@lateraltranslucence/cera'] ?? '',
-    npmrc: io.readFile(join(homedir(), '.npmrc')),
     vercel: has('vercel') ? ['vercel'] : ['npx', '--yes', 'vercel@latest'],
     dryRun: process.argv.includes('--dry-run'),
   },

@@ -45,7 +45,7 @@ The admin builds the type's sidebar entry, list, new and edit screens from the d
 npm run new-site -- ../my-site
 ```
 
-That refreshes the template, builds the package, and packs it into the new site as `vendor/cera.tgz`, so the site has its own copy of Cera: it runs and deploys without this checkout. Then it installs the site, starts its own local Supabase stack on free ports (so it runs next to Cera's and other sites'), writes `.env.local`, seeds an admin account, pages and menus, and makes the first git commit. It ends by printing the admin address and the account. It needs Docker running and the Supabase CLI; without them it stops after installing and lists what's left. `--no-start`, `--no-install` and `--no-git` skip parts.
+That refreshes the template, builds the package, and packs it into the new site as `vendor/cera.tgz`, so the site has its own copy of Cera: it runs and deploys without this checkout. Then it installs the site, starts its own local Supabase stack on free ports (so it runs next to Cera's and other sites'), writes `.env.local`, seeds an admin account, pages and menus, and makes the first git commit. It ends by printing the admin address and the account. It starts Docker if needed (see below); if Docker can't run, it stops after installing and lists what's left. `--no-start`, `--no-install` and `--no-git` skip parts.
 
 Later, to bring the site up to this checkout's Cera (the package, and any new migrations):
 
@@ -53,18 +53,13 @@ Later, to bring the site up to this checkout's Cera (the package, and any new mi
 npm run update-site -- ../my-site
 ```
 
-Once a version is released (below), anyone in the organization can make a site without this checkout:
+Once a version is released (below), anyone can make a site without this checkout, with only Node installed:
 
 ```bash
-npm init @lateraltranslucence/cera my-site
+npm create cera my-site
 ```
 
-That needs, once per computer, a GitHub token that can read packages: create a classic personal access token with `read:packages` at https://github.com/settings/tokens, and put these two lines in your `~/.npmrc`:
-
-```
-@lateraltranslucence:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=<your token>
-```
+The Supabase CLI comes with each site (`npx supabase`). The local database runs in Docker: `create-cera` starts Docker when it's stopped; when it's missing, it offers to install Docker Desktop with Homebrew on a Mac (on a yes), or opens the download page and carries on once Docker runs.
 
 To put a new site online, run `npm run go-live` in it: it creates (or uses) a Supabase project, applies the migrations, makes the first admin account, and sets up and deploys a Vercel project, asking as it goes (`-- --dry-run` shows the steps without doing them).
 
@@ -72,13 +67,19 @@ A site made that way depends on the released `@lateraltranslucence/cera`; update
 
 ## Releasing
 
-Both packages, `@lateraltranslucence/cera` and `@lateraltranslucence/create-cera`, are published privately to GitHub Packages by `.github/workflows/release.yml` when a version tag is pushed. Tag a commit on `main`:
+Both packages, `@lateraltranslucence/cera` and `create-cera`, are published publicly to npm (MIT) by `.github/workflows/release.yml` when a version tag is pushed. Tag a commit on `main`:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
-The workflow checks the tag is a version and on `main`, runs the tests, sets both packages to that version, builds them and publishes them. The `package.json` versions in the repository stay at 0.0.0: the tag is the version. A pre-release (`v0.2.0-beta.1`) is published under `next`, so `@latest` never installs it.
+The workflow signs in to npm with the `NPM_TOKEN` repository secret when it's set, or else with npm's trusted publishing (no secret): on npmjs.com, each package's settings name this repository and `release.yml` as a trusted publisher. Trusted publishing can only be set up on a package that exists, so the first release uses a token; after it, set up trusted publishing for both packages and delete the secret.
+
+The workflow checks the tag is a version and on `main`, runs the tests, sets both packages to that version, builds them and publishes them. The `package.json` versions in the repository stay at 0.0.0: the tag is the version. A pre-release (`v0.4.0-beta.1`) is published under `next`, so `@latest` never installs it.
 
 **Start with [HANDOFF.md](./HANDOFF.md).**
+
+## License
+
+MIT. See [LICENSE](./LICENSE).

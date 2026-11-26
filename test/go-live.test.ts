@@ -2,7 +2,7 @@
 // and Vercel CLIs faked: which commands run, in what order, what's saved.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ENV_FILE, formatEnv, githubPackagesToken, goLive, parseEnv, pickKeys, vercelSettings, type Io, type RunResult } from '../examples/next-site/lib/go-live.ts';
+import { ENV_FILE, formatEnv, goLive, parseEnv, pickKeys, vercelSettings, type Io, type RunResult } from '../examples/next-site/lib/go-live.ts';
 
 const KEYS = JSON.stringify([
   { name: 'anon', type: 'legacy', api_key: 'legacy-anon' },
@@ -49,7 +49,7 @@ const supabase = (command: string, args: string[]): Partial<RunResult> | undefin
   return undefined;
 };
 
-const options = { name: 'my-site', ceraDependency: '^0.1.0', npmrc: '//npm.pkg.github.com/:_authToken=ghp_token123\n', vercel: ['vercel'] };
+const options = { name: 'my-site', vercel: ['vercel'] };
 
 test('env files: round trip, including a value with a newline', () => {
   const values = new Map([['A', 'plain'], ['NPM_RC', 'line one\n//line=two'], ['EMPTY', '']]);
@@ -64,8 +64,6 @@ test('keys: the new kind first, the legacy ones otherwise, never masked ones', (
   assert.deepEqual(pickKeys(JSON.stringify([{ name: 'anon', api_key: 'a' }, { name: 'service_role', api_key: 's' }])), { publishable: 'a', secret: 's' });
   assert.equal(pickKeys(JSON.stringify([{ type: 'publishable', api_key: 'p' }, { type: 'secret', api_key: 'sb_secret_ab······' }])), null);
   assert.equal(pickKeys('not json'), null);
-  assert.equal(githubPackagesToken('registry=x\n//npm.pkg.github.com/:_authToken=ghp_1 \n'), 'ghp_1');
-  assert.equal(githubPackagesToken(null), undefined);
 });
 
 test('a new site: creates the project, migrates, saves the settings, makes the admin, sets up Vercel and deploys', async () => {
@@ -88,13 +86,11 @@ test('a new site: creates the project, migrates, saves the settings, makes the a
     'vercel env add SUPABASE_SECRET_KEY --environment production,preview --force --sensitive --non-interactive',
     'vercel env add CERA_PREVIEW_SECRET --environment production,preview --force --sensitive --non-interactive',
     'vercel env add CRON_SECRET --environment production,preview --force --sensitive --non-interactive',
-    'vercel env add NPM_RC --environment production,preview --force --sensitive --non-interactive',
     'vercel deploy --prod',
   ]);
   // Values go on stdin, never on the command line.
   assert.equal(fake.commands.find((command) => command.line.includes('SUPABASE_SECRET_KEY'))?.input, 'sb_secret_xyz');
-  assert.equal(fake.commands.find((command) => command.line.includes('NPM_RC'))?.input, '@lateraltranslucence:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=ghp_token123');
-  assert.ok(fake.commands.every((command) => !command.line.includes('sb_secret_xyz') && !command.line.includes('ghp_token123')));
+  assert.ok(fake.commands.every((command) => !command.line.includes('sb_secret_xyz')));
 
   const saved = parseEnv(fake.files[ENV_FILE]!);
   assert.equal(saved.get('NEXT_PUBLIC_SUPABASE_URL'), 'https://abcdefghijklmnop.supabase.co');
@@ -129,7 +125,6 @@ test('a dry run changes nothing: only the read-only project list runs, and no fi
   for (const step of ['would run: supabase projects create my-site', 'would run: supabase db push --linked --yes', 'would make me@example.com an admin', 'would run: vercel env add SUPABASE_SECRET_KEY', 'would run: vercel deploy --prod']) {
     assert.ok(shown.includes(step), step);
   }
-  assert.ok(!shown.includes('ghp_token123'));
   assert.match(shown, /--db-password \*\*\* /);
 });
 
@@ -147,10 +142,6 @@ test('it stops early, saying what to do: not signed in, or Vercel refusing a set
   assert.ok(!refused.commands.some((command) => command.line.includes('deploy')));
 });
 
-test('a site with Cera packed in needs no GitHub Packages token on Vercel', async () => {
-  const fake = fakeIo(['abcdefghijklmnop', 'y', '', 'me@example.com', 'y', 'n'], supabase);
-  await goLive({ ...options, ceraDependency: 'file:vendor/cera.tgz' }, fake.io);
-  assert.ok(!fake.commands.some((command) => command.line.includes('NPM_RC')));
-  assert.equal(parseEnv(fake.files[ENV_FILE]!).has('NPM_RC'), false);
+test('settings left empty (no email server) aren’t sent to Vercel', () => {
   assert.deepEqual(vercelSettings(new Map([['SMTP_URL', ''], ['CRON_SECRET', 'c']])).map((setting) => setting.name), ['CRON_SECRET']);
 });

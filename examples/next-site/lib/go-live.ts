@@ -33,10 +33,6 @@ export interface Io {
 export interface GoLiveOptions {
   /** The site's npm name: the default project name. */
   name: string;
-  /** The site's dependency on Cera, from package.json: decides whether Vercel needs a token for GitHub Packages. */
-  ceraDependency: string;
-  /** The user's ~/.npmrc, for its GitHub Packages token. */
-  npmrc?: string | null;
   /** How to run the Vercel CLI: `vercel` when it's installed, else `npx --yes vercel@latest`. */
   vercel: string[];
   /** Print the commands instead of running anything that changes something. */
@@ -93,11 +89,6 @@ export function pickKeys(json: string): { publishable: string; secret: string } 
   return publishable && secret && !secret.includes('·') ? { publishable, secret } : null;
 }
 
-/** The token for GitHub Packages in an .npmrc, if there is one. */
-export function githubPackagesToken(npmrc: string | null | undefined): string | undefined {
-  return /^\/\/npm\.pkg\.github\.com\/:_authToken=(.+)$/m.exec(npmrc ?? '')?.[1]?.trim();
-}
-
 /** The settings Vercel needs, in order: name, value, and whether it's secret (hidden in Vercel's dashboard). */
 export function vercelSettings(env: Map<string, string>): Array<{ name: string; value: string; secret: boolean }> {
   const settings: Array<{ name: string; secret: boolean }> = [
@@ -106,7 +97,6 @@ export function vercelSettings(env: Map<string, string>): Array<{ name: string; 
     { name: 'SUPABASE_SECRET_KEY', secret: true },
     { name: 'CERA_PREVIEW_SECRET', secret: true },
     { name: 'CRON_SECRET', secret: true },
-    { name: 'NPM_RC', secret: true },
     { name: 'SMTP_URL', secret: true },
     { name: 'CERA_EMAIL_FROM', secret: false },
   ];
@@ -142,7 +132,7 @@ export async function goLive(options: GoLiveOptions, io: Io): Promise<boolean> {
   io.say('1. Supabase');
   const projects = await io.run('supabase', ['projects', 'list', '-o', 'json']);
   if (!projects.ok) {
-    io.say('   The Supabase CLI isn’t signed in, or isn’t installed. Run `supabase login`, then run this again.');
+    io.say('   The Supabase CLI isn’t signed in, or isn’t installed. Run `npx supabase login`, then run this again.');
     return false;
   }
   let ref = env.get('NEXT_PUBLIC_SUPABASE_URL')?.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
@@ -212,11 +202,6 @@ export async function goLive(options: GoLiveOptions, io: Io): Promise<boolean> {
   }
   if (!env.get('CERA_PREVIEW_SECRET')) env.set('CERA_PREVIEW_SECRET', randomSecret());
   if (!env.get('CRON_SECRET')) env.set('CRON_SECRET', randomSecret());
-  if (!options.ceraDependency.startsWith('file:') && !env.get('NPM_RC')) {
-    // Vercel installs Cera from GitHub Packages, so it needs a token that can read packages.
-    const token = githubPackagesToken(options.npmrc) ?? (await io.ask('   A GitHub token that can read packages, for Vercel to install Cera (read:packages):', { secret: true }));
-    if (token) env.set('NPM_RC', `@lateraltranslucence:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=${token}`);
-  }
   if (!env.has('SMTP_URL')) {
     const smtp = await io.ask('   An SMTP server for form and approval emails (smtp://user:password@host:port), or leave empty for none:', { default: '', secret: true });
     if (smtp) {

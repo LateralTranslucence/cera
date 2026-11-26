@@ -83,3 +83,34 @@ export function shellQuote(text) {
 export function envValue(text, key) {
   return new RegExp(`^${key}="?(.*?)"?$`, 'm').exec(text)?.[1];
 }
+
+/* ------------------------------------------------------------------ */
+/* Docker                                                              */
+/* ------------------------------------------------------------------ */
+
+/** The Supabase CLI version new sites install (tested with Cera's settings). */
+export const SUPABASE_CLI_VERSION = '^2.122.1';
+
+/** Where to get Docker, by platform. */
+export const DOCKER_DOWNLOAD = {
+  darwin: 'https://docs.docker.com/desktop/setup/install/mac-install/',
+  win32: 'https://docs.docker.com/desktop/setup/install/windows-install/',
+  linux: 'https://docs.docker.com/engine/install/',
+};
+
+/**
+ * What to do about Docker, given what's on this computer:
+ *   ready    it's running
+ *   start    it's installed but stopped: open the app (`app` names it) and wait
+ *   install  not installed, on a Mac with Homebrew, and someone to ask: offer `brew install --cask docker`
+ *   download not installed otherwise: point to the download page (and wait, when someone's there)
+ *   manual   installed but can't be started from here (Linux, Windows): say how
+ */
+export function dockerPlan({ platform, running, cliInstalled, apps = [], hasBrew = false, interactive = false }) {
+  if (running) return { action: 'ready' };
+  const app = apps.includes('OrbStack') ? 'OrbStack' : apps.includes('Docker') ? 'Docker' : null;
+  if (platform === 'darwin' && app) return { action: 'start', app };
+  if (cliInstalled) return { action: 'manual' };
+  if (platform === 'darwin' && hasBrew && interactive) return { action: 'install' };
+  return { action: 'download', url: DOCKER_DOWNLOAD[platform] ?? DOCKER_DOWNLOAD.linux };
+}
