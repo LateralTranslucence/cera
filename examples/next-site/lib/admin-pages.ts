@@ -1,10 +1,9 @@
 import 'server-only';
-import { readPage, type PageOf, type StoredPage } from '@lateraltranslucence/cera';
+import { readPage, roleAtLeast, type PageOf, type StoredPage } from '@lateraltranslucence/cera';
 import { adminPage } from '../cera/index.ts';
 import type { Staff } from './auth.ts';
 
 type AdminPage = PageOf<typeof adminPage>;
-const RANK = { viewer: 1, editor: 2, admin: 3 } as const;
 
 /**
  * The admin pages this person may read (their role meets the page's
@@ -18,6 +17,6 @@ export async function readableAdminPages(staff: Staff): Promise<AdminPage[]> {
     (row) => readPage(adminPage, { ...row, contentType: adminPage.name, panels: [] }, { status: 'draft' }).page,
   );
   return pages
-    .filter((page) => RANK[staff.role] >= RANK[page.boxes.settings.readers])
+    .filter((page) => roleAtLeast(staff.role, page.boxes.settings.readers))
     .sort((first, second) => (first.boxes.settings.menuPosition ?? 999) - (second.boxes.settings.menuPosition ?? 999) || first.title.localeCompare(second.title));
 }

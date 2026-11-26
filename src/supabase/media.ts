@@ -222,6 +222,7 @@ export async function deleteMedia(service: SupabaseClient, id: string, options: 
     if (error.code === 'CE409') {
       const { data: row } = await service.from('cera_media').select('path').eq('id', id).maybeSingle();
       const usedBy = row ? await mediaUsage(service, String((row as { path: string }).path)) : [];
+      if (usedBy.length === 0) return { ok: false, message: 'A version that’s scheduled or waiting for approval uses this file.', usedBy };
       return { ok: false, message: 'A page uses this file. Remove it from those pages first.', usedBy };
     }
     fail(error);
@@ -287,6 +288,7 @@ export async function replaceMedia(service: SupabaseClient, replace: MediaReplac
     await bucket.remove([path]);
     if (error.code === '42501') return { ok: false, message: 'Your account can’t change media.' };
     if (error.code === 'CE404') return { ok: false, message: 'That file isn’t in the library any more.' };
+    if (error.code === 'CE423') return { ok: false, message: 'A live page that needs approval uses this file, so replacing it needs someone who can approve that page.' };
     if (error.code === 'CE409') return { ok: false, message: 'Replace an image with an image, and a video with a video.' };
     fail(error);
   }

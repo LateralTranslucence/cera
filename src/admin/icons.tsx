@@ -27,6 +27,12 @@ const PATHS = {
       <path d="M18 14.5a6.5 6.5 0 0 1 3.5 5.5" />
     </>
   ),
+  approvals: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12.5l2.7 2.7L16 9.8" />
+    </>
+  ),
   account: (
     <>
       <circle cx="12" cy="8" r="4" />
@@ -125,6 +131,13 @@ const PATHS = {
       <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5" />
       <path d="M3.5 3.5v5h5" />
       <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  sliders: (
+    <>
+      <path d="M4 7h9M19 7h1M4 17h1M11 17h9" />
+      <circle cx="16" cy="7" r="2.5" />
+      <circle cx="8" cy="17" r="2.5" />
     </>
   ),
   settings: (

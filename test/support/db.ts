@@ -51,7 +51,7 @@ export async function createTestDb(): Promise<PGlite> {
   return db;
 }
 
-export async function addUser(db: PGlite, role: 'admin' | 'editor' | 'viewer' | null): Promise<string> {
+export async function addUser(db: PGlite, role: 'admin' | 'editor' | 'author' | 'viewer' | null): Promise<string> {
   const id = crypto.randomUUID();
   await db.query('insert into auth.users (id, raw_app_meta_data) values ($1, $2)', [id, role ? { cera_role: role } : {}]);
   return id;

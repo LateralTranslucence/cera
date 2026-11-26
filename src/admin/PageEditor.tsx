@@ -17,7 +17,9 @@ import type { FieldMap, OptionsContext } from '../fields.ts';
 import { checkPage, type PageIssue, type SaveMode, type StoredPage } from '../document.ts';
 import { upgradePanel, type StoredPanel } from '../migrate.ts';
 import type { AnyPanel } from '../panel.ts';
+import { approverWithArticle, type ApprovalRights, type PageApproval, type PageRights } from '../approvals.ts';
 import type { DeletePageResult, PageLink, PageRevision, PageSchedule, SaveResult } from '../supabase/index.ts';
+import { ApprovalCard, ApprovalEvents, DecideDialog, SubmitDialog } from './ApprovalCard.tsx';
 import { Dialog } from './Dialog.tsx';
 import { FieldMapForm, IssueList, type FormContext } from './fields.tsx';
 import { GripIcon, Icon } from './icons.tsx';
@@ -27,10 +29,21 @@ import { duplicatePanel, humanize, issuesAt, moveItem, newPanel, panelName, remo
 export interface SaveInput {
   page: StoredPage;
   expectedVersion: number;
-  /** 'schedule' saves and makes this version go live at `publishAt`. */
-  mode: SaveMode | 'schedule';
+  /**
+   * 'schedule' saves and makes this version go live at `publishAt`; 'submit'
+   * saves and asks for this version to be approved (`publishAt`: when the
+   * submitter would like it live).
+   */
+  mode: SaveMode | 'schedule' | 'submit';
   publishAt?: string;
+  /** 'submit': a note to whoever approves it. */
+  note?: string;
 }
+
+/** What `onDecide` returns: the outcome, and the page's request as it is now. */
+export type EditorDecision =
+  | { ok: true; outcome: 'approved' | 'published' | 'scheduled' | 'sent_back'; approval: PageApproval | null }
+  | { ok: false; reason: string; message: string };
 
 export interface PageEditorProps {
   contentType: AnyContentType;
@@ -74,6 +87,16 @@ export interface PageEditorProps {
   controls?: FormContext['controls'];
   /** Viewers can look but not save. */
   readOnly?: boolean;
+  /** What the signed-in person may do (see `pageRights`). Default: everything but submitting. */
+  rights?: PageRights;
+  /** The page's approval request. */
+  approval?: PageApproval | null;
+  /** What they may do about it (see `approvalRights`). */
+  approvalRights?: ApprovalRights;
+  /** Approves the request or sends it back (a server action that calls `decideApproval`). */
+  onDecide?: (input: { approvalId: string; decision: 'approve' | 'send_back'; publishAt?: string; comment?: string }) => Promise<EditorDecision>;
+  /** Takes their own request back (a server action that calls `withdrawApproval`). */
+  onWithdraw?: (approvalId: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   /** Loads saved versions, newest first (older than `before` when given). Shows History in Page settings. */
   loadHistory?: (before?: number) => Promise<PageRevision[]>;
   /** Restores an old version as a new draft (a server action that calls `restoreRevision`). */
@@ -87,7 +110,17 @@ export interface PageEditorProps {
 }
 
 type Status = { tone: 'info' | 'success' | 'error'; text: string; reload?: boolean } | null;
-type Dialogs = 'unpublish' | 'schedule' | 'add' | 'history' | 'delete' | null;
+type Dialogs = 'unpublish' | 'schedule' | 'add' | 'history' | 'delete' | 'submit' | 'approve' | 'send_back' | null;
+
+const ALL_RIGHTS: PageRights = { edit: true, publish: true, submit: false, unpublish: true, remove: true };
+const NO_APPROVAL_RIGHTS: ApprovalRights = { decide: false, final: false, withdraw: false };
+/** How a save reads in a status line: "Not published.", "Publishing…". */
+const SAVE_WORDS: Record<SaveInput['mode'], { done: string; doing: string }> = {
+  draft: { done: 'saved', doing: 'Saving…' },
+  publish: { done: 'published', doing: 'Publishing…' },
+  schedule: { done: 'scheduled', doing: 'Scheduling…' },
+  submit: { done: 'submitted', doing: 'Submitting…' },
+};
 
 /** How many versions the History dialog loads at a time. */
 const HISTORY_PAGE = 30;
@@ -144,6 +177,11 @@ export function PageEditor({
   icons,
   controls,
   readOnly = false,
+  rights = ALL_RIGHTS,
+  approval: initialApproval = null,
+  approvalRights: initialApprovalRights = NO_APPROVAL_RIGHTS,
+  onDecide,
+  onWithdraw,
   loadHistory,
   onRestore,
   onDelete,
@@ -167,6 +205,8 @@ export function PageEditor({
   const [published, setPublished] = useState(initialPublished);
   const [unpublished, setUnpublished] = useState(initialUnpublished);
   const [schedule, setSchedule] = useState(initialSchedule);
+  const [approval, setApproval] = useState(initialApproval);
+  const [approvalRights, setApprovalRights] = useState(initialApprovalRights);
   const [savedAt, setSavedAt] = useState(updatedAt);
   const [issues, setIssues] = useState<PageIssue[]>([]);
   const [status, setStatus] = useState<Status>(null);
@@ -225,21 +265,21 @@ export function PageEditor({
   const pageRef = useRef(page);
   pageRef.current = page;
 
-  const save = (mode: SaveInput['mode'], publishAt?: string) => {
+  const save = (mode: SaveInput['mode'], publishAt?: string, note?: string) => {
     // The same checks the server runs, first, so errors show without a round trip. The server checks again.
     const check = checkPage(contentType, page, mode === 'draft' ? 'draft' : 'publish');
     if (!check.ok) {
       setIssues(check.issues);
-      setStatus({ tone: 'error', text: `Not ${mode === 'publish' ? 'published' : mode === 'schedule' ? 'scheduled' : 'saved'}. Fix the errors below.` });
+      setStatus({ tone: 'error', text: `Not ${SAVE_WORDS[mode].done}. Fix the errors below.` });
       setOpen((previous) => new Set(previous).add(SETTINGS));
       return;
     }
     // Outside the transition, so it shows immediately (updates inside a transition are held back until it finishes).
-    setStatus({ tone: 'info', text: mode === 'publish' ? 'Publishing…' : mode === 'schedule' ? 'Scheduling…' : 'Saving…' });
+    setStatus({ tone: 'info', text: SAVE_WORDS[mode].doing });
     const sent = page;
     startSaving(async () => {
       try {
-        const result = await onSave({ page: sent, expectedVersion: version, mode, ...(publishAt && { publishAt }) });
+        const result = await onSave({ page: sent, expectedVersion: version, mode, ...(publishAt && { publishAt }), ...(note && { note }) });
         setIssues(result.issues);
         if (result.ok) {
           setVersion(result.version);
@@ -252,6 +292,12 @@ export function PageEditor({
             setUnpublished(published);
             if (mode === 'schedule' && publishAt) setSchedule({ at: publishAt, version: result.version });
           }
+          // Publishing or scheduling replaces a request; submitting makes one of their own.
+          if (mode === 'publish' || mode === 'schedule') setApproval(null);
+          if (mode === 'submit') {
+            setApproval(result.approval ?? null);
+            setApprovalRights({ decide: false, final: false, withdraw: true });
+          }
           // Show what was stored (sanitized rich text, filled-in defaults), unless
           // the editor kept typing during the save: then keep their newer edits.
           if (pageRef.current === sent) {
@@ -263,6 +309,8 @@ export function PageEditor({
           const done =
             mode === 'publish'
               ? 'Published.'
+              : mode === 'submit'
+              ? `Submitted${result.approval ? ` to ${approverWithArticle(result.approval.awaiting)}` : ''} for approval.`
               : mode === 'schedule' && publishAt
                 ? `Scheduled to publish ${formatScheduled(publishAt)}. Changes you make now wait for the next publish.`
                 : published
@@ -272,7 +320,7 @@ export function PageEditor({
           onSaved?.(result, mode);
           return;
         }
-        const verb = mode === 'publish' ? 'published' : mode === 'schedule' ? 'scheduled' : 'saved';
+        const verb = SAVE_WORDS[mode].done;
         switch (result.reason) {
           case 'invalid':
             setStatus({ tone: 'error', text: `Not ${verb}. Fix the errors below.` });
@@ -292,7 +340,10 @@ export function PageEditor({
             setStatus({ tone: 'error', text: `This ${noun} no longer exists.` });
             break;
           case 'bad-time':
-            setStatus({ tone: 'error', text: 'Not scheduled. Pick a time in the future.' });
+            setStatus({ tone: 'error', text: `Not ${verb}. Pick a time in the future.` });
+            break;
+          case 'needs-approval':
+            setStatus({ tone: 'error', text: `Not ${verb}. Someone has to approve ${nouns} now. Reload to submit it.`, reload: true });
             break;
         }
       } catch (error) {
@@ -314,6 +365,60 @@ export function PageEditor({
         setStatus({ tone: 'success', text: `Unpublished. The ${noun} is no longer on the live site.` });
       } catch (error) {
         setStatus({ tone: 'error', text: `Unpublish failed: ${error instanceof Error ? error.message : String(error)}` });
+      }
+    });
+  };
+
+  const decide = (decision: 'approve' | 'send_back', input: { comment: string; publishAt?: string }) => {
+    if (!onDecide || !approval) return;
+    const decided = approval;
+    setDialog(null);
+    setStatus({ tone: 'info', text: decision === 'approve' ? 'Approving…' : 'Sending it back…' });
+    startSaving(async () => {
+      try {
+        const result = await onDecide({ approvalId: decided.id, decision, ...input });
+        if (!result.ok) {
+          setStatus({ tone: 'error', text: result.message, reload: result.reason === 'decided' });
+          return;
+        }
+        setApproval(result.approval);
+        // Whatever happens to it next isn't theirs to decide.
+        setApprovalRights(NO_APPROVAL_RIGHTS);
+        if (result.outcome === 'published') {
+          setPublished(true);
+          setUnpublished(version !== decided.version);
+          setSchedule(undefined);
+        }
+        if (result.outcome === 'scheduled' && input.publishAt) setSchedule({ at: input.publishAt, version: decided.version });
+        setStatus({
+          tone: 'success',
+          text: {
+            approved: `Approved. It now waits for ${approverWithArticle(result.approval?.awaiting)}.`,
+            published: `Approved. Version ${decided.version} is live.`,
+            scheduled: `Approved. Version ${decided.version} goes live ${input.publishAt ? formatScheduled(input.publishAt) : 'as scheduled'}.`,
+            sent_back: 'Sent back.',
+          }[result.outcome],
+        });
+      } catch (error) {
+        setStatus({ tone: 'error', text: `That didn’t work: ${error instanceof Error ? error.message : String(error)}` });
+      }
+    });
+  };
+
+  const withdraw = () => {
+    if (!onWithdraw || !approval) return;
+    const withdrawn = approval;
+    startSaving(async () => {
+      try {
+        const result = await onWithdraw(withdrawn.id);
+        if (!result.ok) {
+          setStatus({ tone: 'error', text: result.message, reload: true });
+          return;
+        }
+        setApproval(null);
+        setStatus({ tone: 'success', text: 'Withdrawn. Submit it again when it’s ready.' });
+      } catch (error) {
+        setStatus({ tone: 'error', text: `Couldn’t withdraw it: ${error instanceof Error ? error.message : String(error)}` });
       }
     });
   };
@@ -487,6 +592,15 @@ export function PageEditor({
   };
 
   const previewUrl = previewHref && version > 0 ? previewHref(page.slug) : undefined;
+  // The same content is already waiting: nothing new to submit.
+  const waiting = approval?.status === 'pending' && approval.version === version && !dirty;
+  const canSubmit = rights.submit && !waiting && !(published && !changes);
+  const canPublish = !readOnly && publishable && rights.publish;
+  const canSchedule = canPublish && Boolean(onCancelSchedule);
+  const canUnpublish = !readOnly && published && rights.unpublish && Boolean(onUnpublish);
+  // Someone who can neither publish nor submit (an author, where nothing needs approval) only saves.
+  const onlySaves = !publishable || (!rights.publish && !rights.submit);
+  const submitLabel = approval?.status === 'pending' ? 'Submit again' : 'Submit for approval';
   const openSchedule = () => {
     setScheduleAt(schedule ? toLocalInput(new Date(schedule.at)) : defaultScheduleTime());
     setDialog('schedule');
@@ -503,7 +617,7 @@ export function PageEditor({
         )}
         <div className="cera-topbar__title">
           <h1>{page.title || `Untitled ${noun}`}</h1>
-          <StateLine noun={noun} version={version} published={published} publishable={publishable} changes={changes} schedule={schedule} onCancelSchedule={!readOnly && onCancelSchedule ? cancelSchedule : undefined} />
+          <StateLine noun={noun} version={version} published={published} publishable={publishable} changes={changes} schedule={schedule} approval={approval} onCancelSchedule={!readOnly && rights.unpublish && onCancelSchedule ? cancelSchedule : undefined} />
         </div>
         <div className="cera-topbar__actions">
           {!readOnly && (
@@ -511,7 +625,7 @@ export function PageEditor({
               {saving ? 'Saving…' : dirty ? 'Unsaved changes' : version > 0 && savedAt ? `Saved ${formatWhen(savedAt).toLowerCase()}` : ''}
             </span>
           )}
-          {!readOnly && published && onUnpublish && (
+          {canUnpublish && (
             <>
               <button type="button" className="cera-button cera-button--lg cera-button--danger cera-topbar__wide" disabled={saving} onClick={openUnpublish}>
                 Unpublish
@@ -525,17 +639,17 @@ export function PageEditor({
               Preview
             </a>
           )}
-          {!readOnly && !publishable && (
+          {!readOnly && onlySaves && (
             <button type="button" className="cera-button cera-button--lg cera-button--primary" disabled={saving || (!dirty && version > 0)} onClick={() => save('draft')}>
-              Save
+              {publishable ? 'Save draft' : 'Save'}
             </button>
           )}
-          {!readOnly && publishable && (
+          {!readOnly && !onlySaves && (
             <>
               <button type="button" className="cera-button cera-button--lg cera-topbar__wide" disabled={saving || (!dirty && version > 0)} onClick={() => save('draft')}>
                 Save draft
               </button>
-              {onCancelSchedule && (
+              {canSchedule && (
                 <button type="button" className="cera-button cera-button--lg cera-topbar__wide" disabled={saving} onClick={openSchedule}>
                   <Icon name="clock" />
                   Schedule
@@ -547,16 +661,21 @@ export function PageEditor({
           {publishable && (
             <ActionsMenu
               actions={[
-                ...(!readOnly ? [{ label: 'Save draft', disabled: saving || (!dirty && version > 0), onSelect: () => save('draft') }] : []),
-                ...(!readOnly && onCancelSchedule ? [{ label: 'Schedule', disabled: saving, onSelect: openSchedule }] : []),
+                ...(!readOnly && !onlySaves ? [{ label: 'Save draft', disabled: saving || (!dirty && version > 0), onSelect: () => save('draft') }] : []),
+                ...(canSchedule ? [{ label: 'Schedule', disabled: saving, onSelect: openSchedule }] : []),
                 ...(previewUrl ? [{ label: 'Preview', href: previewUrl }] : []),
-                ...(!readOnly && published && onUnpublish ? [{ label: 'Unpublish', danger: true, disabled: saving, onSelect: openUnpublish }] : []),
+                ...(canUnpublish ? [{ label: 'Unpublish', danger: true, disabled: saving, onSelect: openUnpublish }] : []),
               ]}
             />
           )}
-          {!readOnly && publishable && (
+          {canPublish && (
             <button type="button" className="cera-button cera-button--lg cera-button--primary" disabled={saving || (published && !changes)} onClick={() => save('publish')}>
               {published ? 'Publish changes' : 'Publish'}
+            </button>
+          )}
+          {!readOnly && publishable && rights.submit && (
+            <button type="button" className="cera-button cera-button--lg cera-button--primary" disabled={saving || !canSubmit} onClick={() => setDialog('submit')}>
+              {submitLabel}
             </button>
           )}
         </div>
@@ -574,6 +693,20 @@ export function PageEditor({
               </button>
             )}
           </p>
+        )}
+
+        {approval && (
+          <ApprovalCard
+            approval={approval}
+            rights={approvalRights}
+            noun={noun}
+            newer={dirty || version !== approval.version}
+            canPublish={canPublish}
+            previewHref={previewHref?.(page.slug, { pageId: page.id, version: approval.version })}
+            busy={saving}
+            {...(onDecide && { onApprove: () => setDialog('approve'), onSendBack: () => setDialog('send_back') })}
+            {...(onWithdraw && { onWithdraw: withdraw })}
+          />
         )}
 
         {/* Page settings: title, address and the content type's boxes. */}
@@ -628,7 +761,7 @@ export function PageEditor({
               <FieldMapForm fields={fields} value={page.boxes[name]} onChange={(boxValue) => update(setIn(page, ['boxes', name], boxValue))} path={['boxes', name]} context={context} />
             </div>
           ))}
-          {version > 0 && (loadHistory || (!readOnly && onDelete)) && (
+          {version > 0 && (loadHistory || (!readOnly && rights.remove && onDelete)) && (
             <div className="cera-panel-card__group cera-settings-actions">
               {loadHistory && (
                 <button type="button" className="cera-button" onClick={openHistory}>
@@ -636,7 +769,7 @@ export function PageEditor({
                   History
                 </button>
               )}
-              {!readOnly && onDelete && (
+              {!readOnly && rights.remove && onDelete && (
                 <button type="button" className="cera-button cera-button--danger" disabled={saving} onClick={openDelete}>
                   <Icon name="trash" />
                   Delete {noun}
@@ -808,6 +941,21 @@ export function PageEditor({
         </form>
       </Dialog>
 
+      <SubmitDialog
+        open={dialog === 'submit'}
+        onClose={() => setDialog(null)}
+        noun={noun}
+        replaces={approval?.status === 'pending'}
+        defaultTime={defaultScheduleTime}
+        onSubmit={({ note, publishAt }) => {
+          setDialog(null);
+          save('submit', publishAt, note);
+        }}
+      />
+      {approval && (dialog === 'approve' || dialog === 'send_back') && (
+        <DecideDialog open onClose={() => setDialog(null)} decision={dialog} approval={approval} rights={approvalRights} noun={noun} defaultTime={defaultScheduleTime} onDecide={(input) => decide(dialog, input)} />
+      )}
+
       <Dialog open={dialog === 'history'} onClose={() => setDialog(null)} title="Page history" wide>
         <p className="cera-note">
           Every save is kept. Restoring a version saves its content as a new draft{published ? `, and the live ${noun} stays as it is until you publish` : ''}. You can undo a
@@ -829,6 +977,7 @@ export function PageEditor({
                     {revisionKind(revision)} · {formatWhen(revision.createdAt)}
                     {revision.createdBy && ` by ${revision.createdBy}`}
                   </p>
+                  {revision.approval && <ApprovalEvents events={revision.approval.filter((event) => event.action !== 'submitted' || event.comment)} />}
                   {(revision.title !== page.title || revision.slug !== page.slug) && (
                     <p className="cera-history__diff">
                       {revision.title !== page.title && <span>Title: {revision.title || 'Untitled'}</span>}
@@ -921,6 +1070,8 @@ export function PageEditor({
 /** What kind of save a revision was, for the History dialog. */
 function revisionKind(revision: PageRevision): string {
   if (revision.restoredFrom !== undefined) return `Restored from version ${revision.restoredFrom}`;
+  // Whoever saved it only submitted it; the request's events, listed below it, say who approved it.
+  if (revision.kind === 'submit' || (revision.kind === 'publish' && revision.approval)) return 'Submitted for approval';
   if (revision.kind === 'publish') return 'Published';
   if (revision.kind === 'schedule' && revision.schedule) {
     const when = formatScheduled(revision.schedule.at);
@@ -941,6 +1092,7 @@ function StateLine({
   publishable,
   changes,
   schedule,
+  approval,
   onCancelSchedule,
 }: {
   noun: string;
@@ -949,8 +1101,15 @@ function StateLine({
   publishable: boolean;
   changes: boolean;
   schedule?: PageSchedule;
+  approval: PageApproval | null;
   onCancelSchedule?: () => void;
 }) {
+  const request = approval && (
+    <>
+      {' · '}
+      <span className="cera-state__changes">{approval.status === 'pending' ? `waiting for ${approverWithArticle(approval.awaiting)}` : 'sent back'}</span>
+    </>
+  );
   const cancel = onCancelSchedule && (
     <button type="button" className="cera-text-button" style={{ height: 28, padding: '0 6px', fontSize: 13 }} onClick={onCancelSchedule}>
       Cancel schedule
@@ -974,6 +1133,7 @@ function StateLine({
             {cancel}
           </>
         )}
+        {request}
       </span>
     );
   }
@@ -983,6 +1143,7 @@ function StateLine({
         <span className="cera-state__dot cera-state__dot--scheduled" aria-hidden="true" />
         <span suppressHydrationWarning>Scheduled for {formatScheduled(schedule.at)}</span>
         {cancel}
+        {request}
       </span>
     );
   }
@@ -990,6 +1151,7 @@ function StateLine({
     <span className="cera-state">
       <span className="cera-state__dot cera-state__dot--draft" aria-hidden="true" />
       {version === 0 ? `New ${noun}, not saved yet` : publishable ? 'Draft' : 'In the admin only'}
+      {request}
     </span>
   );
 }

@@ -7,7 +7,7 @@ export { createPreviewHandler, createExitPreviewHandler, previewSecret, previewe
 export { createSubmissionsExportHandler, type SubmissionsExportOptions } from './submissions.ts';
 export { PanelBoundary, type PanelBoundaryProps } from './PanelBoundary.tsx';
 export { createStaffAuth, type Staff, type StaffAuth, type StaffAuthOptions } from './auth.ts';
-export { createAdminActions, type AdminActions, type AdminActionsOptions, type PasswordState, type SignInState } from './admin-actions.ts';
+export { createAdminActions, type AdminActions, type AdminActionsOptions, type DecideResult, type PasswordState, type SignInState } from './admin-actions.ts';
 export { createCleanupHandler, type CleanupHandlerOptions } from './cleanup.ts';
 export { createAdminScreens, type AdminEditorProps, type AdminItem, type AdminScreens, type AdminScreensOptions, type ShellProps } from './admin-screens.tsx';
 export { defineViews, type DefinedViews, type ViewProps, type Views } from './views.ts';

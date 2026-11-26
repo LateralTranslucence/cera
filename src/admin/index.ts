@@ -3,7 +3,7 @@
  * 'use client' file (they take the content type, which holds functions).
  * Styles: import '@lateraltranslucence/cera/admin.css' in the admin layout.
  */
-export { PageEditor, type PageEditorProps, type SaveInput } from './PageEditor.tsx';
+export { PageEditor, type EditorDecision, type PageEditorProps, type SaveInput } from './PageEditor.tsx';
 export { FieldMapForm, IssueList, type CustomControlProps, type CustomControls, type FormContext, type PageOption, type PageQuery } from './fields.tsx';
 export * from './state.ts';
 export { GalleryInput, MediaInput, mediaReplacer, mediaUploader, type MediaContext } from './media.tsx';
@@ -15,3 +15,5 @@ export { CeraLockup, CeraSeal, Icon, type IconName } from './icons.tsx';
 export { PageList, PageStatus, formatScheduled, formatWhen, type PageListProps } from './PageList.tsx';
 export { ContentList, type ContentListProps } from './ContentList.tsx';
 export { SubmissionList, type SubmissionListProps } from './SubmissionList.tsx';
+export { ApprovalList, type ApprovalListItem } from './ApprovalList.tsx';
+export { ApprovalSettingsForm, approvalWarnings, type ApprovalSettingsFormProps, type ApprovalType } from './ApprovalSettingsForm.tsx';

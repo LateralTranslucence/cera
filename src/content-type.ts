@@ -51,9 +51,10 @@ export interface ContentTypeConfig<Name extends string, Boxes extends BoxMap, Pa
   /** A page's public URL. Defaults to `route` with `[slug]` filled in. */
   url?: (page: PageDocument<Name, Boxes, Panels>) => string;
   /**
-   * The roles that may create, edit, publish and delete pages of this type
-   * (theme: settings()['restrict_users']). Default: admins and editors. Only
-   * admins and editors can save at all, so listing `viewer` changes nothing.
+   * The roles that may write pages of this type (theme:
+   * settings()['restrict_users']). Default: admins, editors and authors.
+   * Viewers can never save, so listing `viewer` changes nothing, and authors
+   * never publish or delete (see `pageRights`).
    * The site's server actions enforce it (see `canEditContentType`).
    */
   editRoles?: readonly CeraRole[];

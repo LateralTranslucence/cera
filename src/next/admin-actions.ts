@@ -14,8 +14,10 @@
  *   …
  */
 import { redirect } from 'next/navigation';
+import { after } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AnyContentType } from '../content-type.ts';
+import { approvalRights, type ApprovalNotice, type ApprovalSettings, type PageApproval } from '../approvals.ts';
 import { canEditContentType, type CeraRole } from '../roles.ts';
 import type { PageOption, PageQuery } from '../admin/fields.tsx';
 import type { SaveInput } from '../admin/PageEditor.tsx';
@@ -25,10 +27,15 @@ import type { MediaDeleteResult, MediaItem, MediaQuery, MediaReplace, MediaRepla
 import {
   cancelSchedule,
   createCeraUser,
+  decideApproval,
   deleteMedia,
   deletePage,
   deleteSubmissions,
   finishMediaUpload,
+  getApprovalPage,
+  getApprovalSettings,
+  getPageApproval,
+  listCeraUsers,
   listMedia,
   listPages,
   mediaUsage,
@@ -37,15 +44,20 @@ import {
   prepareMediaUpload,
   replaceMedia,
   restoreRevision,
+  saveApprovalSettings,
   savePage,
   setCeraRole,
   unpublishPage,
   updateMedia,
+  withdrawApproval,
+  type ApprovalDecision,
   type CreateUserResult,
+  type DecisionResult,
   type DeletePageResult,
   type PageLink,
   type PageRevision,
   type SaveResult,
+  type SettingsResult,
   type UserResult,
 } from '../supabase/index.ts';
 import type { Staff } from './auth.ts';
@@ -62,9 +74,18 @@ export interface AdminActionsOptions {
   icons?: (client: SupabaseClient) => IconLibrary;
   /** Called after a change to the live site (publish, unpublish), e.g. pagesChanged() from ./next/cache. */
   liveChanged?: () => void;
+  /**
+   * Called after a page is submitted, passed to the next tier, approved or
+   * sent back, with the people to tell, e.g. to email them (see
+   * `approvalEmail`). Runs after the response has gone; an error is logged.
+   */
+  approvalChanged?: (notice: ApprovalNotice) => void | Promise<void>;
   /** Where signing in and out lead. Defaults `/admin` and `/admin/login`. */
   paths?: { afterSignIn?: string; signIn?: string };
 }
+
+/** A decision's outcome, with the page's request as it is now (null once approved). */
+export type DecideResult = (Extract<DecisionResult, { ok: true }> & { approval: PageApproval | null }) | Extract<DecisionResult, { ok: false }>;
 
 export type PasswordState = { ok?: boolean; error?: string };
 export type SignInState = { error?: string };
@@ -93,6 +114,46 @@ export function createAdminActions(options: AdminActionsOptions) {
     return member;
   }
 
+  /** Tells the people concerned about a request, once the response has gone. */
+  function notify(member: Staff, contentType: AnyContentType, pageId: string, notice: Pick<ApprovalNotice, 'action' | 'version' | 'comment' | 'at'>, submittedBy?: string): void {
+    const tell = options.approvalChanged;
+    if (!tell) return;
+    const task = async () => {
+      try {
+        const service = serviceClient();
+        const [users, approval, page] = await Promise.all([
+          listCeraUsers(service),
+          getPageApproval(service, pageId),
+          service.from('cera_pages').select('title').eq('id', pageId).maybeSingle(),
+        ]);
+        const waiting = notice.action === 'submitted' || notice.action === 'approved';
+        // Decided or replaced since: whatever did that tells people itself.
+        if (waiting && approval?.status !== 'pending') return;
+        const settings = waiting ? (await getApprovalSettings(service)).settings : null;
+        const others = users.filter((user) => user.email && user.id !== member.user.id);
+        const approvers = waiting ? others.filter((user) => approvalRights(user, contentType, settings!, approval!).decide) : [];
+        // The tier it waits for; those above only when nobody has that role.
+        const tier = approvers.filter((user) => user.role === approval!.awaiting);
+        const recipients = !waiting ? others.filter((user) => user.id === submittedBy) : tier.length > 0 ? tier : approvers;
+        await tell({
+          ...notice,
+          page: { id: pageId, title: String((page.data as { title?: string } | null)?.title ?? ''), contentType: contentType.name, contentTypeLabel: contentType.label },
+          ...(member.user.email && { by: member.user.email }),
+          ...(waiting && { awaiting: approval!.awaiting }),
+          to: recipients.map((user) => user.email),
+        });
+      } catch (error) {
+        console.error('cera: approvalChanged failed', error);
+      }
+    };
+    try {
+      after(task);
+    } catch {
+      // Outside a Next request (a script, a test), straight away.
+      void task();
+    }
+  }
+
   function iconLibrary(client: SupabaseClient): IconLibrary {
     if (!options.icons) throw new Error('This site has no icon sets (createAdminActions: icons).');
     return options.icons(client);
@@ -100,19 +161,62 @@ export function createAdminActions(options: AdminActionsOptions) {
 
   return {
     /**
-     * Saves, publishes or schedules a page. The user id comes from the
-     * verified session, never from the request; savePage validates, and the
-     * database re-checks the user's role.
+     * Saves, submits, publishes or schedules a page. The user id comes from
+     * the verified session, never from the request; savePage validates, and
+     * the database re-checks the user's role and the approval settings.
      */
     async savePage(input: SaveInput): Promise<SaveResult> {
-      const { user, role } = await staff('editor');
+      const member = await staff('author');
+      const { user, role } = member;
       const contentType = byName(input.page?.contentType);
       if (!contentType) return { ok: false, reason: 'invalid', issues: [{ severity: 'error', code: 'invalid-page', path: ['contentType'], message: 'Unknown content type.' }] };
       if (!canEditContentType(role, contentType)) return { ok: false, reason: 'forbidden', message: notYours(contentType), issues: [] };
-      const result = await savePage(serviceClient(), contentType, input.page, { mode: input.mode, publishAt: input.publishAt, expectedVersion: input.expectedVersion, userId: user.id });
+      const result = await savePage(serviceClient(), contentType, input.page, { mode: input.mode, publishAt: input.publishAt, note: input.note, expectedVersion: input.expectedVersion, userId: user.id });
       // Publishing changes the live site; a draft save doesn't, so it keeps the cache.
       if (result.ok && input.mode === 'publish') liveChanged();
+      if (result.ok && input.mode === 'submit') {
+        notify(member, contentType, result.id, { action: 'submitted', version: result.version, comment: input.note, at: input.publishAt });
+        const approval = await getPageApproval(member.client, result.id);
+        return { ...result, ...(approval && { approval }) };
+      }
       return result;
+    },
+
+    /**
+     * Approves a page's request (passing it on, or publishing or scheduling
+     * the submitted version) or sends it back. The database checks the role
+     * against the approval settings.
+     */
+    async decideApproval(input: ApprovalDecision): Promise<DecideResult> {
+      const member = await staff('editor');
+      const request = await getApprovalPage(member.client, input?.approvalId);
+      const contentType = byName(request?.contentType);
+      if (!request || !contentType) return { ok: false, reason: 'not-found', message: 'This request no longer exists.' };
+      if (!canEditContentType(member.role, contentType)) return { ok: false, reason: 'forbidden', message: notYours(contentType) };
+      const result = await decideApproval(serviceClient(), input, { userId: member.user.id });
+      if (!result.ok) return result;
+      if (result.outcome === 'published') liveChanged();
+      notify(
+        member,
+        contentType,
+        result.pageId,
+        { action: result.outcome, version: result.version, comment: input.comment, ...(result.outcome === 'scheduled' && { at: input.publishAt }) },
+        request.submittedBy,
+      );
+      return { ...result, approval: await getPageApproval(member.client, result.pageId) };
+    },
+
+    /** Takes the signed-in user's own request back. */
+    async withdrawApproval(approvalId: string): Promise<{ ok: true } | Extract<DecisionResult, { ok: false }>> {
+      const { user } = await staff('author');
+      return withdrawApproval(serviceClient(), approvalId, { userId: user.id });
+    },
+
+    /** Saves the approval settings (admins only). Types this site doesn't have, or never publishes, are left out. */
+    async saveApprovalSettings(input: { settings: ApprovalSettings; expectedVersion: number }): Promise<SettingsResult> {
+      const { user } = await staff('admin');
+      const tiers = Object.fromEntries(Object.entries(input.settings?.tiers ?? {}).filter(([name]) => byName(name) && byName(name)!.publishable !== false));
+      return saveApprovalSettings(serviceClient(), { tiers, someoneElse: input.settings?.someoneElse === true }, { expectedVersion: Number(input.expectedVersion), userId: user.id });
     },
 
     /** The editor's page picker, read as the signed-in user: it never shows more than the page list does. */
@@ -178,7 +282,7 @@ export function createAdminActions(options: AdminActionsOptions) {
 
     /** Restores an old version as a new draft. */
     async restoreRevision(input: { pageId: string; contentType: string; version: number; expectedVersion: number }): Promise<SaveResult> {
-      const { user, role } = await staff('editor');
+      const { user, role } = await staff('author');
       // restoreRevision checks that the page really is this type.
       const contentType = byName(input.contentType);
       if (!contentType) return { ok: false, reason: 'not-found', message: 'Unknown content type.', issues: [] };
@@ -194,13 +298,13 @@ export function createAdminActions(options: AdminActionsOptions) {
 
     /** Media uploads, step one: a signed URL the browser uploads to. */
     async prepareMediaUpload(request: MediaUploadRequest): Promise<MediaUploadPrepared> {
-      await staff('editor');
+      await staff('author');
       return prepareMediaUpload(serviceClient(), request);
     },
 
     /** Media uploads, step two: checks what arrived and records it. */
     async finishMediaUpload(done: MediaUploadDone): Promise<MediaUploadResult> {
-      const { user } = await staff('editor');
+      const { user } = await staff('author');
       return finishMediaUpload(serviceClient(), done, { userId: user.id });
     },
 
