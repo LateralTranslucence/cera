@@ -5,6 +5,7 @@
  * browser; the list itself is read on the server as the signed-in user.
  */
 import { useMemo, useState, type ReactNode } from 'react';
+import { approverWithArticle } from '../approvals.ts';
 import type { PageSummary } from '../supabase/index.ts';
 import { Icon } from './icons.tsx';
 
@@ -27,7 +28,7 @@ export interface PageListProps {
   extra?: { label: string; render: (page: PageSummary) => ReactNode };
 }
 
-type Filter = 'all' | 'published' | 'drafts' | 'scheduled';
+type Filter = 'all' | 'published' | 'drafts' | 'scheduled' | 'approval';
 type Sort = 'updated' | 'title';
 
 const FILTERS: Array<{ value: Filter; label: string; test: (page: PageSummary) => boolean }> = [
@@ -35,6 +36,8 @@ const FILTERS: Array<{ value: Filter; label: string; test: (page: PageSummary) =
   { value: 'published', label: 'Published', test: (page) => page.published },
   { value: 'drafts', label: 'Drafts', test: (page) => !page.published },
   { value: 'scheduled', label: 'Scheduled', test: (page) => Boolean(page.schedule) },
+  // Shown only when something is waiting or was sent back.
+  { value: 'approval', label: 'In approval', test: (page) => Boolean(page.approval) },
 ];
 
 const day = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
@@ -78,6 +81,11 @@ export function PageStatus({ page }: { page: PageSummary }) {
       ) : page.unpublishedChanges ? (
         <span className="cera-flag">Unpublished changes</span>
       ) : null}
+      {page.approval && (
+        <span className={`cera-flag${page.approval.status === 'sent_back' ? ' cera-flag--danger' : ''}`}>
+          {page.approval.status === 'sent_back' ? 'Sent back' : `Waiting for ${approverWithArticle(page.approval.awaiting)}`}
+        </span>
+      )}
       {page.scheduleFailed && <span className="cera-flag cera-flag--danger">Scheduled publish failed</span>}
     </span>
   );
@@ -100,6 +108,8 @@ export function PageList({
   const [page, setPage] = useState(0);
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((option) => [option.value, pages.filter(option.test).length])) as Record<Filter, number>, [pages]);
+
+  const filters = FILTERS.filter((option) => option.value !== 'approval' || counts.approval > 0 || filter === 'approval');
 
   const shown = useMemo(() => {
     const words = search.toLowerCase().split(/\s+/).filter(Boolean);
@@ -126,7 +136,7 @@ export function PageList({
           <input id="cera-page-search" type="search" placeholder={slugs === 'path' ? 'Search by title or address' : 'Search by name or ID'} value={search} onChange={(event) => (setSearch(event.target.value), reset())} />
         </div>
         <div className="cera-segmented" role="group" aria-label="Status">
-          {FILTERS.map((option) => (
+          {filters.map((option) => (
             <button key={option.value} type="button" aria-pressed={filter === option.value} onClick={() => (setFilter(option.value), reset())}>
               {option.label} · {counts[option.value]}
             </button>
@@ -136,7 +146,7 @@ export function PageList({
         <label className="cera-sort cera-list-toolbar__status">
           <span className="cera-visually-hidden">Status</span>
           <select value={filter} onChange={(event) => (setFilter(event.target.value as Filter), reset())}>
-            {FILTERS.map((option) => (
+            {filters.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label} · {counts[option.value]}
               </option>

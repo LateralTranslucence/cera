@@ -5,12 +5,14 @@
  * signed-in user's role itself. A 'use server' file may only export async
  * functions, hence one wrapper per action.
  */
-import type { CeraRole, MediaQuery, MediaReplace, MediaUpdate, MediaUploadDone, MediaUploadRequest } from '@lateraltranslucence/cera';
+import type { ApprovalSettings, CeraRole, MediaQuery, MediaReplace, MediaUpdate, MediaUploadDone, MediaUploadRequest } from '@lateraltranslucence/cera';
 import type { PageQuery, SaveInput } from '@lateraltranslucence/cera/admin';
 import { createAdminActions, type PasswordState, type SignInState } from '@lateraltranslucence/cera/next';
 import { pagesChanged } from '@lateraltranslucence/cera/next/cache';
+import type { ApprovalDecision } from '@lateraltranslucence/cera/supabase';
 import { contentTypes } from '@/cera';
 import { requireStaff, userClient } from '@/lib/auth.ts';
+import { sendApprovalEmail } from '@/lib/email.ts';
 import { iconLibrary } from '@/lib/icons.ts';
 import { serviceClient } from '@/lib/supabase.ts';
 
@@ -23,10 +25,20 @@ const actions = createAdminActions({
   serviceClient,
   icons: (client) => iconLibrary(client, true),
   liveChanged: pagesChanged,
+  approvalChanged: sendApprovalEmail,
 });
 
 export async function savePageAction(input: SaveInput) {
   return actions.savePage(input);
+}
+export async function decideApprovalAction(input: ApprovalDecision) {
+  return actions.decideApproval(input);
+}
+export async function withdrawApprovalAction(approvalId: string) {
+  return actions.withdrawApproval(approvalId);
+}
+export async function saveApprovalSettingsAction(input: { settings: ApprovalSettings; expectedVersion: number }) {
+  return actions.saveApprovalSettings(input);
 }
 export async function findPagesAction(query: PageQuery) {
   return actions.findPages(query);

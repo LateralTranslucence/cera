@@ -19,7 +19,7 @@ export function canEdit(role: StaffRole): boolean {
   return roleAtLeast(role, 'editor');
 }
 
-/** Admins add people and set roles (the People page). */
+/** Admins add people, set roles (the People page) and change the settings. */
 export function canManagePeople(role: StaffRole): boolean {
   return role === 'admin';
 }

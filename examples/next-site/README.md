@@ -48,6 +48,7 @@ cd examples/next-site && node --env-file=.env.hosted --import tsx scripts/seed.t
 | `app/api/cera/search` | The Search panel's endpoint: `createSearchHandler` (live pages, or working copies in draft mode), with live results cached |
 | `app/api/cera/forms` | Where forms post: `createFormHandler` (token, honeypot, checks, rate limit), storing submissions with the secret key |
 | `app/admin/users`, `app/admin/account` | People (admins: add people, set roles) and Account (change your password) |
+| `app/admin/settings`, `app/admin/approvals` | Settings (admins: approval workflows per content type, in one tier or two) and Approvals (what's waiting, and for whom) |
 | `app/admin/actions.ts` | Server actions: one-line wrappers around the package's `createAdminActions` (save and publish with the user from the verified session, media, people, sign in and out), each checking the role itself |
 | `app/admin/preview` | Preview from the admin (`createPreviewHandler`): checks the session, enables draft mode; with `page` and `version`, an old version from History |
 | `app/api/draft` | Preview for external tools: `/api/draft?secret=…&slug=about` |

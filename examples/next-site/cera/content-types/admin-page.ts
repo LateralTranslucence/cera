@@ -38,7 +38,7 @@ export const adminPage = defineContentType({
       readers: field.select({
         label: 'Permissions',
         note: 'Who can read it in the admin.',
-        options: { viewer: 'Everyone with access', editor: 'Editors and admins', admin: 'Admins only' },
+        options: { viewer: 'Everyone with access', author: 'Authors, editors and admins', editor: 'Editors and admins', admin: 'Admins only' },
         default: 'editor',
       }),
       showInMenu: field.toggle({ label: 'Show In Menu', default: true, note: 'Lists it under Team in the sidebar.' }),

@@ -5,11 +5,12 @@
  *   - getPublishedPage: any client (anon is enough).
  *   - getPageForEditing / getDraftPage / listPages / pageHistory / pageLinks:
  *     a client signed in as a staff user (row-level security limits working
- *     copies to admin/editor/viewer).
+ *     copies to people with a Cera role).
  *   - savePage / unpublishPage / deletePage / restoreRevision: a service-role client, on the server only.
  *     `userId` must come from a verified session (e.g. supabase.auth.getUser()
- *     on the server), never from the request body. The database checks that
- *     this user is an admin or editor.
+ *     on the server), never from the request body. The database checks this
+ *     user's role (an author for drafts, an editor or admin for the rest) and
+ *     the content type's approval settings (see ./approvals.ts).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { pageUrl, type AnyContentType, type PageOf } from '../content-type.ts';
@@ -25,6 +26,8 @@ import {
 } from '../document.ts';
 import type { StoredPanel } from '../migrate.ts';
 
+import type { ApprovalEvent, ApproverRole, PageApproval } from '../approvals.ts';
+import { approvalComment, toApprovalEvents } from './approvals.ts';
 import { CeraDatabaseError, fail } from './errors.ts';
 
 export { mediaUrl } from '../media-url.ts';
@@ -42,6 +45,18 @@ export {
   type AddSubmissionResult,
   type Submission,
 } from './forms.ts';
+export {
+  decideApproval,
+  getApprovalPage,
+  getApprovalSettings,
+  getPageApproval,
+  pendingApprovals,
+  saveApprovalSettings,
+  withdrawApproval,
+  type ApprovalDecision,
+  type DecisionResult,
+  type SettingsResult,
+} from './approvals.ts';
 export { supabaseIcons } from './icons.ts';
 export { createSearchResolver, DEFAULT_SEARCH_ENDPOINT, searchableText, searchedTypes } from './search.ts';
 export { cleanUpUploads, deleteMedia, finishMediaUpload, listMedia, MEDIA_BUCKET, mediaPathFor, mediaUsage, prepareMediaUpload, replaceMedia, updateMedia } from './media.ts';
@@ -352,6 +367,8 @@ export interface PageSummary {
   schedule?: PageSchedule;
   /** Why the last scheduled publish didn't happen, if nothing newer is live. */
   scheduleFailed?: string;
+  /** Waiting for this role's approval, or sent back and not yet answered. */
+  approval?: { status: 'pending'; awaiting: ApproverRole } | { status: 'sent_back' };
 }
 
 type SummaryRow = {
@@ -368,6 +385,8 @@ type SummaryRow = {
   scheduled_for: string | null;
   scheduled_version: number | null;
   schedule_failed: string | null;
+  approval_status: 'pending' | 'sent_back' | null;
+  approval_awaiting: ApproverRole | null;
 };
 
 /** Working copies for the admin's page list, sorted by title. Staff client (row-level security). */
@@ -388,6 +407,8 @@ export async function listPages(client: SupabaseClient, options: { contentType?:
       unpublishedChanges: row.live_differs === true,
       ...(row.scheduled_for && row.scheduled_version !== null && { schedule: { at: row.scheduled_for, version: row.scheduled_version } }),
       ...(row.schedule_failed && { scheduleFailed: row.schedule_failed }),
+      ...(row.approval_status === 'pending' && { approval: { status: 'pending' as const, awaiting: row.approval_awaiting ?? 'editor' } }),
+      ...(row.approval_status === 'sent_back' && { approval: { status: 'sent_back' as const } }),
     }))
     .sort((first, second) => (first.title || first.slug).localeCompare(second.title || second.slug));
 }
@@ -397,10 +418,16 @@ export async function listPages(client: SupabaseClient, options: { contentType?:
 /* ------------------------------------------------------------------ */
 
 export interface SaveOptions {
-  /** 'schedule' validates like 'publish', saves, and makes this version go live at `publishAt`. */
-  mode: SaveMode | 'schedule';
-  /** For 'schedule': when the page goes live (an ISO time in the future). */
+  /**
+   * 'schedule' validates like 'publish', saves, and makes this version go
+   * live at `publishAt`. 'submit' validates like 'publish', saves, and asks
+   * for this version to be approved.
+   */
+  mode: SaveMode | 'schedule' | 'submit';
+  /** For 'schedule': when the page goes live (an ISO time in the future). For 'submit': when the submitter would like it to; optional. */
   publishAt?: string;
+  /** For 'submit': a note to whoever approves it. */
+  note?: string;
   /** 0 to create a page; otherwise the `version` from `getPageForEditing`. */
   expectedVersion: number;
   /** The signed-in user, from a verified server-side session. */
@@ -409,16 +436,29 @@ export interface SaveOptions {
 
 export type SaveResult =
   /** `page` is what was stored: defaults filled in, panels upgraded, rich text sanitized. */
-  | { ok: true; id: string; version: number; revisionId: string; page: StoredPage; issues: PageIssue[] }
+  | {
+      ok: true;
+      id: string;
+      version: number;
+      revisionId: string;
+      page: StoredPage;
+      issues: PageIssue[];
+      /** After a 'submit' through createAdminActions: the request. */
+      approval?: PageApproval;
+    }
   | { ok: false; reason: 'invalid'; issues: PageIssue[] }
-  | { ok: false; reason: 'conflict' | 'forbidden' | 'not-found' | 'slug-taken' | 'bad-time'; message: string; issues: PageIssue[] };
+  /** `needs-approval`: someone else has to approve pages of this type (`mode: 'submit'`). */
+  | { ok: false; reason: SaveFailure; message: string; issues: PageIssue[] };
 
-const REASONS: Record<string, 'conflict' | 'forbidden' | 'not-found' | 'slug-taken' | 'bad-time'> = {
+type SaveFailure = 'conflict' | 'forbidden' | 'not-found' | 'slug-taken' | 'bad-time' | 'needs-approval';
+
+const REASONS: Record<string, SaveFailure> = {
   CE409: 'conflict',
   '42501': 'forbidden',
   CE404: 'not-found',
   '23505': 'slug-taken',
   CE400: 'bad-time',
+  CE423: 'needs-approval',
 };
 
 /**
@@ -439,14 +479,28 @@ export async function savePage<Type extends AnyContentType>(
       issues: [{ severity: 'error', code: 'invalid-page', path: [], message: `${contentType.label} pages are never published; save them instead.` }],
     };
   }
-  const schedule = options.mode === 'schedule';
-  const publishAt = schedule ? new Date(String(options.publishAt ?? '')) : null;
+  const submit = options.mode === 'submit';
+  const publishAt = options.mode === 'schedule' || (submit && options.publishAt) ? new Date(String(options.publishAt ?? '')) : null;
   if (publishAt && (Number.isNaN(publishAt.getTime()) || publishAt.getTime() <= Date.now())) {
     return { ok: false, reason: 'bad-time', message: 'Pick a time in the future.', issues: [] };
   }
-  // A scheduled version must be ready to go live, so it's checked like a publish.
-  const prepared = await preparePageForSave(contentType, raw, { mode: schedule ? 'publish' : (options.mode as SaveMode) });
+  // A scheduled or submitted version must be ready to go live, so it's checked like a publish.
+  const prepared = await preparePageForSave(contentType, raw, { mode: options.mode === 'draft' ? 'draft' : 'publish' });
   if (!prepared.ok) return { ok: false, reason: 'invalid', issues: prepared.issues };
+
+  if (submit) {
+    const { data, error } = await client.rpc('cera_submit_page', {
+      p_page: forRpc(contentType, prepared.page),
+      p_expected_version: options.expectedVersion,
+      p_requested_for: publishAt?.toISOString() ?? null,
+      p_note: approvalComment(options.note),
+      p_user: options.userId,
+    });
+    // CE400 here: the type's approval was turned off (the time is checked above).
+    if (error?.code === 'CE400') return { ok: false, reason: 'forbidden', message: `${contentType.label} pages don’t need approval any more. Reload the page.`, issues: prepared.issues };
+    const saved = data as { id: string; version: number; revisionId: string } | null;
+    return finishSave(contentType, prepared, saved && { id: saved.id, version: saved.version, revisionId: saved.revisionId }, error, 'draft');
+  }
 
   const { data, error } = publishAt
     ? await client.rpc('cera_schedule_page', {
@@ -578,7 +632,7 @@ export async function pageLinks(client: SupabaseClient, pageId: string): Promise
 export interface PageRevision {
   version: number;
   /** How it was saved. A 'schedule' revision's `schedule` says whether it went live. */
-  kind: 'draft' | 'publish' | 'schedule';
+  kind: 'draft' | 'submit' | 'publish' | 'schedule';
   title: string;
   slug: string;
   /** This is the version on the live site now. */
@@ -589,6 +643,8 @@ export interface PageRevision {
   schedule?: { at: string; status: 'pending' | 'published' | 'cancelled' | 'failed' };
   /** Saved by restoring this older version. */
   restoredFrom?: number;
+  /** A submitted version: what happened to its request, oldest first. */
+  approval?: ApprovalEvent[];
 }
 
 type HistoryRow = {
@@ -602,6 +658,7 @@ type HistoryRow = {
   scheduled_for: string | null;
   schedule_status: 'pending' | 'published' | 'cancelled' | 'failed' | null;
   restored_from: number | null;
+  approval_events: unknown;
 };
 
 /**
@@ -621,6 +678,7 @@ export async function pageHistory(client: SupabaseClient, pageId: string, option
     ...(row.created_by_email && { createdBy: row.created_by_email }),
     ...(row.scheduled_for && row.schedule_status && { schedule: { at: row.scheduled_for, status: row.schedule_status } }),
     ...(row.restored_from !== null && { restoredFrom: row.restored_from }),
+    ...(row.approval_events !== null && { approval: toApprovalEvents(row.approval_events) }),
   }));
 }
 

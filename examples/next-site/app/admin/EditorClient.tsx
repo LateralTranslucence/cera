@@ -6,12 +6,13 @@
  * type; nothing here is per type.
  */
 import { useRouter } from 'next/navigation';
-import { adminNounOf, adminPathOf, adminTitleOf, pageUrl, type PageOf, type StoredPage } from '@lateraltranslucence/cera';
+import { adminNounOf, adminPathOf, adminTitleOf, pageUrl, type ApprovalRights, type PageApproval, type PageOf, type PageRights, type StoredPage } from '@lateraltranslucence/cera';
 import { mediaUploader, PageEditor } from '@lateraltranslucence/cera/admin';
 import type { PageSchedule } from '@lateraltranslucence/cera/supabase';
 import { backgroundColors, contentTypes } from '@/cera';
 import {
   cancelScheduleAction,
+  decideApprovalAction,
   deletePageAction,
   findMediaAction,
   findPagesAction,
@@ -24,6 +25,7 @@ import {
   savePageAction,
   searchIconsAction,
   unpublishPageAction,
+  withdrawApprovalAction,
 } from './actions.ts';
 
 const media = {
@@ -40,6 +42,9 @@ export function EditorClient({
   updatedAt,
   schedule,
   readOnly,
+  rights,
+  approval,
+  approvalRights,
 }: {
   page: StoredPage;
   version: number;
@@ -48,6 +53,9 @@ export function EditorClient({
   updatedAt?: string;
   schedule?: PageSchedule;
   readOnly: boolean;
+  rights: PageRights;
+  approval?: PageApproval | null;
+  approvalRights?: ApprovalRights;
 }) {
   const router = useRouter();
   const contentType = contentTypes.find((candidate) => candidate.name === page.contentType);
@@ -67,6 +75,20 @@ export function EditorClient({
       updatedAt={updatedAt}
       schedule={schedule}
       readOnly={readOnly}
+      rights={rights}
+      approval={approval}
+      approvalRights={approvalRights}
+      onDecide={async (input) => {
+        const result = await decideApprovalAction(input);
+        // Refresh the server-rendered sidebar (the Approvals count).
+        router.refresh();
+        return result;
+      }}
+      onWithdraw={async (approvalId) => {
+        const result = await withdrawApprovalAction(approvalId);
+        router.refresh();
+        return result;
+      }}
       onSave={savePageAction}
       findPages={findPagesAction}
       media={media}

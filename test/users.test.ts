@@ -69,7 +69,7 @@ test('the list puts people with access first, by role, then everyone else', asyn
       ['zed@cera.test', null],
     ],
   );
-  assert.deepEqual([...CERA_ROLES], ['admin', 'editor', 'viewer']);
+  assert.deepEqual([...CERA_ROLES], ['admin', 'editor', 'author', 'viewer']);
 });
 
 test('adding someone creates a confirmed account with the role and returns the password once', async () => {

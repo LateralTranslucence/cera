@@ -34,13 +34,16 @@ import {
   type AnyContentType,
 } from '../content-type.ts';
 import type { StoredPage } from '../document.ts';
-import { canEditContentType, roleAtLeast, type CeraRole } from '../roles.ts';
+import { approvalRights, pageRights, type ApprovalRights, type ApprovalSettings, type PageApproval, type PageRights } from '../approvals.ts';
+import { CERA_ROLES, canEditContentType, roleAtLeast, type CeraRole, type CeraUser } from '../roles.ts';
+import { ApprovalList } from '../admin/ApprovalList.tsx';
+import { ApprovalSettingsForm, type ApprovalSettingsFormProps } from '../admin/ApprovalSettingsForm.tsx';
 import { AdminSidebar, type NavItem, type NavSection } from '../admin/AdminSidebar.tsx';
 import { ContentList } from '../admin/ContentList.tsx';
 import { Icon, type IconName } from '../admin/icons.tsx';
 import { formType } from '../forms/form-type.ts';
 import { iconType } from '../icons/icon-type.ts';
-import { getPageForEditing, listPages, submissionCounts, type PageSchedule } from '../supabase/index.ts';
+import { getApprovalSettings, getPageApproval, getPageForEditing, listPages, pendingApprovals, submissionCounts, type PageSchedule } from '../supabase/index.ts';
 import { supabaseIcons } from '../supabase/icons.ts';
 import type { Staff } from './auth.ts';
 
@@ -53,6 +56,11 @@ export interface AdminEditorProps {
   updatedAt?: string;
   schedule?: PageSchedule;
   readOnly: boolean;
+  /** What this person may do with the page, under the site's approval settings. */
+  rights: PageRights;
+  /** The page's approval request, and what this person may do about it. */
+  approval?: PageApproval | null;
+  approvalRights?: ApprovalRights;
 }
 
 /** A sidebar entry for one of the site's own screens. */
@@ -100,7 +108,7 @@ export interface ShellProps {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' } as const;
+const ROLE_NAMES = { admin: 'Admin', editor: 'Editor', author: 'Author', viewer: 'Viewer' } as const;
 
 export function createAdminScreens(options: AdminScreensOptions) {
   const basePath = options.basePath ?? '/admin';
@@ -248,13 +256,14 @@ export function createAdminScreens(options: AdminScreensOptions) {
   /** A new page of a type, unsaved until the editor's first save. */
   async function NewScreen({ path }: { path: string }) {
     const contentType = typeAt(path);
-    const staff = await requireStaff('editor');
+    const staff = await requireStaff('author');
     // Types limited to other roles (editRoles): back to their list.
     if (!canEditContentType(staff.role, contentType)) redirect(`${listHref(contentType)}?error=forbidden`);
+    const { settings } = await getApprovalSettings(staff.client);
     const page: StoredPage = { id: crypto.randomUUID(), contentType: contentType.name, slug: '', title: '', boxes: {}, panels: [] };
     return (
       <Shell staff={staff} active={path}>
-        <Editor page={page} version={0} published={false} readOnly={false} />
+        <Editor page={page} version={0} published={false} readOnly={false} rights={pageRights(staff.role, contentType, settings)} />
       </Shell>
     );
   }
@@ -267,6 +276,7 @@ export function createAdminScreens(options: AdminScreensOptions) {
     // Read as the signed-in user: row-level security decides what they can see.
     const editable = await getPageForEditing(staff.client, contentType, id);
     if (!editable) notFound();
+    const [{ settings }, approval] = await Promise.all([getApprovalSettings(staff.client), getPageApproval(staff.client, id)]);
     return (
       <Shell staff={staff} active={path} currentPageId={id}>
         <Editor
@@ -277,7 +287,91 @@ export function createAdminScreens(options: AdminScreensOptions) {
           updatedAt={editable.updatedAt}
           schedule={editable.schedule}
           readOnly={!canEditContentType(staff.role, contentType)}
+          rights={pageRights(staff.role, contentType, settings)}
+          approval={approval}
+          {...(approval && { approvalRights: approvalRights({ role: staff.role, id: staff.user.id }, contentType, settings, approval) })}
         />
+      </Shell>
+    );
+  }
+
+  /** Every request waiting for approval, those this person can decide first. */
+  async function ApprovalsScreen() {
+    const staff = await requireStaff();
+    const [{ settings }, requests] = await Promise.all([getApprovalSettings(staff.client), pendingApprovals(staff.client)]);
+    const items = requests.flatMap((request) => {
+      const contentType = options.contentTypes.find((candidate) => candidate.name === request.contentType);
+      if (!contentType || !roleAtLeast(staff.role, listRole(contentType))) return [];
+      const rights = approvalRights({ role: staff.role, id: staff.user.id }, contentType, settings, { status: 'pending', ...request });
+      return [
+        {
+          id: request.id,
+          title: request.title,
+          type: contentType.label,
+          href: `${listHref(contentType)}/${request.pageId}`,
+          awaiting: request.awaiting,
+          requestedFor: request.requestedFor,
+          submittedAt: request.submittedAt,
+          submittedBy: request.submittedBy?.email,
+          decide: rights.decide,
+          mine: request.submittedBy?.id === staff.user.id,
+        },
+      ];
+    });
+    return (
+      <Shell staff={staff} active="approvals">
+        <div className="cera-screen">
+          <div className="cera-screen__head">
+            <div>
+              <p className="cera-breadcrumb">Content</p>
+              <h1 className="cera-screen__title">Approvals</h1>
+            </div>
+          </div>
+          <ApprovalList items={items.sort((first, second) => Number(second.decide) - Number(first.decide))} />
+        </div>
+      </Shell>
+    );
+  }
+
+  /**
+   * The Approvals sidebar entry, for `items`: nothing while approval is off
+   * everywhere and nothing waits. Its count is what this person can decide.
+   */
+  async function approvalsItem(staff: Staff): Promise<AdminItem[]> {
+    const [{ settings }, requests] = await Promise.all([getApprovalSettings(staff.client), pendingApprovals(staff.client)]);
+    if (requests.length === 0 && !usesApproval(settings)) return [];
+    const count = requests.filter((request) => {
+      const contentType = options.contentTypes.find((candidate) => candidate.name === request.contentType);
+      return contentType && approvalRights({ role: staff.role, id: staff.user.id }, contentType, settings, { status: 'pending', ...request }).decide;
+    }).length;
+    return [{ key: 'approvals', section: 'Content', label: 'Approvals', href: `${basePath}/approvals`, icon: 'approvals', ...(count > 0 && { count }) }];
+  }
+
+  const usesApproval = (settings: ApprovalSettings) => options.contentTypes.some((contentType) => contentType.publishable !== false && (settings.tiers[contentType.name]?.length ?? 0) > 0);
+
+  /** The site's settings (admins only): approval workflows. `users` (listCeraUsers) lets it point out workflows nobody could finish. */
+  async function SettingsScreen({ save, users }: { save: ApprovalSettingsFormProps['onSave']; users?: CeraUser[] }) {
+    const staff = await requireStaff('admin');
+    const { settings, version } = await getApprovalSettings(staff.client);
+    return (
+      <Shell staff={staff} active="settings">
+        <div className="cera-screen">
+          <div className="cera-screen__head">
+            <div>
+              <p className="cera-breadcrumb">Site</p>
+              <h1 className="cera-screen__title">Settings</h1>
+            </div>
+          </div>
+          <ApprovalSettingsForm
+            settings={settings}
+            version={version}
+            types={options.contentTypes
+              .filter((contentType) => contentType.publishable !== false)
+              .map((contentType) => ({ name: contentType.name, title: adminTitleOf(contentType), ...(contentType.editRoles && { editRoles: contentType.editRoles }) }))}
+            {...(users && { people: Object.fromEntries(CERA_ROLES.map((role) => [role, users.filter((user) => user.role === role).length])) })}
+            onSave={save}
+          />
+        </div>
       </Shell>
     );
   }
@@ -293,7 +387,7 @@ export function createAdminScreens(options: AdminScreensOptions) {
   /** The first content type's list: where the admin's home sends people. */
   const homePath = `${basePath}/${adminPathOf(options.contentTypes[0]!)}`;
 
-  return { Shell, ListScreen, NewScreen, EditScreen, metadataFor, listHref, homePath };
+  return { Shell, ListScreen, NewScreen, EditScreen, ApprovalsScreen, SettingsScreen, approvalsItem, metadataFor, listHref, homePath };
 }
 
 export type AdminScreens = ReturnType<typeof createAdminScreens>;
