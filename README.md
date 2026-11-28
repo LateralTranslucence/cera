@@ -74,7 +74,7 @@ git tag v0.3.0
 git push origin v0.3.0
 ```
 
-The workflow signs in to npm with npm's trusted publishing, so there's no token or secret: on npmjs.com, each package's settings name this repository and `release.yml` as a trusted publisher.
+The workflow signs in to npm with npm's trusted publishing, so there's no token or secret: on npmjs.com, each package's settings name this repository and `release.yml` as a trusted publisher, with "Allow npm publish" ticked (new publishers allow only staged publishes until it is).
 
 The workflow checks the tag is a version and on `main`, runs the tests, sets both packages to that version, builds them and publishes them. The `package.json` versions in the repository stay at 0.0.0: the tag is the version. A pre-release (`v0.4.0-beta.1`) is published under `next`, so `@latest` never installs it.
 

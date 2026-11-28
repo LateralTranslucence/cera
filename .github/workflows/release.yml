@@ -11,10 +11,10 @@ name: Release
 #
 # npm sign-in: npm's trusted publishing, configured for both packages on
 # npmjs.com for this repository and release.yml. No token or secret: npm
-# trades the workflow's OIDC identity for a short-lived one. Nothing may set
-# NODE_AUTH_TOKEN, not even to an empty value (as setup-node's registry-url
-# or an unset secret would), or npm uses that instead and the publish is
-# refused ("OIDC permission denied").
+# trades the workflow's OIDC identity for a short-lived one, so the workflow
+# sets no NODE_AUTH_TOKEN and no registry-url. Each trusted publisher must
+# have "Allow npm publish" ticked: new ones allow only staged publishes, and
+# the publish is then refused ("OIDC permission denied for this action").
 on:
   push:
     tags: ['v*']
